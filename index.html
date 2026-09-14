@@ -86,32 +86,43 @@
     :root{--neo-frame-reserve:210px}
     .neo-browser-frame-wrap{height:min(calc(100vh - var(--neo-frame-reserve)),820px)!important;max-height:calc(100vh - var(--neo-frame-reserve))!important;min-height:320px!important}
 
-    /* Browser icon: white by default */
-    a[href="/Browser"] svg.neo-sidebar-browser-icon,
-    a[href="/Browser"] svg.neo-sidebar-browser-icon *,
-    a[href="/Browser"] svg {
+    /* Browser icon colors driven by html[data-neo-page] set by script below */
+    html:not([data-neo-page="Browser"]) a[href="/Browser"] svg,
+    html:not([data-neo-page="Browser"]) a[href="/Browser"] svg * {
       color: #ffffff !important;
       stroke: #ffffff !important;
       fill: none !important;
     }
-
-    /* Browser icon: red ONLY when active (same as Movies) */
-    a[href="/Browser"].text-accent svg.neo-sidebar-browser-icon,
-    a[href="/Browser"].text-accent svg.neo-sidebar-browser-icon *,
-    a[href="/Browser"].text-accent svg,
-    a[href="/Browser"].text-accent svg *,
-    a[href="/Browser"][class*="text-accent"] svg,
-    a[href="/Browser"][class*="text-accent"] svg *,
-    a[href="/Browser"][class*="bg-accent"] svg,
-    a[href="/Browser"][class*="bg-accent"] svg * {
-      color: hsl(var(--accent)) !important;
-      stroke: hsl(var(--accent)) !important;
+    html[data-neo-page="Browser"] a[href="/Browser"] svg,
+    html[data-neo-page="Browser"] a[href="/Browser"] svg * {
+      color: hsl(var(--accent, 0 80% 55%)) !important;
+      stroke: hsl(var(--accent, 0 80% 55%)) !important;
       fill: none !important;
     }
   </style>
 </head><body class="has-top-ad">
   <div id="root"></div>
   <div id="custom-cursor"><div class="cursor-halo-ring r1"></div><div class="cursor-halo-ring r2"></div><div class="cursor-halo-ring r3"></div></div>
+  <script>
+    /* Keep html[data-neo-page] in sync with the current route so CSS can style the Browser icon */
+    (function () {
+      function pageName() {
+        var seg = (location.pathname || '/').split('/').filter(Boolean)[0] || 'home';
+        return seg;
+      }
+      function sync() {
+        document.documentElement.setAttribute('data-neo-page', pageName());
+      }
+      sync();
+      var _push = history.pushState.bind(history);
+      var _replace = history.replaceState.bind(history);
+      history.pushState = function () { _push.apply(null, arguments); sync(); };
+      history.replaceState = function () { _replace.apply(null, arguments); sync(); };
+      window.addEventListener('popstate', sync);
+      // Also re-sync after React finishes routing
+      setInterval(sync, 400);
+    })();
+  </script>
   <script>
     (function(){
       var cursor=document.getElementById('custom-cursor'); if(!cursor)return;
