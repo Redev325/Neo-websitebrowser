@@ -85,6 +85,20 @@
     html.neo-native-cursor #custom-cursor{display:none!important}
     :root{--neo-frame-reserve:210px}
     .neo-browser-frame-wrap{height:min(calc(100vh - var(--neo-frame-reserve)),820px)!important;max-height:calc(100vh - var(--neo-frame-reserve))!important;min-height:320px!important}
+
+    /* Browser sidebar icon: force red when active (matches Movies icon) */
+    a[href="/Browser"].text-accent svg.neo-sidebar-browser-icon,
+    a[href="/Browser"].text-accent svg.neo-sidebar-browser-icon *,
+    a[href="/Browser"].bg-accent\/15 svg.neo-sidebar-browser-icon,
+    a[href="/Browser"].bg-accent\/15 svg.neo-sidebar-browser-icon *,
+    a[href="/Browser"][class*="bg-accent"] svg.neo-sidebar-browser-icon,
+    a[href="/Browser"][class*="bg-accent"] svg.neo-sidebar-browser-icon *,
+    a[href="/Browser"][class*="text-accent"] svg,
+    a[href="/Browser"][class*="text-accent"] svg * {
+      color: hsl(var(--accent)) !important;
+      stroke: hsl(var(--accent)) !important;
+      fill: none !important;
+    }
   </style>
 </head><body class="has-top-ad">
   <div id="root"></div>
