@@ -1,5 +1,8 @@
 # Neo Browser
 
+Neo Browser officially built in using NEO search™ you can now search up about anything in the neo browser (coulldn't use duckduck go or microsoft bing so i resorted to my own browser)
+enjoy playing games watching youtube or whatever might comfort you using the new browser The games section will be next to come.
+
 Neo Browser is a static web UI with a proxy backend. The repository now supports **both Vercel and Railway** without changing the Browser frontend.
 
 ## Deploy on Vercel
