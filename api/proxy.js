@@ -31,31 +31,6 @@ function makeProx(proxyOrigin) {
   return (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
 }
 
-// Sites that block datacenter/proxy IPs — load directly in a full-frame iframe (user's IP)
-const DIRECT_LOAD_HOSTS = /^(?:www\.)?(snokido\.com|kbhgames\.com|crazygames\.com|poki\.com|y8\.com)$/i;
-
-function shouldDirectLoad(u) {
-  try {
-    return DIRECT_LOAD_HOSTS.test(u.hostname);
-  } catch {
-    return false;
-  }
-}
-
-function renderDirectFrame(target, proxyOrigin) {
-  const href = target.toString();
-  const bridge = buildBridge(proxyOrigin, href);
-  const safeHref = href.replace(/&/g, "&" + "amp;").replace(/"/g, "&" + "quot;").replace(/</g, "&" + "lt;");
-  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n" +
-    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n" +
-    "<title>Loading...</title>\n<style>\n" +
-    "html,body{margin:0;padding:0;background:#0a0a0b;height:100%;overflow:hidden}\n" +
-    "iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#0a0a0b}\n" +
-    "</style>\n" + bridge + "\n</head>\n<body>\n" +
-    "<iframe src=\"" + safeHref + "\" allow=\"fullscreen; autoplay; gamepad; pointer-lock; clipboard-read; clipboard-write; encrypted-media\" allowfullscreen referrerpolicy=\"no-referrer-when-downgrade\"></iframe>\n" +
-    "</body>\n</html>";
-}
-
 function searchQueryOf(u) {
   const host = u.hostname.toLowerCase();
   const isBing = host === "www.bing.com" || host === "bing.com";
@@ -199,43 +174,64 @@ module.exports = async function handler(req, res) {
   const proxyOrigin = proto + "://" + host;
 
   try {
-    if (shouldDirectLoad(target)) {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store");
-      return res.status(200).send(renderDirectFrame(target, proxyOrigin));
-    }
-
     let current = target;
     let r;
-    for (let i = 0; i < 6; i++) {
+    let usedFallback = false;
+
+    async function tryFetch(url) {
       const headers = {
-        accept: req.headers.accept || "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        accept: req.headers.accept || "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "accept-language": req.headers["accept-language"] || "en-US,en;q=0.9",
         "user-agent": req.headers["user-agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        referer: current.origin + "/",
+        referer: url.origin + "/",
         "upgrade-insecure-requests": "1",
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "none",
-        "sec-fetch-user": "?1",
         "accept-encoding": "identity",
       };
       if (req.headers.cookie) headers.cookie = req.headers.cookie;
       if (req.headers.range) headers.range = req.headers.range;
-      r = await fetch(current.toString(), {
+      return fetch(url.toString(), {
         redirect: "manual",
         headers,
         signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined,
       });
-      if (!(r.status >= 300 && r.status < 400)) break;
-      const loc = r.headers.get("location");
-      if (!loc) break;
-      const next = targetUrl(loc, current);
-      if (!next) return res.status(403).send("Redirect destination is blocked");
-      current = next;
     }
 
-    const type = r.headers.get("content-type") || "";
+    try {
+      for (let i = 0; i < 6; i++) {
+        r = await tryFetch(current);
+        if (!(r.status >= 300 && r.status < 400)) break;
+        const loc = r.headers.get("location");
+        if (!loc) break;
+        const next = targetUrl(loc, current);
+        if (!next) return res.status(403).send("Redirect destination is blocked");
+        current = next;
+      }
+    } catch (fetchErr) {
+      try {
+        const fb = await fetch(
+          "https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()),
+          { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined }
+        );
+        if (fb.ok) { r = fb; usedFallback = true; }
+        else throw fetchErr;
+      } catch (_) {
+        throw fetchErr;
+      }
+    }
+
+    if (!usedFallback && r && (r.status === 403 || r.status === 503 || r.status === 520 || r.status === 521 || r.status === 522)) {
+      try {
+        const fb = await fetch(
+          "https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()),
+          { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined }
+        );
+        if (fb.ok) { r = fb; usedFallback = true; }
+      } catch (_) {}
+    }
+
+    const type = usedFallback
+      ? (r.headers.get("content-type") || "text/html; charset=utf-8")
+      : (r.headers.get("content-type") || "");
     const body = await r.arrayBuffer();
 
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -244,14 +240,13 @@ module.exports = async function handler(req, res) {
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Cache-Control", "no-store");
 
-    if (type.toLowerCase().includes("text/html")) {
+    if (type.toLowerCase().includes("text/html") || usedFallback) {
       let html = new TextDecoder("utf-8").decode(body);
       const query = searchQueryOf(current);
       if (query) {
         const results = parseBingResults(html);
         if (results.length) {
           res.setHeader("Content-Type", "text/html; charset=utf-8");
-          res.setHeader("Cache-Control", "no-store");
           return res.status(200).send(renderSearchPage(query, results, proxyOrigin));
         }
       }
