@@ -19,13 +19,16 @@ app.get("/api/search", (req, res) => searchHandler(req, res));
 
 // --- Static frontend --------------------------------------------------------
 // Serves index.html, /assets, /static, etc. exactly like Vercel did.
+const staticRoot = __dirname;
 app.use(
-  express.static(__dirname, {
+  express.static(staticRoot, {
     // Don't cache index.html itself (it's small and may change on deploy),
     // but let hashed asset filenames (assets/xxx-HASH.js) cache long-term.
     setHeaders(res, filePath) {
       if (path.basename(filePath) === "index.html") {
         res.setHeader("Cache-Control", "no-cache");
+      } else if (/\.(js|css|webp|png|woff2|svg)$/i.test(filePath)) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
       }
     },
   })
@@ -34,10 +37,18 @@ app.use(
 // SPA fallback: any other GET request gets index.html so client-side
 // routing (if any) keeps working.
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.sendFile(path.join(staticRoot, "index.html"), (err) => {
+    if (err) {
+      console.error("Failed to send index.html:", err.message);
+      res.status(500).send("Internal Server Error");
+    }
+  });
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Neo Browser listening on port ${port}`);
+// Railway (and most cloud platforms) require binding to 0.0.0.0 so the
+// platform proxy can reach the process. Listening only on localhost fails.
+app.listen(port, "0.0.0.0", () => {
+  console.log(`Neo Browser listening on 0.0.0.0:${port}`);
+  console.log(`Static root: ${staticRoot}`);
 });
