@@ -117,11 +117,13 @@ app.use((req, res, next) => {
   try {
     const encoded = referer.slice(idx + marker.length).split("&")[0];
     const originalUrl = new URL(decodeURIComponent(encoded));
-    // Include the full query string if present
+    // Build the escaped URL from the current request path + query + fragment
     const escapedUrl = new URL(req.originalUrl, originalUrl.origin);
     const target = "/api/proxy?url=" + encodeURIComponent(escapedUrl.toString());
-    return res.redirect(302, target);
-  } catch {
+    // Use 307 Temporary Redirect to preserve the method and prevent infinite loops
+    return res.redirect(307, target);
+  } catch (e) {
+    console.error("[escaped-nav] Error reconstructing URL:", e.message);
     return next();
   }
 });
