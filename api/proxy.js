@@ -273,6 +273,29 @@ module.exports = async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Cache-Control", "no-store");
+    // Force full-URL referrers on any subsequent navigation out of this
+    // page. Sites like YouTube often ship their own restrictive
+    // `<meta name="referrer">` tag, which would otherwise starve the
+    // escaped-navigation safety net (server.js) of the Referer info it
+    // needs to recover from a raw `location.href = "/relative"` jump.
+    // An HTTP Referrer-Policy header takes precedence over any in-page
+    // meta tag, so this overrides it regardless.
+    res.setHeader("Referrer-Policy", "unsafe-url");
+
+    // Forward Set-Cookie from the upstream site back to the browser, scoped
+    // to our own domain (strip Domain= so it defaults to us). Without this,
+    // every request through the proxy looks like a brand-new anonymous
+    // visitor with no continuity between the page load and its follow-up
+    // data calls — which is exactly what makes sites like YouTube serve a
+    // stripped-down "signed out / no session" experience (empty sidebar,
+    // no feed) instead of their normal content.
+    const rawSetCookies = typeof r.headers.getSetCookie === "function" ? r.headers.getSetCookie() : [];
+    if (rawSetCookies.length) {
+      const rewritten = rawSetCookies.map((c) =>
+        c.replace(/;\s*domain=[^;]*/i, "").replace(/;\s*samesite=[^;]*/i, "; SameSite=Lax")
+      );
+      res.setHeader("Set-Cookie", rewritten);
+    }
 
     if (type.toLowerCase().includes("text/html") || usedFallback) {
       let html = new TextDecoder("utf-8").decode(body);
@@ -286,6 +309,10 @@ module.exports = async function handler(req, res) {
       }
       const bridge = buildBridge(proxyOrigin, current.toString());
       html = rewriteLinks(html, current.toString(), proxyOrigin);
+      // Strip any referrer meta tag the source page ships with — the
+      // Referrer-Policy header above already overrides it for spec-
+      // compliant browsers, but removing it too avoids any ambiguity.
+      html = html.replace(/<meta\b[^>]*name\s*=\s*["']referrer["'][^>]*>/gi, "");
       if (/<head[^>]*>/i.test(html)) {
         html = html.replace(/<head([^>]*)>/i, (m) => m + bridge);
       } else {
