@@ -27,14 +27,18 @@ function targetUrl(raw, base) {
   }
 }
 
-const prox = (u) => "/api/proxy?url=" + encodeURIComponent(u.toString());
+// proxyOrigin is the public origin of THIS app (e.g. https://xxx.up.railway.app)
+// Must be absolute so <base href="https://youtube.com"> does not rewrite /api/proxy to youtube.com/api/proxy
+function makeProx(proxyOrigin) {
+  return (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
+}
 
-// Injected into every proxied HTML page:
-// 1) Cursor bridge so the parent Neo cursor tracks inside the iframe
-// 2) Network interceptor so fetch/XHR/WebSocket-like absolute URLs go through our proxy
-const PAGE_BRIDGE = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}</style>
+function buildPageBridge(proxyOrigin) {
+  const originJson = JSON.stringify(proxyOrigin);
+  return `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}</style>
 <script id="neo-proxy-bridge">(function(){
 if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;
+var PROXY_ORIGIN=${originJson};
 
 /* ---- cursor bridge ---- */
 var styleEl=document.getElementById('neo-proxy-cursor-style');
@@ -47,19 +51,16 @@ document.addEventListener('mouseleave',function(){try{parent.postMessage({source
 window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-shell')return;if('nativeCursor' in d)setNative(!!d.nativeCursor)},{passive:true});
 try{parent.postMessage({source:'neo-browser-cursor',hello:true},'*')}catch(_){}
 
-/* ---- network interceptor: route http(s) through parent origin proxy ---- */
+/* ---- network interceptor ---- */
 function toProxy(url){
   try{
     var u=new URL(url,location.href);
     if(u.protocol!=='http:'&&u.protocol!=='https:')return null;
-    // Already proxied
-    if(u.pathname==='/api/proxy'||u.pathname.indexOf('/api/proxy')===0)return null;
-    // Same-origin relative that already resolved to our host is fine if it's /api/
-    return location.origin+'/api/proxy?url='+encodeURIComponent(u.toString());
+    if(u.href.indexOf('/api/proxy?url=')!==-1)return null;
+    return PROXY_ORIGIN+'/api/proxy?url='+encodeURIComponent(u.toString());
   }catch(_){return null;}
 }
 
-// fetch
 var _fetch=window.fetch;
 window.fetch=function(input,init){
   try{
@@ -67,28 +68,24 @@ window.fetch=function(input,init){
     var proxied=toProxy(url);
     if(proxied){
       if(typeof input==='string')input=proxied;
-      else if(input&&typeof Request!=='undefined'&&input instanceof Request){
-        input=new Request(proxied,input);
-      }
+      else if(typeof Request!=='undefined'&&input instanceof Request)input=new Request(proxied,input);
     }
   }catch(_){}
   return _fetch.call(this,input,init);
 };
 
-// XMLHttpRequest
 var XO=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(method,url){
   try{
     var proxied=toProxy(url);
-    if(proxied)url=proxied;
+    if(proxied)arguments[1]=proxied;
   }catch(_){}
   return XO.apply(this,arguments);
 };
-
-// Optional: rewrite new Image().src assignments is harder; <img src> already rewritten server-side.
 })();</script>`;
+}
 
-function rewriteAttr(tag, attr, base) {
+function rewriteAttr(tag, attr, base, prox) {
   const re = new RegExp("(" + attr + "\\s*=\\s*[\\\"'])([^\\\"']+)([\\\"'])", "i");
   return tag.replace(re, (all, a, raw, b) => {
     if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(raw)) return all;
@@ -97,21 +94,18 @@ function rewriteAttr(tag, attr, base) {
   });
 }
 
-function rewriteHtml(html, base) {
-  const baseTag = `<base href="${base.replace(/"/g, "&quot;")}">`;
-  if (/<head[^>]*>/i.test(html)) {
-    html = html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);
-  } else if (/<html[^>]*>/i.test(html)) {
-    html = html.replace(/<html([^>]*)>/i, `<html$1><head>${baseTag}</head>`);
-  } else {
-    html = baseTag + html;
-  }
+function rewriteHtml(html, base, proxyOrigin) {
+  const prox = makeProx(proxyOrigin);
+  const bridge = buildPageBridge(proxyOrigin);
+
+  // Do NOT inject <base href> — it breaks absolute-path /api/proxy links.
+  // Instead rewrite all resource URLs to absolute proxy URLs.
 
   html = html.replace(
     /<(img|script|source|video|audio|track|iframe|embed|object)\b[^>]*>/gi,
     (tag) => {
       let out = tag;
-      for (const a of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, a, base);
+      for (const a of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, a, base, prox);
       return out;
     }
   );
@@ -119,11 +113,11 @@ function rewriteHtml(html, base) {
   html = html.replace(/<link\b[^>]*>/gi, (tag) => {
     const rel = (tag.match(/\brel\s*=\s*[\"']([^\"']+)[\"']/i)?.[1] || "").toLowerCase();
     if (!/(stylesheet|icon|preload|modulepreload|apple-touch-icon)/.test(rel)) return tag;
-    return rewriteAttr(tag, "href", base);
+    return rewriteAttr(tag, "href", base, prox);
   });
 
-  html = html.replace(/<a\b[^>]*>/gi, (tag) => rewriteAttr(tag, "href", base));
-  html = html.replace(/<form\b[^>]*>/gi, (tag) => rewriteAttr(tag, "action", base));
+  html = html.replace(/<a\b[^>]*>/gi, (tag) => rewriteAttr(tag, "href", base, prox));
+  html = html.replace(/<form\b[^>]*>/gi, (tag) => rewriteAttr(tag, "action", base, prox));
 
   html = html.replace(/\b(srcset)\s*=\s*([\"'])(.*?)\2/gi, (all, attr, q, value) => {
     const parts = value.split(",").map((part) => {
@@ -148,18 +142,19 @@ function rewriteHtml(html, base) {
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy-report-only[\"'][^>]*>/gi, "");
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']x-frame-options[\"'][^>]*>/gi, "");
 
-  // Inject bridge as early as possible in <head> so fetch is patched before app scripts run
+  // Inject bridge early in <head>
   if (/<head[^>]*>/i.test(html)) {
-    html = html.replace(/<head([^>]*)>/i, (m) => m + PAGE_BRIDGE);
+    html = html.replace(/<head([^>]*)>/i, (m) => m + bridge);
   } else if (/<\/body>/i.test(html)) {
-    html = html.replace(/<\/body>/i, PAGE_BRIDGE + "</body>");
+    html = html.replace(/<\/body>/i, bridge + "</body>");
   } else {
-    html += PAGE_BRIDGE;
+    html += bridge;
   }
   return html;
 }
 
-function rewriteCss(css, base) {
+function rewriteCss(css, base, proxyOrigin) {
+  const prox = makeProx(proxyOrigin);
   return css.replace(/url\(\s*(['\"]?)([^'\")]+)\1\s*\)/gi, (all, q, raw) => {
     const u = targetUrl(raw.trim(), base);
     return u ? `url("${prox(u)}")` : all;
@@ -184,6 +179,14 @@ function isCacheableType(type) {
     t.includes("audio/") ||
     t.includes("video/")
   );
+}
+
+function getProxyOrigin(req) {
+  const xfProto = (req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  const xfHost = (req.headers["x-forwarded-host"] || "").split(",")[0].trim();
+  const host = xfHost || req.headers.host || "localhost";
+  const proto = xfProto || (host.includes("localhost") ? "http" : "https");
+  return proto + "://" + host;
 }
 
 async function fetchChecked(start, req) {
@@ -314,7 +317,9 @@ function parseBingResults(html) {
   return results;
 }
 
-function renderSearchPage(query, results) {
+function renderSearchPage(query, results, proxyOrigin) {
+  const prox = makeProx(proxyOrigin);
+  const bridge = buildPageBridge(proxyOrigin);
   const q = escapeHtml(query);
   const items = results
     .map(
@@ -366,7 +371,7 @@ function renderSearchPage(query, results) {
     ${results.length ? items : empty}
     <footer>Neo Browser · Use responsibly</footer>
   </div>
-  ${PAGE_BRIDGE}
+  ${bridge}
 </body>
 </html>`;
 }
@@ -376,6 +381,8 @@ module.exports = async function handler(req, res) {
   if (!raw || typeof raw !== "string") return res.status(400).send("Missing ?url=");
   const target = targetUrl(raw);
   if (!target) return res.status(400).send("Invalid or blocked URL");
+
+  const proxyOrigin = getProxyOrigin(req);
 
   try {
     const result = await fetchChecked(target, req);
@@ -388,7 +395,6 @@ module.exports = async function handler(req, res) {
 
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Access-Control-Allow-Origin", "*");
-    // Allow credentialed-ish patterns from iframe
     res.setHeader("Access-Control-Allow-Headers", "*");
 
     if (isCacheableType(type)) {
@@ -405,18 +411,18 @@ module.exports = async function handler(req, res) {
         const results = parseBingResults(text);
         if (results.length) {
           res.setHeader("Content-Type", "text/html; charset=utf-8");
-          return res.status(200).send(renderSearchPage(query, results));
+          return res.status(200).send(renderSearchPage(query, results, proxyOrigin));
         }
       }
 
-      const html = rewriteHtml(text, current.toString());
+      const html = rewriteHtml(text, current.toString(), proxyOrigin);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(r.status).send(html);
     }
 
     if (type.toLowerCase().includes("text/css")) {
       const text = new TextDecoder(charsetOf(type)).decode(body);
-      const css = rewriteCss(text, current.toString());
+      const css = rewriteCss(text, current.toString(), proxyOrigin);
       res.setHeader("Content-Type", "text/css; charset=utf-8");
       return res.status(r.status).send(css);
     }
