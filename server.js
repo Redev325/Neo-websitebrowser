@@ -24,17 +24,13 @@ const MIME = {
   ".txt": "text/plain; charset=utf-8"
 };
 
-function normalizeListExpression(expression) {
-  return `Array.isArray(${expression}) ? ${expression} : (${expression} && Array.isArray(${expression}.data) ? ${expression}.data : ${expression} && Array.isArray(${expression}.items) ? ${expression}.items : ${expression} && Array.isArray(${expression}.results) ? ${expression}.results : [])`;
-}
-
 function patchBrowserBundle(js) {
-  // The exported Base44 bundle passes CE.list() directly into React state.
-  // On Railway the SDK can return a wrapper such as { data: [...] } instead
-  // of the raw array. Normalize only those known list callbacks so the app
-  // receives the array it expects. This avoids changing Object.prototype.
-  const normalized = normalizeListExpression("x");
-  return js.replace(/CE\.list\(\)\.then\(t\)/g, `CE.list().then(x=>t(${normalized}))`);
+  // The exported Base44 bundle expects CE.list() to resolve to an array.
+  // Some Railway responses can be wrapped as {data:[...]} / {items:[...]}
+  // / {results:[...]}. Normalize every CE.list() call before React sees it.
+  const helper = `const __neoNormalizeList=x=>Array.isArray(x)?x:(x&&Array.isArray(x.data)?x.data:(x&&Array.isArray(x.items)?x.items:(x&&Array.isArray(x.results)?x.results:[])));const __neoList=()=>Promise.resolve(CE.list()).then(__neoNormalizeList);`;
+  const patched = js.replace(/\bCE\.list\(\)/g, "__neoList()");
+  return `${helper}${patched}`;
 }
 
 function createResponse(res) {
