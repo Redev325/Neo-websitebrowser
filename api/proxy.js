@@ -28,7 +28,7 @@ function targetUrl(raw, base) {
 const prox = u => "/api/proxy?url=" + encodeURIComponent(u.toString());
 
 function rewriteAttr(tag, attr, base) {
-  const re = new RegExp("(" + attr + "\\s*=\\s*[\\\"'])([^\\\"']+)([\\\"'])", "i");
+  const re = new RegExp("(" + attr + "\\s*=\\s*[\"'])([^\"']+)([\"'])", "i");
   return tag.replace(re, (all, a, raw, b) => {
     if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(raw)) return all;
     const u = targetUrl(raw, base);
@@ -37,22 +37,22 @@ function rewriteAttr(tag, attr, base) {
 }
 
 function rewriteHtml(html, base) {
-  html = html.replace(/<(img|script|source|video|audio|track|iframe|embed|object)\\b[^>]*>/gi,
+  html = html.replace(/<(img|script|source|video|audio|track|iframe|embed|object)\b[^>]*>/gi,
     tag => {
       let out = tag;
       for (const a of ["src", "data-src", "poster"]) out = rewriteAttr(out, a, base);
       return out;
     });
 
-  html = html.replace(/<link\\b[^>]*>/gi, tag => {
-    const rel = (tag.match(/\\brel\\s*=\\s*[\"']([^\"']+)[\"']/i)?.[1] || "").toLowerCase();
+  html = html.replace(/<link\b[^>]*>/gi, tag => {
+    const rel = (tag.match(/\brel\s*=\s*[\"']([^\"']+)[\"']/i)?.[1] || "").toLowerCase();
     if (!/(stylesheet|icon|preload|modulepreload)/.test(rel)) return tag;
     return rewriteAttr(tag, "href", base);
   });
 
-  html = html.replace(/\\b(srcset)\\s*=\\s*([\"'])(.*?)\\2/gi, (all, attr, q, value) => {
+  html = html.replace(/\b(srcset)\s*=\s*([\"'])(.*?)\2/gi, (all, attr, q, value) => {
     const parts = value.split(",").map(part => {
-      const m = part.trim().match(/^(\\S+)(\\s+.*)?$/);
+      const m = part.trim().match(/^(\S+)(\s+.*)?$/);
       if (!m) return part;
       const u = targetUrl(m[1], base);
       return u ? prox(u) + (m[2] || "") : part;
@@ -60,23 +60,17 @@ function rewriteHtml(html, base) {
     return `${attr}=${q}${parts.join(", ")}${q}`;
   });
 
-  html = html.replace(/\\bstyle\\s*=\\s*([\"'])(.*?)\\1/gi, (all, q, value) => {
-    const rewritten = value.replace(/url\\(\\s*(['\"]?)([^'\")]+)\\1\\s*\\)/gi, (x, qq, raw) => {
+  html = html.replace(/\bstyle\s*=\s*([\"'])(.*?)\1/gi, (all, q, value) => {
+    const rewritten = value.replace(/url\(\s*(['\"]?)([^'\")]+)\1\s*\)/gi, (x, qq, raw) => {
       const u = targetUrl(raw.trim(), base);
       return u ? `url(\"${prox(u)}\")` : x;
     });
     return `style=${q}${rewritten}${q}`;
   });
 
-  html = html.replace(/<meta\\b[^>]*http-equiv\\s*=\\s*[\"']content-security-policy[\"'][^>]*>/gi, "");
-  html = html.replace(/<meta\\b[^>]*content-security-policy[^>]*>/gi, "");
+  html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy[\"'][^>]*>/gi, "");
+  html = html.replace(/<meta\b[^>]*content-security-policy[^>]*>/gi, "");
 
-  // Hide the native iframe cursor and report top-level coordinates to Neo.
-  // DuckDuckGo's normal page loads organic results through links.duckduckgo.com.
-  // Because the page is being displayed through Neo's browser proxy, those
-  // requests would otherwise originate from the Vercel iframe and can fail.
-  // Route DuckDuckGo's dynamic API calls back through the same proxy so the
-  // actual DuckDuckGo UI can continue to work instead of showing its error page.
   const bridge = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}#neo-proxy-cursor{display:none!important}</style><script id="neo-proxy-cursor-script">(function(){
 if(window.__neoProxyCursor)return;window.__neoProxyCursor=1;
 function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}
@@ -84,21 +78,21 @@ function send(e,click){var p=screenPoint(e);parent.postMessage({source:'neo-brow
 document.addEventListener('mousemove',function(e){send(e,false)},{passive:true});
 document.addEventListener('mousedown',function(e){send(e,true)},{passive:true});
 document.addEventListener('mouseleave',function(){parent.postMessage({source:'neo-browser-cursor',leave:true},'*')},{passive:true});
-function shouldProxy(value){try{var u=new URL(value,location.href);return /(^|\\.)duckduckgo\\.com$/i.test(u.hostname)&&u.hostname.toLowerCase()==='links.duckduckgo.com'}catch(_){return false}}
-function proxyUrl(value){try{var u=new URL(value,location.href);return '/api/proxy?url='+encodeURIComponent(u.toString())}catch(_){return value}}
+function isDdgApi(value){try{var u=new URL(value,location.href);return u.hostname.toLowerCase()==='links.duckduckgo.com'}catch(_){return false}}
+function proxyDdgApi(value){try{var u=new URL(value,location.href);return '/api/proxy?url='+encodeURIComponent(u.toString())}catch(_){return value}}
 var nativeFetch=window.fetch;
-if(nativeFetch){window.fetch=function(input,init){try{var raw=typeof input==='string'?input:(input&&input.url)||'';if(shouldProxy(raw)){if(typeof input==='string')input=proxyUrl(raw);else input=new Request(proxyUrl(raw),input)}}catch(_){}return nativeFetch.call(this,input,init)}}
+if(nativeFetch){window.fetch=function(input,init){try{var raw=typeof input==='string'?input:(input&&input.url)||'';if(isDdgApi(raw)){if(typeof input==='string')input=proxyDdgApi(raw);else input=new Request(proxyDdgApi(raw),input)}}catch(_){}return nativeFetch.call(this,input,init)}}
 var nativeOpen=XMLHttpRequest.prototype.open;
-XMLHttpRequest.prototype.open=function(method,url){try{if(shouldProxy(url))url=proxyUrl(url)}catch(_){}return nativeOpen.apply(this,arguments)};
+XMLHttpRequest.prototype.open=function(method,url){try{if(isDdgApi(url))url=proxyDdgApi(url)}catch(_){}return nativeOpen.apply(this,arguments)};
 })();</script>`;
 
-  if (/<\\/body>/i.test(html)) html = html.replace(/<\\/body>/i, bridge + "</body>");
+  if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, bridge + "</body>");
   else html += bridge;
   return html;
 }
 
 function rewriteCss(css, base) {
-  return css.replace(/url\\(\\s*(['\"]?)([^'\")]+)\\1\\s*\\)/gi, (all, q, raw) => {
+  return css.replace(/url\(\s*(['\"]?)([^'\")]+)\1\s*\)/gi, (all, q, raw) => {
     const u = targetUrl(raw.trim(), base);
     return u ? `url(\"${prox(u)}\")` : all;
   });
