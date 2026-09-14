@@ -4,113 +4,45 @@
   var proto = XMLHttpRequest.prototype;
   var open = proto.open, setRequestHeader = proto.setRequestHeader, send = proto.send;
   var TOKEN_KEY = 'base44_access_token';
-  var storedTokenHeader = function () {
-    try { return 'Bearer ' + localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
-  };
-  var forgetStoredToken = function () {
-    try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('token'); } catch (e) {}
-  };
-
-  proto.open = function (method, url) {
-    this.__b44IsAuthCheck = /\/entities\/User\/me(\?|$)/.test(url);
-    return open.apply(this, arguments);
-  };
-
-  proto.setRequestHeader = function (name, value) {
-    if (this.__b44IsAuthCheck && name.toLowerCase() === 'authorization' && value === storedTokenHeader()) {
-      this.__b44SentToken = value;
-    }
-    return setRequestHeader.call(this, name, value);
-  };
-
-  proto.send = function () {
-    this.addEventListener('loadend', function () {
-      var rejectedTokenStillStored = this.status === 401 && this.__b44SentToken === storedTokenHeader();
-      if (rejectedTokenStillStored) forgetStoredToken();
-    });
-    return send.apply(this, arguments);
-  };
+  var storedTokenHeader = function () { try { return 'Bearer ' + localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } };
+  var forgetStoredToken = function () { try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('token'); } catch (e) {} };
+  proto.open = function (method, url) { this.__b44IsAuthCheck = /\/entities\/User\/me(\?|$)/.test(url); return open.apply(this, arguments); };
+  proto.setRequestHeader = function (name, value) { if (this.__b44IsAuthCheck && name.toLowerCase() === 'authorization' && value === storedTokenHeader()) this.__b44SentToken = value; return setRequestHeader.call(this, name, value); };
+  proto.send = function () { this.addEventListener('loadend', function () { var rejectedTokenStillStored = this.status === 401 && this.__b44SentToken === storedTokenHeader(); if (rejectedTokenStillStored) forgetStoredToken(); }); return send.apply(this, arguments); };
 })();
   </script>
   <script>
-    // Keep a useful error screen on self-hosted deployments instead of a silent
-    // black page. This is intentionally tiny and only appears when startup
-    // actually fails; normal operation is unchanged.
     (function () {
       function showRuntimeError(message) {
         try {
           if (document.getElementById('neo-runtime-error')) return;
-          var box = document.createElement('div');
-          box.id = 'neo-runtime-error';
+          var box = document.createElement('div'); box.id = 'neo-runtime-error';
           box.style.cssText = 'position:fixed;inset:20px;z-index:2147483647;background:#0b0b0d;color:#f4f4f6;border:1px solid #3a3a42;border-radius:14px;padding:22px;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 20px 80px rgba(0,0,0,.6);overflow:auto';
-          box.innerHTML = '<strong style="font-size:18px">Neo Browser could not start</strong><p style="color:#b8b8c0">The server is reachable, but the browser app hit a startup error.</p><pre style="white-space:pre-wrap;color:#ff7b7b">' + String(message || 'Unknown startup error').replace(/[&<>]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) + '</pre><p style="color:#8f8f98">This diagnostic is temporary and does not change the normal app when it starts successfully.</p>';
+          box.innerHTML = '<strong style="font-size:18px">Neo Browser could not start</strong><p style="color:#b8b8c0">The server is reachable, but the browser app hit a startup error.</p><pre style="white-space:pre-wrap;color:#ff7b7b">' + String(message || 'Unknown startup error').replace(/[&<>]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }) + '</pre>';
           document.body.appendChild(box);
         } catch (_) {}
       }
-      window.addEventListener('error', function (event) {
-        if (event && event.error) showRuntimeError(event.error.stack || event.error.message || event.message);
-        else if (event) showRuntimeError(event.message || 'Script error');
-      });
-      window.addEventListener('unhandledrejection', function (event) {
-        var reason = event && event.reason;
-        showRuntimeError(reason && (reason.stack || reason.message) || String(reason || 'Unhandled promise rejection'));
-      });
+      window.addEventListener('error', function (event) { if (event && event.error) showRuntimeError(event.error.stack || event.error.message || event.message); else if (event) showRuntimeError(event.message || 'Script error'); });
+      window.addEventListener('unhandledrejection', function (event) { var reason = event && event.reason; showRuntimeError(reason && (reason.stack || reason.message) || String(reason || 'Unhandled promise rejection')); });
     })();
   </script>
-  <meta charset="utf-8">
-  <meta content="width=device-width, initial-scale=1.0" name="viewport">
-  <title>Neo</title>
-  <link href="https://fonts.googleapis.com" rel="preconnect">
-  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
-  <script src="assets/index-BtrMTjCx.js" type="module"></script>
-  <link crossorigin="" href="assets/index-DAxXqx_k.css" rel="stylesheet">
+  <meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><title>Neo</title>
+  <link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <script src="assets/index-BtrMTjCx.js" type="module"></script><link crossorigin="" href="assets/index-DAxXqx_k.css" rel="stylesheet">
   <script type="module">
-   if (window.self === window.top) {
-  let lastPath = "";
-  function getPageNameFromPath(path) {
-    const segments = path.split("/").filter(Boolean);
-    return segments[0] || null;
-  }
-  function trackPageView() {
-    const path = window.location.pathname;
-    if (path === lastPath) return;
-    lastPath = path;
-    const pageName = getPageNameFromPath(path) || "home";
-    const appId = "6a83d89cecbce69b361331b1";
-    if (!appId) return;
-    fetch(`/api/app-logs/${appId}/log-user-in-app/${pageName}`, { method: "POST" }).catch(() => {});
-  }
-  const originalPushState = history.pushState.bind(history);
-  history.pushState = function (...args) { originalPushState(...args); trackPageView(); };
-  const originalReplaceState = history.replaceState.bind(history);
-  history.replaceState = function (...args) { originalReplaceState(...args); trackPageView(); };
-  window.addEventListener("popstate", trackPageView);
-  trackPageView();
-}
+   if (window.self === window.top) { let lastPath=""; function getPageNameFromPath(path){const segments=path.split("/").filter(Boolean);return segments[0]||null;} function trackPageView(){const path=window.location.pathname;if(path===lastPath)return;lastPath=path;const pageName=getPageNameFromPath(path)||"home";fetch(`/api/app-logs/6a83d89cecbce69b361331b1/log-user-in-app/${pageName}`,{method:"POST"}).catch(()=>{});} const originalPushState=history.pushState.bind(history);history.pushState=function(...args){originalPushState(...args);trackPageView();};const originalReplaceState=history.replaceState.bind(history);history.replaceState=function(...args){originalReplaceState(...args);trackPageView();};window.addEventListener("popstate",trackPageView);trackPageView();}
   </script>
-  <meta content="yes" name="mobile-web-app-capable">
-  <meta content="black" name="apple-mobile-web-app-status-bar-style">
-  <meta content="Project Neo" name="apple-mobile-web-app-title">
+  <meta content="yes" name="mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="Project Neo" name="apple-mobile-web-app-title">
   <style>
-    html, body, * { cursor: none !important; }
-    body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; background: radial-gradient(circle at 50% 40%, hsl(var(--accent) / 0.14) 0%, transparent 55%); }
-    #custom-cursor { position: fixed; top: 0; left: 0; width: 58px; height: 58px; pointer-events: none; z-index: 2147483647; transform: translate(-50%, -50%); background-repeat: no-repeat; background-position: center; background-size: contain; animation: cursor-fade 1.6s ease-in-out infinite; }
-    @keyframes cursor-fade { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
-    @media (hover:none) { #custom-cursor { display:none!important; } }
-    .cursor-halo-ring { position:absolute; top:50%; left:50%; width:26px; height:26px; margin:-13px 0 0 -13px; border-radius:50%; border:1.5px solid hsl(var(--accent) / .85); box-shadow:0 0 10px hsl(var(--accent) / .55); opacity:0; pointer-events:none; animation:halo-expand 2.6s ease-out infinite; }
-    .cursor-halo-ring.r2 { animation-delay:.87s; } .cursor-halo-ring.r3 { animation-delay:1.74s; }
-    @keyframes halo-expand { 0% { transform:scale(.3); opacity:0; } 14% { opacity:.8; } 100% { transform:scale(3.2); opacity:0; } }
-    .cursor-particle { position:fixed; border-radius:50%; pointer-events:none; z-index:2147483646; animation:particle-float 1s ease-out forwards; }
-    @keyframes particle-float { 0% { opacity:1; transform:translate(-50%,-50%) scale(1); } 100% { opacity:0; transform:translate(-50%,-50%) scale(.15); } }
-    .cursor-trail-dot { position:fixed; top:0; left:0; width:5px; height:5px; border-radius:50%; background:hsl(var(--accent)); pointer-events:none; z-index:2147483646; transform:translate(-50%,-50%); animation:trail-fade .45s ease-out forwards; box-shadow:0 0 4px hsl(var(--accent) / .6); }
-    @keyframes trail-fade { 0% { opacity:.9; transform:translate(-50%,-50%) scale(1); } 100% { opacity:0; transform:translate(-50%,-50%) scale(.25); } }
-    .click-burst-center { position:fixed; width:10px; height:10px; border-radius:50%; background:radial-gradient(circle,hsl(var(--accent)) 0%,hsl(var(--primary)) 70%,transparent 100%); pointer-events:none; z-index:2147483646; transform:translate(-50%,-50%); animation:burst-center .4s ease-out forwards; box-shadow:0 0 8px hsl(var(--accent) / .8); }
-    @keyframes burst-center { 0% { width:6px;height:6px;opacity:1; } 100% { width:28px;height:28px;opacity:0; } }
-    .click-burst-ray { position:fixed; width:2px; background:linear-gradient(to bottom,#fff 0%,hsl(var(--accent)) 35%,transparent 100%); pointer-events:none; z-index:2147483645; transform-origin:center top; animation:burst-ray .45s ease-out forwards; }
-    @keyframes burst-ray { 0% { opacity:1; transform:translate(-50%,0) rotate(var(--rot,0deg)) scaleY(.3); } 100% { opacity:0; transform:translate(-50%,0) rotate(var(--rot,0deg)) scaleY(1); } }
-    .click-burst-particle { position:fixed; width:3px;height:3px;border-radius:50%;background:hsl(var(--accent));pointer-events:none;z-index:2147483645;transform:translate(-50%,-50%);animation:burst-particle .45s ease-out forwards; }
-    @keyframes burst-particle { 0% { opacity:1; transform:translate(-50%,-50%) scale(1); } 100% { opacity:0; transform:translate(-50%,-50%) scale(.3); } }
+    html,body,*{cursor:none!important} body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(circle at 50% 40%,hsl(var(--accent)/.14) 0%,transparent 55%)}
+    #custom-cursor{position:fixed;top:0;left:0;width:58px;height:58px;pointer-events:none;z-index:2147483647;transform:translate(-50%,-50%);background-repeat:no-repeat;background-position:center;background-size:contain;animation:cursor-fade 1.6s ease-in-out infinite}
+    @keyframes cursor-fade{0%,100%{opacity:1}50%{opacity:.55}} @media(hover:none){#custom-cursor{display:none!important}}
+    .cursor-halo-ring{position:absolute;top:50%;left:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:1.5px solid hsl(var(--accent)/.85);box-shadow:0 0 10px hsl(var(--accent)/.55);opacity:0;pointer-events:none;animation:halo-expand 2.6s ease-out infinite}.cursor-halo-ring.r2{animation-delay:.87s}.cursor-halo-ring.r3{animation-delay:1.74s}@keyframes halo-expand{0%{transform:scale(.3);opacity:0}14%{opacity:.8}100%{transform:scale(3.2);opacity:0}}
+    .cursor-particle{position:fixed;border-radius:50%;pointer-events:none;z-index:2147483646;animation:particle-float 1s ease-out forwards}@keyframes particle-float{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(.15)}}
+    .cursor-trail-dot{position:fixed;top:0;left:0;width:5px;height:5px;border-radius:50%;background:hsl(var(--accent));pointer-events:none;z-index:2147483646;transform:translate(-50%,-50%);animation:trail-fade .45s ease-out forwards;box-shadow:0 0 4px hsl(var(--accent)/.6)}@keyframes trail-fade{0%{opacity:.9;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(.25)}}
+    .click-burst-center{position:fixed;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle,hsl(var(--accent)) 0%,hsl(var(--primary)) 70%,transparent 100%);pointer-events:none;z-index:2147483646;transform:translate(-50%,-50%);animation:burst-center .4s ease-out forwards;box-shadow:0 0 8px hsl(var(--accent)/.8)}@keyframes burst-center{0%{width:6px;height:6px;opacity:1}100%{width:28px;height:28px;opacity:0}}
+    .click-burst-ray{position:fixed;width:2px;background:linear-gradient(to bottom,#fff 0%,hsl(var(--accent)) 35%,transparent 100%);pointer-events:none;z-index:2147483645;transform-origin:center top;animation:burst-ray .45s ease-out forwards}@keyframes burst-ray{0%{opacity:1;transform:translate(-50%,0) rotate(var(--rot,0deg)) scaleY(.3)}100%{opacity:0;transform:translate(-50%,0) rotate(var(--rot,0deg)) scaleY(1)}}
+    .click-burst-particle{position:fixed;width:3px;height:3px;border-radius:50%;background:hsl(var(--accent));pointer-events:none;z-index:2147483645;transform:translate(-50%,-50%);animation:burst-particle .45s ease-out forwards}@keyframes burst-particle{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(.3)}}
   </style>
- </head><body><div id="root"></div>
- </body></html>
+</head><body><div id="root"></div><div id="custom-cursor"><div class="cursor-halo-ring r1"></div><div class="cursor-halo-ring r2"></div><div class="cursor-halo-ring r3"></div></div>
+</body></html>
