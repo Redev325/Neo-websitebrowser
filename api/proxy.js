@@ -71,25 +71,14 @@ function rewriteHtml(html, base) {
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']content-security-policy["'][^>]*>/gi, "");
   html = html.replace(/<meta\b[^>]*content-security-policy[^>]*>/gi, "");
 
-  // The parent Neo cursor is the only visible cursor. The proxied document
-  // reports SCREEN coordinates (not iframe-local coordinates) so the parent
-  // cursor stays directly on top of the real mouse position.
-  const bridge = `<style id="neo-proxy-cursor-style">
-html,body{cursor:none!important}
-#neo-proxy-cursor{display:none!important}
-</style><script id="neo-proxy-cursor-script">(function(){
+  // Hide the native iframe cursor and report top-level screen coordinates to Neo.
+  const bridge = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}#neo-proxy-cursor{display:none!important}</style><script id="neo-proxy-cursor-script">(function(){
 if(window.__neoProxyCursor)return;window.__neoProxyCursor=1;
-function screenPoint(e){
-  var x=e.clientX,y=e.clientY;
-  try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){ }
-  return{x:x,y:y};
-}
+function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}
 function send(e,click){var p=screenPoint(e);parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}
-function move(e){send(e,false)}
-function down(e){send(e,true)}
-function leave(){parent.postMessage({source:'neo-browser-cursor',leave:true},'*')}
-function boot(){document.addEventListener('mousemove',move,{passive:true});document.addEventListener('mousedown',down,{passive:true});document.addEventListener('mouseleave',leave,{passive:true});window.addEventListener('message',function(e){/* parent accent bridge intentionally has no visible child cursor */})}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+document.addEventListener('mousemove',function(e){send(e,false)},{passive:true});
+document.addEventListener('mousedown',function(e){send(e,true)},{passive:true});
+document.addEventListener('mouseleave',function(){parent.postMessage({source:'neo-browser-cursor',leave:true},'*')},{passive:true});
 })();</script>`;
 
   if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, bridge + "</body>");
@@ -132,15 +121,7 @@ async function fetchChecked(start, req) {
 
 function neoErrorPage(title, message, target) {
   const safeTarget = String(target || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
-<style>
-html,body{margin:0;background:#030305;color:#f5f5f5;font:15px/1.5 system-ui,sans-serif}
-.neo{max-width:820px;margin:70px auto;padding:32px}
-h1{font-size:26px;margin:0 0 12px}.muted{opacity:.65}
-a{color:#ff4657;text-decoration:none}.box{margin-top:22px;padding:18px;border:1px solid #27272d;border-radius:16px;background:#0a0a0e}
-</style></head><body><main class="neo"><h1>${title}</h1><p class="muted">${message}</p>
-<div class="box">The requested page returned an error before it could be displayed inside Neo Browser.</div>
-<p><a href="${safeTarget}" target="_top" rel="noreferrer">Open the original page</a></p></main></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>html,body{margin:0;background:#030305;color:#f5f5f5;font:15px/1.5 system-ui,sans-serif}.neo{max-width:820px;margin:70px auto;padding:32px}h1{font-size:26px;margin:0 0 12px}.muted{opacity:.65}a{color:#ff4657;text-decoration:none}.box{margin-top:22px;padding:18px;border:1px solid #27272d;border-radius:16px;background:#0a0a0e}</style></head><body><main class="neo"><h1>${title}</h1><p class="muted">${message}</p><div class="box">The requested page returned an error before it could be displayed inside Neo Browser.</div><p><a href="${safeTarget}" target="_top" rel="noreferrer">Open the original page</a></p></main></body></html>`;
 }
 
 module.exports = async function handler(req,res){
@@ -149,15 +130,9 @@ module.exports = async function handler(req,res){
   const target=targetUrl(raw);
   if(!target) return res.status(400).send("Invalid or blocked URL");
 
-  // Neo's address bar uses the normal DuckDuckGo URL. Instead of asking
-  // DuckDuckGo to render a JavaScript-heavy page inside our iframe (which is
-  // what caused the "Unexpected error" screen), route searches to our
-  // server-side results page. Lite is never used here.
-  if(target.hostname === "duckduckgo.com" && target.pathname === "/" && target.searchParams.get("q")){
-    const q=target.searchParams.get("q");
-    return res.redirect(302,"/api/search?q="+encodeURIComponent(q));
-  }
-
+  // Do not replace DuckDuckGo with Neo's own results page. The browser should
+  // display DuckDuckGo itself. This also avoids relying on DuckDuckGo's server
+  // accepting a Vercel-side HTML scraping request.
   try{
     const result=await fetchChecked(target,req);
     if(result.blocked) return res.status(403).send("Redirect destination is blocked");
@@ -173,18 +148,8 @@ module.exports = async function handler(req,res){
 
     if(type.toLowerCase().includes("text/html")){
       const text=new TextDecoder(charsetOf(type)).decode(body);
-      const lower=text.toLowerCase();
-      if (r.status >= 400 || (current.hostname.includes("duckduckgo.com") &&
-          (lower.includes("failed to get search results") ||
-           lower.includes("if this persists, please email us") ||
-           lower.includes("anonymized error code")))) {
-        res.setHeader("Content-Type","text/html; charset=utf-8");
-        return res.status(200).send(neoErrorPage(
-          "Search temporarily unavailable",
-          "DuckDuckGo did not return usable results to the server. Neo Browser will not display the provider's raw error page.",
-          current.toString()
-        ));
-      }
+      // Don't replace DuckDuckGo's own error UI. The actual page is what the
+      // user asked for, and its search UI remains fully DuckDuckGo branded.
       const html=rewriteHtml(text,current.toString());
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(r.status).send(html);
