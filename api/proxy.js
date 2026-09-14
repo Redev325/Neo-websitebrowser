@@ -125,26 +125,40 @@ function renderSearchPage(query, results, proxyOrigin) {
   const bridge = buildBridge(proxyOrigin, "https://www.bing.com/");
   const q = escapeHtml(query);
   const items = results.map((r) =>
-    "<article class=\"res\">" +
-    "<a class=\"res-url\" href=\"" + escapeHtml(prox(new URL(r.url))) + "\">" + escapeHtml(r.display) + "</a>" +
-    "<a class=\"res-title\" href=\"" + escapeHtml(prox(new URL(r.url))) + "\">" + escapeHtml(r.title) + "</a>" +
-    (r.snippet ? "<p class=\"res-snip\">" + escapeHtml(r.snippet) + "</p>" : "") +
-    "</article>"
+    '<article class="res">' +
+    '<a class="res-url" href="' + escapeHtml(prox(new URL(r.url))) + '">' + escapeHtml(r.display) + '</a>' +
+    '<a class="res-title" href="' + escapeHtml(prox(new URL(r.url))) + '">' + escapeHtml(r.title) + '</a>' +
+    (r.snippet ? '<p class="res-snip">' + escapeHtml(r.snippet) + '</p>' : '') +
+    '</article>'
   ).join("");
-  const empty = "<div class=\"empty\"><div class=\"empty-orb\"></div><p>No results found for <strong>" + q + "</strong>.</p><p class=\"empty-sub\">Try a different search or enter a full URL.</p></div>";
-  return "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" +
-    "<title>" + q + " - Neo Search</title><style>" +
-    ":root{--bg:#0a0a0b;--panel:#111114;--border:#1f1f24;--text:#e7e7ea;--muted:#8a8a93;--accent:#ff2d2d;--link:#8ab4ff;}" +
-    "*{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;min-height:100%}" +
-    ".wrap{max-width:720px;margin:0 auto;padding:28px 20px 60px}.brand{font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;font-weight:700}" +
-    ".q{font-size:22px;font-weight:600;margin:0 0 6px}.meta{color:var(--muted);font-size:13px;margin:0 0 28px}" +
-    ".res{padding:16px 0;border-top:1px solid var(--border)}.res-url{display:block;font-size:12px;color:var(--muted);text-decoration:none;margin-bottom:4px;word-break:break-all}" +
-    ".res-title{display:block;font-size:18px;color:var(--link);text-decoration:none;margin-bottom:6px;line-height:1.3}.res-title:hover{text-decoration:underline}" +
-    ".res-snip{margin:0;font-size:14px;color:var(--muted);line-height:1.5}.empty{text-align:center;padding:60px 20px;color:var(--muted)}" +
-    ".empty-orb{width:48px;height:48px;border-radius:50%;margin:0 auto 16px;background:radial-gradient(circle at 30% 30%,#ff4d4d,#7a0000);box-shadow:0 0 24px rgba(255,45,45,0.35)}.empty-sub{font-size:13px}" +
-    "</style>" + bridge + "</head><body><div class=\"wrap\"><div class=\"brand\">Neo Search</div><h1 class=\"q\">" + q + "</h1>" +
-    "<p class=\"meta\">" + (results.length ? results.length + " results" : "No results") + "</p>" +
-    (results.length ? items : empty) + "</div></body></html>";
+  const empty = '<div class="empty"><div class="empty-orb"></div><p>No results found for <strong>' + q + '</strong>.</p><p class="empty-sub">Try a different search or enter a full URL.</p></div>';
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '<title>' + q + ' - Neo Search</title><style>' +
+    ':root{--bg:#0a0a0b;--panel:#111114;--border:#1f1f24;--text:#e7e7ea;--muted:#8a8a93;--accent:#ff2d2d;--link:#8ab4ff;}' +
+    '*{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;min-height:100%;cursor:none}' +
+    '.wrap{max-width:720px;margin:0 auto;padding:28px 24px 80px}' +
+    'header{display:flex;align-items:center;gap:10px;padding-bottom:18px;border-bottom:1px solid var(--border);margin-bottom:24px}' +
+    '.mark{width:38px;height:38px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 0 10px rgba(255,45,45,.5))}' +
+    '.wordmark{height:40px;width:auto;object-fit:contain;display:block}' +
+    '.meta{color:var(--muted);font-size:13px;margin:0 0 20px}.meta strong{color:var(--text)}' +
+    '.res{padding:14px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
+    '.res-url{display:block;color:var(--muted);font-size:12.5px;text-decoration:none;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+    '.res-title{display:block;color:var(--link);font-size:18px;line-height:1.35;text-decoration:none}.res-title:hover{text-decoration:underline}' +
+    '.res-snip{color:#c4c4cc;font-size:14px;line-height:1.5;margin:6px 0 0}' +
+    '.empty{text-align:center;padding:60px 0;color:var(--muted)}' +
+    '.empty-orb{width:56px;height:56px;border-radius:50%;margin:0 auto 18px;background:radial-gradient(circle at 50% 45%,#fff 0%,#ff5a5a 30%,var(--accent) 60%,#7a0000 100%);box-shadow:0 0 26px rgba(255,45,45,.5)}' +
+    '.empty-sub{font-size:13px;margin-top:6px}' +
+    'footer{margin-top:34px;text-align:center;color:var(--muted);font-size:12px}' +
+    '</style></head><body><div class="wrap">' +
+    '<header>' +
+    '<img class="mark" src="/assets/neo-logo-diamond.png" alt="Neo" />' +
+    '<img class="wordmark" src="/assets/neo-search-wordmark.png" alt="Neo Search" />' +
+    '</header>' +
+    '<p class="meta">Results for <strong>' + q + '</strong></p>' +
+    (results.length ? items : empty) +
+    '<footer>Neo Browser · Use responsibly</footer>' +
+    '</div>' + bridge + '</body></html>';
 }
 
 module.exports = async function handler(req, res) {
