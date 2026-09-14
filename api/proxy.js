@@ -40,7 +40,9 @@ if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;
 var PROXY_ORIGIN=${originJson};
 var PAGE_BASE=${baseJson};
 
-/* ---- cursor (respect pointer lock / fullscreen for games) ---- */
+/* Game / embed hosts: load iframes DIRECTLY (proxying Unity WebGL breaks them) */
+var DIRECT_IFRAME_HOSTS=/snokido\\.com$|wgplayer\\.com$|crazygames\\.com$|gamepix\\.com$|gamedistribution\\.com$|itch\\.io$|newgrounds\\.com$|kongregate\\.com$|poki\\.com$|y8\\.com$|coolmathgames\\.com$|html5\\.|unity3d\\.|unityusercontent\\./i;
+
 var styleEl=document.getElementById('neo-proxy-cursor-style');
 function setNative(on){if(styleEl)styleEl.textContent=on?'html,body,*{cursor:auto!important}':'html,body,*{cursor:none!important}'}
 function gameCursorMode(){return !!(document.pointerLockElement||document.fullscreenElement||document.webkitFullscreenElement)}
@@ -69,7 +71,17 @@ function toProxy(url){
   }catch(_){return null;}
 }
 
-/* ---- fetch / XHR ---- */
+function shouldProxyIframe(url){
+  try{
+    var u=new URL(String(url),PAGE_BASE||location.href);
+    // Keep game embeds on their real origin — Unity WebGL + large asset packs fail hard through a double proxy
+    if(DIRECT_IFRAME_HOSTS.test(u.hostname))return false;
+    if(/\\/embed\\//i.test(u.pathname))return false;
+    if(/\\/games\\//i.test(u.pathname)&&/webgl|unity|html5/i.test(u.pathname))return false;
+    return true;
+  }catch(_){return true;}
+}
+
 var _fetch=window.fetch;
 window.fetch=function(input,init){
   try{
@@ -88,7 +100,6 @@ XMLHttpRequest.prototype.open=function(method,url){
   return XO.apply(this,arguments);
 };
 
-/* ---- Workers ---- */
 try{
   var _Worker=window.Worker;
   window.Worker=function(scriptURL,options){var p=toProxy(scriptURL);return new _Worker(p||scriptURL,options);};
@@ -102,7 +113,17 @@ try{
   }
 }catch(_){}
 
-/* ---- CRITICAL for Snokido: proxy dynamically set iframe.src ---- */
+/* iframe.src: proxy normal pages, but NOT game embed CDNs */
+function enhanceGameIframe(el){
+  try{
+    var allow=el.getAttribute('allow')||'';
+    ['autoplay','fullscreen','pointer-lock','gamepad','clipboard-write'].forEach(function(a){
+      if(allow.indexOf(a)===-1)allow+=(allow?',':'')+a;
+    });
+    el.setAttribute('allow',allow);
+    if(!el.hasAttribute('allowfullscreen'))el.setAttribute('allowfullscreen','');
+  }catch(_){}
+}
 try{
   var iframeProto=HTMLIFrameElement.prototype;
   var srcDesc=Object.getOwnPropertyDescriptor(iframeProto,'src');
@@ -112,16 +133,13 @@ try{
       configurable:true,enumerable:true,
       get:function(){return origSrcGet.call(this);},
       set:function(v){
-        var p=toProxy(v);
-        origSrcSet.call(this,p||v);
-        // Ensure game embeds can use fullscreen / autoplay / pointer lock
-        try{
-          var allow=this.getAttribute('allow')||'';
-          var need=['autoplay','fullscreen','pointer-lock','gamepad','clipboard-write'];
-          need.forEach(function(a){if(allow.indexOf(a)===-1)allow+=(allow?',':'')+a;});
-          this.setAttribute('allow',allow);
-          if(!this.hasAttribute('allowfullscreen'))this.setAttribute('allowfullscreen','');
-        }catch(_){}
+        var finalUrl=v;
+        if(shouldProxyIframe(v)){
+          var p=toProxy(v);
+          if(p)finalUrl=p;
+        }
+        origSrcSet.call(this,finalUrl);
+        enhanceGameIframe(this);
       }
     });
   }
@@ -130,14 +148,16 @@ try{
   var _setAttr=Element.prototype.setAttribute;
   Element.prototype.setAttribute=function(name,value){
     if(this.tagName==='IFRAME'&&name&&String(name).toLowerCase()==='src'){
-      var p=toProxy(value);
-      if(p)value=p;
+      if(shouldProxyIframe(value)){
+        var p=toProxy(value);
+        if(p)value=p;
+      }
+      enhanceGameIframe(this);
     }
     return _setAttr.call(this,name,value);
   };
 }catch(_){}
 
-/* ---- MutationObserver: catch iframe src set via innerHTML ---- */
 try{
   var mo=new MutationObserver(function(muts){
     muts.forEach(function(m){
@@ -145,8 +165,9 @@ try{
         if(n.nodeType!==1)return;
         var list=n.tagName==='IFRAME'?[n]:(n.querySelectorAll?n.querySelectorAll('iframe'):[]);
         Array.prototype.forEach.call(list,function(f){
+          enhanceGameIframe(f);
           var s=f.getAttribute('src');
-          if(!s)return;
+          if(!s||!shouldProxyIframe(s))return;
           var p=toProxy(s);
           if(p&&p!==s)f.setAttribute('src',p);
         });
@@ -156,7 +177,6 @@ try{
   mo.observe(document.documentElement,{childList:true,subtree:true});
 }catch(_){}
 
-/* ---- navigation guards ---- */
 function proxyNavigate(href){
   var proxied=toProxy(href);
   if(!proxied)return false;
@@ -206,14 +226,30 @@ function rewriteHtml(html, base, proxyOrigin) {
   const prox = makeProx(proxyOrigin);
   const bridge = buildPageBridge(proxyOrigin, base);
 
+  // Do NOT rewrite iframe src for known game CDNs — leave them absolute/original
   html = html.replace(
-    /<(img|script|source|video|audio|track|iframe|embed|object)\b[^>]*>/gi,
+    /<(img|script|source|video|audio|track|embed|object)\b[^>]*>/gi,
     (tag) => {
       let out = tag;
       for (const a of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, a, base, prox);
       return out;
     }
   );
+
+  // iframes: only rewrite if not a game embed host
+  html = html.replace(/<iframe\b[^>]*>/gi, (tag) => {
+    const srcMatch = tag.match(/\bsrc\s*=\s*[\"']([^\"']+)[\"']/i);
+    if (srcMatch) {
+      try {
+        const u = new URL(srcMatch[1], base);
+        if (/snokido\.com$|wgplayer\.com$|crazygames\.com$|gamepix\.com$|gamedistribution\.com$|itch\.io$|poki\.com$|y8\.com$/i.test(u.hostname)) {
+          return tag; // leave game embed alone
+        }
+        if (/\/embed\//i.test(u.pathname)) return tag;
+      } catch {}
+    }
+    return rewriteAttr(tag, "src", base, prox);
+  });
 
   html = html.replace(/<link\b[^>]*>/gi, (tag) => {
     const rel = (tag.match(/\brel\s*=\s*[\"']([^\"']+)[\"']/i)?.[1] || "").toLowerCase();
