@@ -86,15 +86,24 @@
     :root{--neo-frame-reserve:210px}
     .neo-browser-frame-wrap{height:min(calc(100vh - var(--neo-frame-reserve)),820px)!important;max-height:calc(100vh - var(--neo-frame-reserve))!important;min-height:320px!important}
 
-    /* Browser sidebar icon: force red when active (matches Movies icon) */
+    /* Browser icon: white by default */
+    a[href="/Browser"] svg.neo-sidebar-browser-icon,
+    a[href="/Browser"] svg.neo-sidebar-browser-icon *,
+    a[href="/Browser"] svg {
+      color: #ffffff !important;
+      stroke: #ffffff !important;
+      fill: none !important;
+    }
+
+    /* Browser icon: red ONLY when active (same as Movies) */
     a[href="/Browser"].text-accent svg.neo-sidebar-browser-icon,
     a[href="/Browser"].text-accent svg.neo-sidebar-browser-icon *,
-    a[href="/Browser"].bg-accent\/15 svg.neo-sidebar-browser-icon,
-    a[href="/Browser"].bg-accent\/15 svg.neo-sidebar-browser-icon *,
-    a[href="/Browser"][class*="bg-accent"] svg.neo-sidebar-browser-icon,
-    a[href="/Browser"][class*="bg-accent"] svg.neo-sidebar-browser-icon *,
+    a[href="/Browser"].text-accent svg,
+    a[href="/Browser"].text-accent svg *,
     a[href="/Browser"][class*="text-accent"] svg,
-    a[href="/Browser"][class*="text-accent"] svg * {
+    a[href="/Browser"][class*="text-accent"] svg *,
+    a[href="/Browser"][class*="bg-accent"] svg,
+    a[href="/Browser"][class*="bg-accent"] svg * {
       color: hsl(var(--accent)) !important;
       stroke: hsl(var(--accent)) !important;
       fill: none !important;
