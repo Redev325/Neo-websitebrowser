@@ -86,26 +86,30 @@
     :root{--neo-frame-reserve:210px}
     .neo-browser-frame-wrap{height:min(calc(100vh - var(--neo-frame-reserve)),820px)!important;max-height:calc(100vh - var(--neo-frame-reserve))!important;min-height:320px!important}
 
-    /* Browser icon: same grey as other inactive sidebar icons */
+    /* Browser icon: grey when inactive, red when active */
     html:not([data-neo-page="Browser"]) a[href="/Browser"] svg,
     html:not([data-neo-page="Browser"]) a[href="/Browser"] svg * {
       color: rgb(166, 166, 166) !important;
       stroke: rgb(166, 166, 166) !important;
       fill: none !important;
     }
-    /* Browser icon: red when on the Browser page */
     html[data-neo-page="Browser"] a[href="/Browser"] svg,
     html[data-neo-page="Browser"] a[href="/Browser"] svg * {
       color: hsl(var(--accent, 0 80% 55%)) !important;
       stroke: hsl(var(--accent, 0 80% 55%)) !important;
       fill: none !important;
     }
+
+    /* Stronger rain on the Browser page */
+    .neo-browser-rain-canvas {
+      opacity: 1 !important;
+      filter: brightness(1.35) contrast(1.15) saturate(1.2);
+    }
   </style>
 </head><body class="has-top-ad">
   <div id="root"></div>
   <div id="custom-cursor"><div class="cursor-halo-ring r1"></div><div class="cursor-halo-ring r2"></div><div class="cursor-halo-ring r3"></div></div>
   <script>
-    /* Keep html[data-neo-page] in sync with the current route so CSS can style the Browser icon */
     (function () {
       function pageName() {
         var seg = (location.pathname || '/').split('/').filter(Boolean)[0] || 'home';

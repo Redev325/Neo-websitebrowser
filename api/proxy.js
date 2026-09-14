@@ -6,7 +6,7 @@ const BLOCKED_HOSTS = new Set([
 function isPrivateIPv4(host) {
   const p = host.split(".").map(Number);
   if (p.length !== 4 || p.some(Number.isNaN)) return false;
-  const [a,b] = p;
+  const [a, b] = p;
   return a === 10 || a === 127 || (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 }
@@ -22,14 +22,13 @@ function targetUrl(raw, base) {
     const u = new URL(raw, base);
     if (!["http:", "https:"].includes(u.protocol) || blocked(u.hostname)) return null;
     return u;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
-const prox = u => "/api/proxy?url=" + encodeURIComponent(u.toString());
+const prox = (u) => "/api/proxy?url=" + encodeURIComponent(u.toString());
 
-// Shared bridge injected into every proxied HTML document. Hides the native
-// cursor and forwards pointer coordinates to the parent Neo Browser shell so
-// the custom cursor keeps tracking over proxied content.
 const CURSOR_BRIDGE = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}</style><script id="neo-proxy-cursor-script">(function(){
 if(window.__neoProxyCursor)return;window.__neoProxyCursor=1;
 var styleEl=document.getElementById('neo-proxy-cursor-style');
@@ -39,10 +38,7 @@ function send(e,click){var p=screenPoint(e);parent.postMessage({source:'neo-brow
 document.addEventListener('mousemove',function(e){send(e,false)},{passive:true});
 document.addEventListener('mousedown',function(e){send(e,true)},{passive:true});
 document.addEventListener('mouseleave',function(){parent.postMessage({source:'neo-browser-cursor',leave:true},'*')},{passive:true});
-// The shell tells us whether to show the real OS cursor (used in fullscreen,
-// where the parent's custom cursor element cannot render over this frame).
 window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-shell')return;if('nativeCursor' in d)setNative(!!d.nativeCursor)},{passive:true});
-// Ask the shell for the current cursor mode as soon as we load.
 try{parent.postMessage({source:'neo-browser-cursor',hello:true},'*')}catch(_){}
 })();</script>`;
 
@@ -56,26 +52,37 @@ function rewriteAttr(tag, attr, base) {
 }
 
 function rewriteHtml(html, base) {
-  html = html.replace(/<(img|script|source|video|audio|track|iframe|embed|object)\b[^>]*>/gi,
-    tag => {
-      let out = tag;
-      for (const a of ["src", "data-src", "poster"]) out = rewriteAttr(out, a, base);
-      return out;
-    });
+  // Inject <base> early so relative URLs resolve against the real site
+  const baseTag = `<base href="${base.replace(/"/g, "&quot;")}">`;
+  if (/<head[^>]*>/i.test(html)) {
+    html = html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);
+  } else if (/<html[^>]*>/i.test(html)) {
+    html = html.replace(/<html([^>]*)>/i, `<html$1><head>${baseTag}</head>`);
+  } else {
+    html = baseTag + html;
+  }
 
-  html = html.replace(/<link\b[^>]*>/gi, tag => {
+  html = html.replace(
+    /<(img|script|source|video|audio|track|iframe|embed|object)\b[^>]*>/gi,
+    (tag) => {
+      let out = tag;
+      for (const a of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, a, base);
+      return out;
+    }
+  );
+
+  html = html.replace(/<link\b[^>]*>/gi, (tag) => {
     const rel = (tag.match(/\brel\s*=\s*[\"']([^\"']+)[\"']/i)?.[1] || "").toLowerCase();
-    if (!/(stylesheet|icon|preload|modulepreload)/.test(rel)) return tag;
+    if (!/(stylesheet|icon|preload|modulepreload|apple-touch-icon)/.test(rel)) return tag;
     return rewriteAttr(tag, "href", base);
   });
 
-  // Route in-page navigation (anchors) back through the proxy so clicks stay
-  // inside the Neo Browser instead of breaking out to the real site (which
-  // often refuses to be framed).
-  html = html.replace(/<a\b[^>]*>/gi, tag => rewriteAttr(tag, "href", base));
+  // Anchors + form actions stay inside the proxy
+  html = html.replace(/<a\b[^>]*>/gi, (tag) => rewriteAttr(tag, "href", base));
+  html = html.replace(/<form\b[^>]*>/gi, (tag) => rewriteAttr(tag, "action", base));
 
   html = html.replace(/\b(srcset)\s*=\s*([\"'])(.*?)\2/gi, (all, attr, q, value) => {
-    const parts = value.split(",").map(part => {
+    const parts = value.split(",").map((part) => {
       const m = part.trim().match(/^(\S+)(\s+.*)?$/);
       if (!m) return part;
       const u = targetUrl(m[1], base);
@@ -87,13 +94,18 @@ function rewriteHtml(html, base) {
   html = html.replace(/\bstyle\s*=\s*([\"'])(.*?)\1/gi, (all, q, value) => {
     const rewritten = value.replace(/url\(\s*(['\"]?)([^'\")]+)\1\s*\)/gi, (x, qq, raw) => {
       const u = targetUrl(raw.trim(), base);
-      return u ? `url(\"${prox(u)}\")` : x;
+      return u ? `url("${prox(u)}")` : x;
     });
     return `style=${q}${rewritten}${q}`;
   });
 
+  // Strip CSP that would block proxied resources
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy[\"'][^>]*>/gi, "");
   html = html.replace(/<meta\b[^>]*content-security-policy[^>]*>/gi, "");
+  html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy-report-only[\"'][^>]*>/gi, "");
+
+  // Remove X-Frame-Options style meta if present
+  html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']x-frame-options[\"'][^>]*>/gi, "");
 
   if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, CURSOR_BRIDGE + "</body>");
   else html += CURSOR_BRIDGE;
@@ -103,43 +115,67 @@ function rewriteHtml(html, base) {
 function rewriteCss(css, base) {
   return css.replace(/url\(\s*(['\"]?)([^'\")]+)\1\s*\)/gi, (all, q, raw) => {
     const u = targetUrl(raw.trim(), base);
-    return u ? `url(\"${prox(u)}\")` : all;
+    return u ? `url("${prox(u)}")` : all;
   });
 }
 
 function charsetOf(contentType) {
   const m = contentType.match(/charset=([^;]+)/i);
-  return m ? m[1].trim().replace(/^[\"']|[\"']$/g,"") : "utf-8";
+  return m ? m[1].trim().replace(/^[\"']|[\"']$/g, "") : "utf-8";
+}
+
+function isCacheableType(type) {
+  const t = (type || "").toLowerCase();
+  return (
+    t.includes("image/") ||
+    t.includes("font/") ||
+    t.includes("text/css") ||
+    t.includes("javascript") ||
+    t.includes("application/javascript") ||
+    t.includes("application/font") ||
+    t.includes("woff") ||
+    t.includes("audio/") ||
+    t.includes("video/")
+  );
 }
 
 async function fetchChecked(start, req) {
   let current = start;
-  for (let i=0; i<6; i++) {
+  for (let i = 0; i < 6; i++) {
     const headers = {
-      "accept": req.headers.accept || "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      accept:
+        req.headers.accept ||
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
       "accept-language": req.headers["accept-language"] || "en-US,en;q=0.9",
-      "user-agent": req.headers["user-agent"] || "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-      "referer": current.origin + "/",
-      "upgrade-insecure-requests": "1"
+      "user-agent":
+        req.headers["user-agent"] ||
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      referer: current.origin + "/",
+      "upgrade-insecure-requests": "1",
+      // Prefer identity so we don't fight double-compression; Node fetch decompresses anyway
+      "accept-encoding": "identity",
     };
     if (req.headers.cookie) headers.cookie = req.headers.cookie;
 
-    const r = await fetch(current.toString(), { redirect:"manual", headers });
-    if (!(r.status >= 300 && r.status < 400)) return {r,current};
-    const loc=r.headers.get("location");
-    if(!loc) return {r,current};
-    const next=targetUrl(loc,current);
-    if(!next) return {blocked:true};
-    current=next;
+    const r = await fetch(current.toString(), {
+      redirect: "manual",
+      headers,
+      // Abort very slow upstreams so the UI doesn't hang forever
+      signal: AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined,
+    });
+
+    if (!(r.status >= 300 && r.status < 400)) return { r, current };
+    const loc = r.headers.get("location");
+    if (!loc) return { r, current };
+    const next = targetUrl(loc, current);
+    if (!next) return { blocked: true };
+    current = next;
   }
-  return {tooMany:true};
+  return { tooMany: true };
 }
 
-/* ------------------------------------------------------------------ */
-/* Search rendering                                                    */
-/* ------------------------------------------------------------------ */
+/* Search helpers (unchanged logic, kept for Bing results page) */
 
-// A proxied Bing search URL, e.g. www.bing.com/search?q=...
 function searchQueryOf(u) {
   const host = u.hostname.toLowerCase();
   const isBing = host === "www.bing.com" || host === "bing.com";
@@ -171,16 +207,21 @@ function clean(s) {
 }
 
 function escapeHtml(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-// Bing wraps every organic result link in a /ck/a redirect whose real target
-// is base64url-encoded in the `u` param (after an "a1" prefix). Decode it back
-// to the actual destination; return null for Bing/Microsoft-internal links.
 function resolveBingLink(href) {
   const url = decodeEntities(href);
   let host = "";
-  try { host = new URL(url).hostname.toLowerCase(); } catch { return null; }
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
   if (host.endsWith("bing.com")) {
     try {
       const enc = new URL(url).searchParams.get("u");
@@ -195,9 +236,6 @@ function resolveBingLink(href) {
   return url;
 }
 
-// Parse Bing's server-rendered organic results out of its HTML. Bing includes
-// these in the initial document (inside <li class="b_algo">), so we never need
-// to run Bing's client-side JavaScript.
 function parseBingResults(html) {
   const results = [];
   const seen = new Set();
@@ -207,7 +245,9 @@ function parseBingResults(html) {
     const next = html.indexOf(marker, idx + marker.length);
     const block = html.slice(idx, next === -1 ? html.length : next);
 
-    const linkMatch = block.match(/<h2[^>]*>[\s\S]*?<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
+    const linkMatch = block.match(
+      /<h2[^>]*>[\s\S]*?<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i
+    );
     if (linkMatch) {
       const url = resolveBingLink(linkMatch[1]);
       const title = clean(linkMatch[2]);
@@ -217,7 +257,12 @@ function parseBingResults(html) {
       if (url && title && !seen.has(url)) {
         seen.add(url);
         let display = url;
-        try { const uu = new URL(url); display = uu.hostname.replace(/^www\./, "") + (uu.pathname === "/" ? "" : uu.pathname); } catch {}
+        try {
+          const uu = new URL(url);
+          display =
+            uu.hostname.replace(/^www\./, "") +
+            (uu.pathname === "/" ? "" : uu.pathname);
+        } catch {}
         results.push({ url, title, snippet, display });
       }
     }
@@ -228,12 +273,16 @@ function parseBingResults(html) {
 
 function renderSearchPage(query, results) {
   const q = escapeHtml(query);
-  const items = results.map(r => `
+  const items = results
+    .map(
+      (r) => `
       <article class="res">
         <a class="res-url" href="${escapeHtml(prox(new URL(r.url)))}">${escapeHtml(r.display)}</a>
         <a class="res-title" href="${escapeHtml(prox(new URL(r.url)))}">${escapeHtml(r.title)}</a>
         ${r.snippet ? `<p class="res-snip">${escapeHtml(r.snippet)}</p>` : ""}
-      </article>`).join("");
+      </article>`
+    )
+    .join("");
 
   const empty = `<div class="empty"><div class="empty-orb"></div><p>No results found for <strong>${q}</strong>.</p><p class="empty-sub">Try a different search or enter a full URL.</p></div>`;
 
@@ -279,59 +328,62 @@ function renderSearchPage(query, results) {
 </html>`;
 }
 
-/* ------------------------------------------------------------------ */
+module.exports = async function handler(req, res) {
+  const raw = req.query?.url;
+  if (!raw || typeof raw !== "string") return res.status(400).send("Missing ?url=");
+  const target = targetUrl(raw);
+  if (!target) return res.status(400).send("Invalid or blocked URL");
 
-module.exports = async function handler(req,res){
-  const raw=req.query?.url;
-  if(!raw || typeof raw!=="string") return res.status(400).send("Missing ?url=");
-  const target=targetUrl(raw);
-  if(!target) return res.status(400).send("Invalid or blocked URL");
+  try {
+    const result = await fetchChecked(target, req);
+    if (result.blocked) return res.status(403).send("Redirect destination is blocked");
+    if (result.tooMany) return res.status(502).send("Too many redirects");
 
-  try{
-    const result=await fetchChecked(target,req);
-    if(result.blocked) return res.status(403).send("Redirect destination is blocked");
-    if(result.tooMany) return res.status(502).send("Too many redirects");
+    const { r, current } = result;
+    const type = r.headers.get("content-type") || "";
+    const body = await r.arrayBuffer();
 
-    const {r,current}=result;
-    const type=r.headers.get("content-type")||"";
-    const body=await r.arrayBuffer();
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Access-Control-Allow-Origin", "*");
 
-    res.setHeader("X-Content-Type-Options","nosniff");
-    res.setHeader("Cache-Control","no-store");
-    res.setHeader("Access-Control-Allow-Origin","*");
+    // Cache static assets so repeat loads are much faster
+    if (isCacheableType(type)) {
+      res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    } else {
+      res.setHeader("Cache-Control", "no-store");
+    }
 
-    if(type.toLowerCase().includes("text/html")){
-      const text=new TextDecoder(charsetOf(type)).decode(body);
+    if (type.toLowerCase().includes("text/html")) {
+      const text = new TextDecoder(charsetOf(type)).decode(body);
 
-      // If this is a search query, render our own clean results page instead
-      // of proxying the search engine's JavaScript app (which loads results
-      // via XHR that would otherwise hit our own origin and 404).
-      const query=searchQueryOf(current);
-      if(query){
-        const results=parseBingResults(text);
-        // Only take over rendering when we actually recovered results; if the
-        // engine returned a challenge/empty shell, fall through to raw proxy.
-        if(results.length){
-          res.setHeader("Content-Type","text/html; charset=utf-8");
+      const query = searchQueryOf(current);
+      if (query) {
+        const results = parseBingResults(text);
+        if (results.length) {
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
           return res.status(200).send(renderSearchPage(query, results));
         }
       }
 
-      const html=rewriteHtml(text,current.toString());
+      const html = rewriteHtml(text, current.toString());
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(r.status).send(html);
     }
-    if(type.toLowerCase().includes("text/css")){
-      const text=new TextDecoder(charsetOf(type)).decode(body);
-      const css=rewriteCss(text,current.toString());
-      res.setHeader("Content-Type","text/css; charset=utf-8");
+
+    if (type.toLowerCase().includes("text/css")) {
+      const text = new TextDecoder(charsetOf(type)).decode(body);
+      const css = rewriteCss(text, current.toString());
+      res.setHeader("Content-Type", "text/css; charset=utf-8");
       return res.status(r.status).send(css);
     }
 
-    res.setHeader("Content-Type",type||"application/octet-stream");
+    res.setHeader("Content-Type", type || "application/octet-stream");
     return res.status(r.status).send(Buffer.from(body));
-  }catch(e){
+  } catch (e) {
     console.error(e);
+    if (e && (e.name === "TimeoutError" || e.name === "AbortError")) {
+      return res.status(504).send("Upstream timed out");
+    }
     return res.status(502).send("Proxy request failed");
   }
-}
+};
