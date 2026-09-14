@@ -1,0 +1,30 @@
+module.exports = async function handler(req, res) {
+  const q = typeof req.query?.q === "string" ? req.query.q.trim() : "";
+  if (!q) return res.status(400).send("Missing ?q=");
+
+  const enc = encodeURIComponent(q);
+  const html = `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Neo Search</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#030305;color:#f5f5f7;font:15px/1.5 system-ui,-apple-system,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:34px 28px 60px}.brand{font-size:13px;opacity:.6;margin-bottom:18px}
+h1{font-size:30px;margin:0 0 8px}.q{opacity:.7;margin-bottom:26px}.card{padding:20px;border:1px solid #24242b;border-radius:18px;background:#0a0a0f;margin:12px 0}
+a{color:#fff;text-decoration:none}.primary{display:inline-flex;padding:11px 16px;border-radius:12px;background:#ff3344;color:#fff;font-weight:650}
+.secondary{display:inline-flex;padding:10px 14px;border:1px solid #303039;border-radius:12px;margin-left:8px;color:#ddd}
+.small{opacity:.6;font-size:13px;margin-top:8px}
+</style></head><body><main class="wrap">
+<div class="brand">NEO BROWSER • SEARCH</div>
+<h1>Search the web</h1>
+<div class="q">Results for <strong>${q.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}</strong></div>
+<section class="card"><h2>DuckDuckGo</h2>
+<p>Open your search directly on DuckDuckGo. Some search providers prevent their results pages from being embedded inside other websites, so Neo opens the provider directly instead of showing a broken or blocked frame.</p>
+<a class="primary" href="https://duckduckgo.com/?q=${enc}" target="_blank" rel="noopener noreferrer">Search DuckDuckGo</a>
+<a class="secondary" href="https://lite.duckduckgo.com/lite/?q=${enc}" target="_blank" rel="noopener noreferrer">DuckDuckGo Lite</a>
+<div class="small">Your search is sent directly to DuckDuckGo when you choose one of the buttons.</div></section>
+<section class="card"><h2>Tip</h2><p>To visit a website, enter its full address such as <strong>https://example.com</strong> in the Neo address bar.</p></section>
+</main></body></html>`;
+  res.setHeader("Content-Type","text/html; charset=utf-8");
+  res.setHeader("Cache-Control","no-store");
+  res.status(200).send(html);
+};
