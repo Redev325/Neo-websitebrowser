@@ -31,6 +31,31 @@ function makeProx(proxyOrigin) {
   return (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
 }
 
+// Sites that block datacenter/proxy IPs — load directly in a full-frame iframe (user's IP)
+const DIRECT_LOAD_HOSTS = /^(?:www\.)?(snokido\.com|kbhgames\.com|crazygames\.com|poki\.com|y8\.com)$/i;
+
+function shouldDirectLoad(u) {
+  try {
+    return DIRECT_LOAD_HOSTS.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function renderDirectFrame(target, proxyOrigin) {
+  const href = target.toString();
+  const bridge = buildBridge(proxyOrigin, href);
+  const safeHref = href.replace(/&/g, "&" + "amp;").replace(/"/g, "&" + "quot;").replace(/</g, "&" + "lt;");
+  return "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n" +
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n" +
+    "<title>Loading...</title>\n<style>\n" +
+    "html,body{margin:0;padding:0;background:#0a0a0b;height:100%;overflow:hidden}\n" +
+    "iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#0a0a0b}\n" +
+    "</style>\n" + bridge + "\n</head>\n<body>\n" +
+    "<iframe src=\"" + safeHref + "\" allow=\"fullscreen; autoplay; gamepad; pointer-lock; clipboard-read; clipboard-write; encrypted-media\" allowfullscreen referrerpolicy=\"no-referrer-when-downgrade\"></iframe>\n" +
+    "</body>\n</html>";
+}
+
 function searchQueryOf(u) {
   const host = u.hostname.toLowerCase();
   const isBing = host === "www.bing.com" || host === "bing.com";
@@ -174,6 +199,12 @@ module.exports = async function handler(req, res) {
   const proxyOrigin = proto + "://" + host;
 
   try {
+    if (shouldDirectLoad(target)) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).send(renderDirectFrame(target, proxyOrigin));
+    }
+
     let current = target;
     let r;
     for (let i = 0; i < 6; i++) {
@@ -260,9 +291,11 @@ module.exports = async function handler(req, res) {
       ? "The site took too long to respond."
       : "This site could not be loaded through Neo Browser.";
     const detail = (e && e.message) ? String(e.message).slice(0, 200) : "";
+    const bridge = buildBridge(proxyOrigin, "https://www.bing.com/");
     const html = "<!DOCTYPE html><html><head><meta charset=utf-8><title>Neo Browser</title>" +
-      "<style>html,body{margin:0;background:#0a0a0b;color:#e7e7ea;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;cursor:auto}" +
-      ".box{text-align:center;padding:40px;max-width:420px}.t{font-size:18px;margin:0 0 10px}.s{color:#8a8a93;font-size:14px;margin:0}</style></head>" +
+      "<style>html,body{margin:0;background:#0a0a0b;color:#e7e7ea;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}" +
+      ".box{text-align:center;padding:40px;max-width:420px}.t{font-size:18px;margin:0 0 10px}.s{color:#8a8a93;font-size:14px;margin:0}</style>" +
+      bridge + "</head>" +
       "<body><div class=box><p class=t>" + msg + "</p><p class=s>" + detail.replace(/</g,"") + "</p></div></body></html>";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     if (e && (e.name === "TimeoutError" || e.name === "AbortError")) {
