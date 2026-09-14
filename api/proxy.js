@@ -40,24 +40,16 @@ if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;
 var PROXY_ORIGIN=${originJson};
 var PAGE_BASE=${baseJson};
 
-/* ---- cursor bridge (respect pointer lock + fullscreen for games) ---- */
+/* ---- cursor (respect pointer lock / fullscreen for games) ---- */
 var styleEl=document.getElementById('neo-proxy-cursor-style');
 function setNative(on){if(styleEl)styleEl.textContent=on?'html,body,*{cursor:auto!important}':'html,body,*{cursor:none!important}'}
-function gameCursorMode(){
-  return !!(document.pointerLockElement||document.fullscreenElement||document.webkitFullscreenElement);
-}
-function syncCursorMode(){
-  // Native cursor when pointer-locked / fullscreen (games); otherwise hide for Neo cursor
-  setNative(gameCursorMode());
-}
+function gameCursorMode(){return !!(document.pointerLockElement||document.fullscreenElement||document.webkitFullscreenElement)}
+function syncCursorMode(){setNative(gameCursorMode())}
 document.addEventListener('pointerlockchange',syncCursorMode);
 document.addEventListener('fullscreenchange',syncCursorMode);
 document.addEventListener('webkitfullscreenchange',syncCursorMode);
 function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}
-function send(e,click){
-  if(gameCursorMode())return; // don't spam parent while playing
-  var p=screenPoint(e);try{parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}catch(_){}
-}
+function send(e,click){if(gameCursorMode())return;var p=screenPoint(e);try{parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}catch(_){}}
 document.addEventListener('mousemove',function(e){send(e,false)},{passive:true});
 document.addEventListener('mousedown',function(e){send(e,true)},{passive:true});
 document.addEventListener('mouseleave',function(){try{parent.postMessage({source:'neo-browser-cursor',leave:true},'*')}catch(_){}},{passive:true});
@@ -65,12 +57,11 @@ window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!==
 try{parent.postMessage({source:'neo-browser-cursor',hello:true},'*')}catch(_){}
 syncCursorMode();
 
-/* ---- URL → proxy ---- */
 function toProxy(url){
   try{
     if(url==null||url==='')return null;
     var s=String(url);
-    if(/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(s))return null;
+    if(/^(data:|blob:|javascript:|mailto:|tel:|#|about:)/i.test(s))return null;
     var u=new URL(s,PAGE_BASE||location.href);
     if(u.protocol!=='http:'&&u.protocol!=='https:')return null;
     if(u.href.indexOf('/api/proxy?url=')!==-1)return null;
@@ -78,7 +69,7 @@ function toProxy(url){
   }catch(_){return null;}
 }
 
-/* ---- fetch / XHR (games load lots of assets this way) ---- */
+/* ---- fetch / XHR ---- */
 var _fetch=window.fetch;
 window.fetch=function(input,init){
   try{
@@ -93,36 +84,79 @@ window.fetch=function(input,init){
 };
 var XO=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(method,url){
-  try{
-    var proxied=toProxy(url);
-    if(proxied)arguments[1]=proxied;
-  }catch(_){}
+  try{var proxied=toProxy(url);if(proxied)arguments[1]=proxied;}catch(_){}
   return XO.apply(this,arguments);
 };
 
-/* ---- Web Workers (common in game engines) ---- */
+/* ---- Workers ---- */
 try{
   var _Worker=window.Worker;
-  window.Worker=function(scriptURL,options){
-    var p=toProxy(scriptURL);
-    return new _Worker(p||scriptURL,options);
-  };
+  window.Worker=function(scriptURL,options){var p=toProxy(scriptURL);return new _Worker(p||scriptURL,options);};
   window.Worker.prototype=_Worker.prototype;
 }catch(_){}
 try{
   if(window.SharedWorker){
     var _SW=window.SharedWorker;
-    window.SharedWorker=function(scriptURL,options){
-      var p=toProxy(scriptURL);
-      return new _SW(p||scriptURL,options);
-    };
+    window.SharedWorker=function(scriptURL,options){var p=toProxy(scriptURL);return new _SW(p||scriptURL,options);};
     window.SharedWorker.prototype=_SW.prototype;
   }
 }catch(_){}
 
-/* ---- importScripts inside workers can't be patched here; worker file itself is proxied ---- */
+/* ---- CRITICAL for Snokido: proxy dynamically set iframe.src ---- */
+try{
+  var iframeProto=HTMLIFrameElement.prototype;
+  var srcDesc=Object.getOwnPropertyDescriptor(iframeProto,'src');
+  if(srcDesc&&srcDesc.set){
+    var origSrcSet=srcDesc.set,origSrcGet=srcDesc.get;
+    Object.defineProperty(iframeProto,'src',{
+      configurable:true,enumerable:true,
+      get:function(){return origSrcGet.call(this);},
+      set:function(v){
+        var p=toProxy(v);
+        origSrcSet.call(this,p||v);
+        // Ensure game embeds can use fullscreen / autoplay / pointer lock
+        try{
+          var allow=this.getAttribute('allow')||'';
+          var need=['autoplay','fullscreen','pointer-lock','gamepad','clipboard-write'];
+          need.forEach(function(a){if(allow.indexOf(a)===-1)allow+=(allow?',':'')+a;});
+          this.setAttribute('allow',allow);
+          if(!this.hasAttribute('allowfullscreen'))this.setAttribute('allowfullscreen','');
+        }catch(_){}
+      }
+    });
+  }
+}catch(_){}
+try{
+  var _setAttr=Element.prototype.setAttribute;
+  Element.prototype.setAttribute=function(name,value){
+    if(this.tagName==='IFRAME'&&name&&String(name).toLowerCase()==='src'){
+      var p=toProxy(value);
+      if(p)value=p;
+    }
+    return _setAttr.call(this,name,value);
+  };
+}catch(_){}
 
-/* ---- navigation guards (avoid host SPA 404) ---- */
+/* ---- MutationObserver: catch iframe src set via innerHTML ---- */
+try{
+  var mo=new MutationObserver(function(muts){
+    muts.forEach(function(m){
+      m.addedNodes&&m.addedNodes.forEach(function(n){
+        if(n.nodeType!==1)return;
+        var list=n.tagName==='IFRAME'?[n]:(n.querySelectorAll?n.querySelectorAll('iframe'):[]);
+        Array.prototype.forEach.call(list,function(f){
+          var s=f.getAttribute('src');
+          if(!s)return;
+          var p=toProxy(s);
+          if(p&&p!==s)f.setAttribute('src',p);
+        });
+      });
+    });
+  });
+  mo.observe(document.documentElement,{childList:true,subtree:true});
+}catch(_){}
+
+/* ---- navigation guards ---- */
 function proxyNavigate(href){
   var proxied=toProxy(href);
   if(!proxied)return false;
@@ -280,13 +314,11 @@ async function fetchChecked(start, req) {
       "accept-encoding": "identity",
     };
     if (req.headers.cookie) headers.cookie = req.headers.cookie;
-    // Support Range requests (audio/video streaming in games)
     if (req.headers.range) headers.range = req.headers.range;
 
     const r = await fetch(current.toString(), {
       redirect: "manual",
       headers,
-      // Games often load large wasm/data packs
       signal: AbortSignal.timeout ? AbortSignal.timeout(60000) : undefined,
     });
 
@@ -474,7 +506,6 @@ module.exports = async function handler(req, res) {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
-    // Help wasm / cross-origin game assets
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 
     if (isCacheableType(type, current.pathname)) {
@@ -483,7 +514,6 @@ module.exports = async function handler(req, res) {
       res.setHeader("Cache-Control", "no-store");
     }
 
-    // Forward partial content status for range requests
     const status = r.status;
 
     if (type.toLowerCase().includes("text/html")) {
@@ -510,12 +540,10 @@ module.exports = async function handler(req, res) {
       return res.status(status).send(css);
     }
 
-    // Preserve Content-Type for wasm / binary game packs
     let outType = type || "application/octet-stream";
     if (!type && /\.wasm$/i.test(current.pathname)) outType = "application/wasm";
     res.setHeader("Content-Type", outType);
 
-    // Forward content-range if present
     const cr = r.headers.get("content-range");
     if (cr) res.setHeader("Content-Range", cr);
     const ar = r.headers.get("accept-ranges");
