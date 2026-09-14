@@ -316,7 +316,7 @@ module.exports = async function handler(req, res) {
       if (/<head[^>]*>/i.test(html)) {
         html = html.replace(/<head([^>]*)>/i, (m) => m + bridge);
       } else {
-        bridge + html;
+        html = bridge + html;
       }
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(r.status).send(html);
@@ -396,7 +396,7 @@ function buildBridge(proxyOrigin, pageBase) {
     'document.addEventListener("submit",function(e){var form=e.target;if(!form)return;try{var action=form.getAttribute("action")||PAGE_BASE;var method=(form.getAttribute("method")||"GET").toUpperCase();if(method==="GET"){var u=new URL(action,PAGE_BASE||location.href);if(form.elements.length)u.search=new URLSearchParams(new FormData(form)).toString();var p=toProxy(u.toString());if(p){e.preventDefault();location.href=p;return}}}catch(e){}}},{capture:true});' +
     'function rewriteHistoryUrl(url){if(url==null||url==="")return null;try{var s=String(url);if(s.indexOf("/api/proxy?url=")!==-1)return null;if(s.charAt(0)==="#")return null;var u=new URL(s,PAGE_BASE||location.href);return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
     'try{var _push=history.pushState.bind(history);var _repl=history.replaceState.bind(history);history.pushState=function(state,title,url){if(url!=null){var p=rewriteHistoryUrl(url);if(p){arguments[2]=p}}return _push.apply(this,arguments)};history.replaceState=function(state,title,url){if(url!=null){var p=rewriteHistoryUrl(url);if(p){arguments[2]=p}}return _repl.apply(this,arguments)}}catch(e){}' +
-    'var _assign=Object.getOwnPropertyDescriptor(Location.prototype,"href").set;Object.defineProperty(Location.prototype,"href",{set:function(v){if(!nav(v)){_assign.call(this,v)}}});' +
+    'try{var _href=Object.getOwnPropertyDescriptor(Location.prototype,"href");if(_href&&_href.set){var _set=_href.set;Object.defineProperty(Location.prototype,"href",{set:function(v){var p=toProxy(v);if(p){_set.call(this,p)}else{_set.call(this,v)}}})}}catch(e){}' +
     '})();</script>'
   );
 }
