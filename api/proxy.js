@@ -71,9 +71,6 @@ function rewriteHtml(html, base) {
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy[\"'][^>]*>/gi, "");
   html = html.replace(/<meta\b[^>]*content-security-policy[^>]*>/gi, "");
 
-  // Hide the iframe's native cursor and forward its coordinates to Neo.
-  // DuckDuckGo's normal search page fetches organic results from
-  // links.duckduckgo.com, so those requests must also pass through Neo.
   const bridge = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}#neo-proxy-cursor{display:none!important}</style><script id="neo-proxy-cursor-script">(function(){
 if(window.__neoProxyCursor)return;window.__neoProxyCursor=1;
 function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}
@@ -86,7 +83,7 @@ function proxyDdgApi(value){try{var u=new URL(value,location.href);return '/api/
 var nativeFetch=window.fetch;
 if(nativeFetch){window.fetch=function(input,init){try{var raw=typeof input==='string'?input:(input&&input.url)||'';if(isDdgApi(raw)){var p=proxyDdgApi(raw);input=typeof input==='string'?p:new Request(p,input)}}catch(_){}return nativeFetch.call(this,input,init)}}
 var nativeOpen=XMLHttpRequest.prototype.open;
-XMLHttpRequest.prototype.open=function(method,url){try{if(isDdgApi(url))url=proxyDdgApi(url)}catch(_){}var rest=Array.prototype.slice.call(arguments,2);return nativeOpen.call(this,method,url.apply?url:url,...rest)};
+XMLHttpRequest.prototype.open=function(method,url){try{if(isDdgApi(url))url=proxyDdgApi(url)}catch(_){}var rest=Array.prototype.slice.call(arguments,2);return nativeOpen.call(this,method,url,...rest)};
 })();</script>`;
 
   if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, bridge + "</body>");
@@ -132,11 +129,6 @@ async function fetchChecked(start, req) {
     current=next;
   }
   return {tooMany:true};
-}
-
-function neoErrorPage(title, message, target) {
-  const safeTarget = String(target || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;");
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>html,body{margin:0;background:#030305;color:#f5f5f5;font:15px/1.5 system-ui,sans-serif}.neo{max-width:820px;margin:70px auto;padding:32px}h1{font-size:26px;margin:0 0 12px}.muted{opacity:.65}a{color:#ff4657;text-decoration:none}.box{margin-top:22px;padding:18px;border:1px solid #27272d;border-radius:16px;background:#0a0a0e}</style></head><body><main class="neo"><h1>${title}</h1><p class="muted">${message}</p><div class="box">The requested page returned an error before it could be displayed inside Neo Browser.</div><p><a href="${safeTarget}" target="_top" rel="noreferrer">Open the original page</a></p></main></body></html>`;
 }
 
 module.exports = async function handler(req,res){
