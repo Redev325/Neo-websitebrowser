@@ -24,6 +24,27 @@ const MIME = {
   ".txt": "text/plain; charset=utf-8"
 };
 
+const RAILWAY_COMPAT_SCRIPT = `<script>
+(function () {
+  // Some Base44 list responses can be wrapped as {data:[...]}, while the
+  // exported browser bundle expects the list itself to have .map().
+  if (Object.prototype.hasOwnProperty.call(Object.prototype, "__neoMapCompat")) return;
+  Object.defineProperty(Object.prototype, "__neoMapCompat", { value: true, enumerable: false });
+  Object.defineProperty(Object.prototype, "map", {
+    configurable: true,
+    enumerable: false,
+    writable: true,
+    value: function (callback, thisArg) {
+      var list = Array.isArray(this) ? this :
+        Array.isArray(this.data) ? this.data :
+        Array.isArray(this.items) ? this.items :
+        Array.isArray(this.results) ? this.results : null;
+      return list ? Array.prototype.map.call(list, callback, thisArg) : [];
+    }
+  });
+})();
+</script>`;
+
 function createResponse(res) {
   let statusCode = 200;
   let sent = false;
@@ -80,7 +101,6 @@ function serveStatic(req, res, url) {
     return;
   }
 
-  // SPA fallback: the built frontend can handle client-side routes itself.
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     filePath = path.join(ROOT, "index.html");
   }
@@ -102,8 +122,28 @@ function serveStatic(req, res, url) {
       headers["Cache-Control"] = "public, max-age=31536000, immutable";
     }
 
+    if (req.method === "HEAD") {
+      res.writeHead(200, headers);
+      return res.end();
+    }
+
+    if (ext === ".html") {
+      fs.readFile(filePath, "utf8", (readErr, html) => {
+        if (readErr) {
+          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+          return res.end("Failed to read page");
+        }
+        const patched = html.includes("</head>")
+          ? html.replace("</head>", RAILWAY_COMPAT_SCRIPT + "</head>")
+          : html + RAILWAY_COMPAT_SCRIPT;
+        headers["Content-Length"] = Buffer.byteLength(patched);
+        res.writeHead(200, headers);
+        res.end(patched);
+      });
+      return;
+    }
+
     res.writeHead(200, headers);
-    if (req.method === "HEAD") return res.end();
     fs.createReadStream(filePath).pipe(res);
   });
 }
