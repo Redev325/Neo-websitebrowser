@@ -34,7 +34,213 @@ function makeProx(proxyOrigin) {
 function buildPageBridge(proxyOrigin, pageBase) {
   const originJson = JSON.stringify(proxyOrigin);
   const baseJson = JSON.stringify(pageBase);
-  return `<style id=\"neo-proxy-cursor-style\">html,body,*{cursor:none!important}</style>\n<script id=\"neo-proxy-bridge\">(function(){\nif(window.__neoProxyBridge)return;window.__neoProxyBridge=1;\nvar PROXY_ORIGIN=${originJson};\nvar PAGE_BASE=${baseJson};\n\nvar DIRECT_IFRAME_HOSTS=/snokido\\.com$|wgplayer\\.com$|crazygames\\.com$|gamepix\\.com$|gamedistribution\\.com$|itch\\.io$|newgrounds\\.com$|kongregate\\.com$|poki\\.com$|y8\\.com$|coolmathgames\\.com$|html5\\.|unity3d\\.|unityusercontent\\.|kbhgames\\.com$|kbh\\./i;\n\nvar styleEl=document.getElementById('neo-proxy-cursor-style');\nfunction setNative(on){if(styleEl)styleEl.textContent=on?'html,body,*{cursor:auto!important}':'html,body,*{cursor:none!important}'}\nfunction gameCursorMode(){return !!(document.pointerLockElement||document.fullscreenElement||document.webkitFullscreenElement)}\nfunction syncCursorMode(){setNative(gameCursorMode())}\ndocument.addEventListener('pointerlockchange',syncCursorMode);\ndocument.addEventListener('fullscreenchange',syncCursorMode);\ndocument.addEventListener('webkitfullscreenchange',syncCursorMode);\nfunction screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}\nfunction send(e,click){if(gameCursorMode())return;var p=screenPoint(e);try{parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}catch(_){}}\ndocument.addEventListener('mousemove',function(e){send(e,false)},{passive:true});\ndocument.addEventListener('mousedown',function(e){send(e,true)},{passive:true});\ndocument.addEventListener('mouseleave',function(){try{parent.postMessage({source:'neo-browser-cursor',leave:true},'*')}catch(_){}},{passive:true});\nwindow.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-shell')return;if('nativeCursor' in d)setNative(!!d.nativeCursor||gameCursorMode())},{passive:true});\ntry{parent.postMessage({source:'neo-browser-cursor',hello:true},'*')}catch(_){}\nsyncCursorMode();\n\nfunction toProxy(url){\n  try{\n    if(url==null||url==='')return null;\n    var s=String(url);\n    if(/^(data:|blob:|javascript:|mailto:|tel:|#|about:)/i.test(s))return null;\n    var u=new URL(s,PAGE_BASE||location.href);\n    if(u.protocol!=='http:'&&u.protocol!=='https:')return null;\n    if(u.href.indexOf('/api/proxy?url=')!==-1)return null;\n    return PROXY_ORIGIN+'/api/proxy?url='+encodeURIComponent(u.toString());\n  }catch(_){return null;}\n}\n\nfunction shouldProxyIframe(url){\n  try{\n    var u=new URL(String(url),PAGE_BASE||location.href);\n    if(DIRECT_IFRAME_HOSTS.test(u.hostname))return false;\n    if(/\\/embed\\//i.test(u.pathname))return false;\n    if(/\\/games\\//i.test(u.pathname)&&/webgl|unity|html5/i.test(u.pathname))return false;\n    return true;\n  }catch(_){return true;}\n}\n\nvar _fetch=window.fetch;\nwindow.fetch=function(input,init){\n  try{\n    var url=typeof input==='string'?input:(input&&input.url)||'';\n    var proxied=toProxy(url);\n    if(proxied){\n      if(typeof input==='string')input=proxied;\n      else if(typeof Request!=='undefined'&&input instanceof Request)input=new Request(proxied,input);\n    }\n  }catch(_){}\n  return _fetch.call(this,input,init);\n};\nvar XO=XMLHttpRequest.prototype.open;\nXMLHttpRequest.prototype.open=function(method,url){\n  try{var proxied=toProxy(url);if(proxied)arguments[1]=proxied;}catch(_){}\n  return XO.apply(this,arguments);\n};\n\ntry{\n  var _Worker=window.Worker;\n  window.Worker=function(scriptURL,options){var p=toProxy(scriptURL);return new _Worker(p||scriptURL,options);};\n  window.Worker.prototype=_Worker.prototype;\n}catch(_){}\ntry{\n  if(window.SharedWorker){\n    var _SW=window.SharedWorker;\n    window.SharedWorker=function(scriptURL,options){var p=toProxy(scriptURL);return new _SW(p||scriptURL,options);};\n    window.SharedWorker.prototype=_SW.prototype;\n  }\n}catch(_){}\n\nfunction enhanceGameIframe(el){\n  try{\n    var allow=el.getAttribute('allow')||'';\n    ['autoplay','fullscreen','pointer-lock','gamepad','clipboard-write'].forEach(function(a){\n      if(allow.indexOf(a)===-1)allow+=(allow?',':'')+a;\n    });\n    el.setAttribute('allow',allow);\n    if(!el.hasAttribute('allowfullscreen'))el.setAttribute('allowfullscreen','');\n  }catch(_){}\n}\ntry{\n  var iframeProto=HTMLIFrameElement.prototype;\n  var srcDesc=Object.getOwnPropertyDescriptor(iframeProto,'src');\n  if(srcDesc&&srcDesc.set){\n    var origSrcSet=srcDesc.set,origSrcGet=srcDesc.get;\n    Object.defineProperty(iframeProto,'src',{\n      configurable:true,enumerable:true,\n      get:function(){return origSrcGet.call(this);},\n      set:function(v){\n        var finalUrl=v;\n        if(shouldProxyIframe(v)){\n          var p=toProxy(v);\n          if(p)finalUrl=p;\n        }\n        origSrcSet.call(this,finalUrl);\n        enhanceGameIframe(this);\n      }\n    });\n  }\n}catch(_){}\ntry{\n  var _setAttr=Element.prototype.setAttribute;\n  Element.prototype.setAttribute=function(name,value){\n    if(this.tagName==='IFRAME'&&name&&String(name).toLowerCase()==='src'){\n      if(shouldProxyIframe(value)){\n        var p=toProxy(value);\n        if(p)value=p;\n      }\n      enhanceGameIframe(this);\n    }\n    return _setAttr.call(this,name,value);\n  };\n}catch(_){}\n\ntry{\n  var mo=new MutationObserver(function(muts){\n    muts.forEach(function(m){\n      m.addedNodes&&m.addedNodes.forEach(function(n){\n        if(n.nodeType!==1)return;\n        var list=n.tagName==='IFRAME'?[n]:(n.querySelectorAll?n.querySelectorAll('iframe'):[]);\n        Array.prototype.forEach.call(list,function(f){\n          enhanceGameIframe(f);\n          var s=f.getAttribute('src');\n          if(!s||!shouldProxyIframe(s))return;\n          var p=toProxy(s);\n          if(p&&p!==s)f.setAttribute('src',p);\n        });\n      });\n    });\n  });\n  mo.observe(document.documentElement,{childList:true,subtree:true});\n}catch(_){}\n\nfunction proxyNavigate(href){\n  var proxied=toProxy(href);\n  if(!proxied)return false;\n  location.href=proxied;\n  return true;\n}\ndocument.addEventListener('click',function(e){\n  var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;\n  if(!a)return;\n  var href=a.getAttribute('href');\n  if(!href||href.charAt(0)==='#'||/^(javascript:|mailto:|tel:)/i.test(href))return;\n  if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;\n  if(a.target&&a.target!=='_self'&&a.target!=='')return;\n  if(proxyNavigate(href)){e.preventDefault();e.stopPropagation();}\n},true);\ndocument.addEventListener('submit',function(e){\n  var form=e.target;\n  if(!form)return;\n  try{\n    var action=form.getAttribute('action')||PAGE_BASE;\n    var method=(form.getAttribute('method')||'GET').toUpperCase();\n    if(method!=='GET')return;\n    var u=new URL(action,PAGE_BASE||location.href);\n    var fd=new FormData(form);\n    fd.forEach(function(v,k){u.searchParams.append(k,v);});\n    if(proxyNavigate(u.toString())){e.preventDefault();e.stopPropagation();}\n  }catch(_){}\n},true);\ntry{\n  var _assign=Location.prototype.assign,_replace=Location.prototype.replace;\n  Location.prototype.assign=function(url){var p=toProxy(url);return _assign.call(this,p||url);};\n  Location.prototype.replace=function(url){var p=toProxy(url);return _replace.call(this,p||url);};\n}catch(_){}\n\nfunction rewriteHistoryUrl(url){\n  if(url==null||url==='')return null;\n  try{\n    var s=String(url);\n    if(s.indexOf('/api/proxy?url=')!==-1)return null;\n    if(s.charAt(0)==='#')return null;\n    var u=new URL(s,PAGE_BASE||location.href);\n    if(u.origin===location.origin && u.pathname.indexOf('/api/proxy')!==0){\n      u=new URL(u.pathname+u.search+u.hash,PAGE_BASE);\n    }\n    if(u.protocol!=='http:'&&u.protocol!=='https:')return null;\n    return toProxy(u.href);\n  }catch(_){return null;}\n}\ntry{\n  var _push=history.pushState.bind(history);\n  var _repl=history.replaceState.bind(history);\n  history.pushState=function(state,title,url){\n    if(url!=null){\n      var p=rewriteHistoryUrl(url);\n      if(p){location.href=p;return;}\n    }\n    return _push(state,title,url);\n  };\n  history.replaceState=function(state,title,url){\n    if(url!=null){\n      var p=rewriteHistoryUrl(url);\n      if(p){location.href=p;return;}\n    }\n    return _repl(state,title,url);\n  };\n}catch(_){}\n})();</script>`;
+  return `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}</style>
+<script id="neo-proxy-bridge">(function(){
+if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;
+var PROXY_ORIGIN=${originJson};
+var PAGE_BASE=${baseJson};
+
+var DIRECT_IFRAME_HOSTS=/snokido\\.com$|wgplayer\\.com$|crazygames\\.com$|gamepix\\.com$|gamedistribution\\.com$|itch\\.io$|newgrounds\\.com$|kongregate\\.com$|poki\\.com$|y8\\.com$|coolmathgames\\.com$|kbhgames\\.com$|html5\\.|unity3d\\.|unityusercontent\\./i;
+
+var styleEl=document.getElementById('neo-proxy-cursor-style');
+function setNative(on){if(styleEl)styleEl.textContent=on?'html,body,*{cursor:auto!important}':'html,body,*{cursor:none!important}'}
+function gameCursorMode(){return !!(document.pointerLockElement||document.fullscreenElement||document.webkitFullscreenElement)}
+function syncCursorMode(){setNative(gameCursorMode())}
+document.addEventListener('pointerlockchange',syncCursorMode);
+document.addEventListener('fullscreenchange',syncCursorMode);
+document.addEventListener('webkitfullscreenchange',syncCursorMode);
+function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}
+function send(e,click){if(gameCursorMode())return;var p=screenPoint(e);try{parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}catch(_){}}
+document.addEventListener('mousemove',function(e){send(e,false)},{passive:true});
+document.addEventListener('mousedown',function(e){send(e,true)},{passive:true});
+document.addEventListener('mouseleave',function(){try{parent.postMessage({source:'neo-browser-cursor',leave:true},'*')}catch(_){}},{passive:true});
+window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-shell')return;if('nativeCursor' in d)setNative(!!d.nativeCursor||gameCursorMode())},{passive:true});
+try{parent.postMessage({source:'neo-browser-cursor',hello:true},'*')}catch(_){}
+syncCursorMode();
+
+function toProxy(url){
+  try{
+    if(url==null||url==='')return null;
+    var s=String(url);
+    if(/^(data:|blob:|javascript:|mailto:|tel:|#|about:)/i.test(s))return null;
+    var u=new URL(s,PAGE_BASE||location.href);
+    if(u.protocol!=='http:'&&u.protocol!=='https:')return null;
+    if(u.href.indexOf('/api/proxy?url=')!==-1)return null;
+    return PROXY_ORIGIN+'/api/proxy?url='+encodeURIComponent(u.toString());
+  }catch(_){return null;}
+}
+
+function shouldProxyIframe(url){
+  try{
+    var u=new URL(String(url),PAGE_BASE||location.href);
+    if(DIRECT_IFRAME_HOSTS.test(u.hostname))return false;
+    if(/\\/embed\\//i.test(u.pathname))return false;
+    if(/\\/games\\//i.test(u.pathname)&&/webgl|unity|html5/i.test(u.pathname))return false;
+    return true;
+  }catch(_){return true;}
+}
+
+var _fetch=window.fetch;
+window.fetch=function(input,init){
+  try{
+    var url=typeof input==='string'?input:(input&&input.url)||'';
+    var proxied=toProxy(url);
+    if(proxied){
+      if(typeof input==='string')input=proxied;
+      else if(typeof Request!=='undefined'&&input instanceof Request)input=new Request(proxied,input);
+    }
+  }catch(_){}
+  return _fetch.call(this,input,init);
+};
+var XO=XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open=function(method,url){
+  try{var proxied=toProxy(url);if(proxied)arguments[1]=proxied;}catch(_){}
+  return XO.apply(this,arguments);
+};
+
+try{
+  var _Worker=window.Worker;
+  window.Worker=function(scriptURL,options){var p=toProxy(scriptURL);return new _Worker(p||scriptURL,options);};
+  window.Worker.prototype=_Worker.prototype;
+}catch(_){}
+try{
+  if(window.SharedWorker){
+    var _SW=window.SharedWorker;
+    window.SharedWorker=function(scriptURL,options){var p=toProxy(scriptURL);return new _SW(p||scriptURL,options);};
+    window.SharedWorker.prototype=_SW.prototype;
+  }
+}catch(_){}
+
+function enhanceGameIframe(el){
+  try{
+    var allow=el.getAttribute('allow')||'';
+    ['autoplay','fullscreen','pointer-lock','gamepad','clipboard-write'].forEach(function(a){
+      if(allow.indexOf(a)===-1)allow+=(allow?',':'')+a;
+    });
+    el.setAttribute('allow',allow);
+    if(!el.hasAttribute('allowfullscreen'))el.setAttribute('allowfullscreen','');
+  }catch(_){}
+}
+try{
+  var iframeProto=HTMLIFrameElement.prototype;
+  var srcDesc=Object.getOwnPropertyDescriptor(iframeProto,'src');
+  if(srcDesc&&srcDesc.set){
+    var origSrcSet=srcDesc.set,origSrcGet=srcDesc.get;
+    Object.defineProperty(iframeProto,'src',{
+      configurable:true,enumerable:true,
+      get:function(){return origSrcGet.call(this);},
+      set:function(v){
+        var finalUrl=v;
+        if(shouldProxyIframe(v)){
+          var p=toProxy(v);
+          if(p)finalUrl=p;
+        }
+        origSrcSet.call(this,finalUrl);
+        enhanceGameIframe(this);
+      }
+    });
+  }
+}catch(_){}
+try{
+  var _setAttr=Element.prototype.setAttribute;
+  Element.prototype.setAttribute=function(name,value){
+    if(this.tagName==='IFRAME'&&name&&String(name).toLowerCase()==='src'){
+      if(shouldProxyIframe(value)){
+        var p=toProxy(value);
+        if(p)value=p;
+      }
+      enhanceGameIframe(this);
+    }
+    return _setAttr.call(this,name,value);
+  };
+}catch(_){}
+
+try{
+  var mo=new MutationObserver(function(muts){
+    muts.forEach(function(m){
+      m.addedNodes&&m.addedNodes.forEach(function(n){
+        if(n.nodeType!==1)return;
+        var list=n.tagName==='IFRAME'?[n]:(n.querySelectorAll?n.querySelectorAll('iframe'):[]);
+        Array.prototype.forEach.call(list,function(f){
+          enhanceGameIframe(f);
+          var s=f.getAttribute('src');
+          if(!s||!shouldProxyIframe(s))return;
+          var p=toProxy(s);
+          if(p&&p!==s)f.setAttribute('src',p);
+        });
+      });
+    });
+  });
+  mo.observe(document.documentElement,{childList:true,subtree:true});
+}catch(_){}
+
+function proxyNavigate(href){
+  var proxied=toProxy(href);
+  if(!proxied)return false;
+  location.href=proxied;
+  return true;
+}
+document.addEventListener('click',function(e){
+  var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;
+  if(!a)return;
+  var href=a.getAttribute('href');
+  if(!href||href.charAt(0)==='#'||/^(javascript:|mailto:|tel:)/i.test(href))return;
+  if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
+  if(a.target&&a.target!=='_self'&&a.target!=='')return;
+  if(proxyNavigate(href)){e.preventDefault();e.stopPropagation();}
+},true);
+document.addEventListener('submit',function(e){
+  var form=e.target;
+  if(!form)return;
+  try{
+    var action=form.getAttribute('action')||PAGE_BASE;
+    var method=(form.getAttribute('method')||'GET').toUpperCase();
+    if(method!=='GET')return;
+    var u=new URL(action,PAGE_BASE||location.href);
+    var fd=new FormData(form);
+    fd.forEach(function(v,k){u.searchParams.append(k,v);});
+    if(proxyNavigate(u.toString())){e.preventDefault();e.stopPropagation();}
+  }catch(_){}
+},true);
+try{
+  var _assign=Location.prototype.assign,_replace=Location.prototype.replace;
+  Location.prototype.assign=function(url){var p=toProxy(url);return _assign.call(this,p||url);};
+  Location.prototype.replace=function(url){var p=toProxy(url);return _replace.call(this,p||url);};
+}catch(_){}
+
+function rewriteHistoryUrl(url){
+  if(url==null||url==='')return null;
+  try{
+    var s=String(url);
+    if(s.indexOf('/api/proxy?url=')!==-1)return null;
+    if(s.charAt(0)==='#')return null;
+    var u=new URL(s,PAGE_BASE||location.href);
+    if(u.origin===location.origin && u.pathname.indexOf('/api/proxy')!==0){
+      u=new URL(u.pathname+u.search+u.hash,PAGE_BASE);
+    }
+    if(u.protocol!=='http:'&&u.protocol!=='https:')return null;
+    return toProxy(u.href);
+  }catch(_){return null;}
+}
+try{
+  var _push=history.pushState.bind(history);
+  var _repl=history.replaceState.bind(history);
+  history.pushState=function(state,title,url){
+    if(url!=null){
+      var p=rewriteHistoryUrl(url);
+      if(p){location.href=p;return;}
+    }
+    return _push(state,title,url);
+  };
+  history.replaceState=function(state,title,url){
+    if(url!=null){
+      var p=rewriteHistoryUrl(url);
+      if(p){location.href=p;return;}
+    }
+    return _repl(state,title,url);
+  };
+}catch(_){}
+})();</script>`;
 }
 
 function rewriteAttr(tag, attr, base, prox) {
@@ -205,10 +411,10 @@ function stripTags(s) {
 
 function decodeEntities(s) {
   return s
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
     .replace(/&#0?39;/g, "'")
     .replace(/&#x27;/gi, "'")
     .replace(/&nbsp;/g, " ")
@@ -222,10 +428,10 @@ function clean(s) {
 
 function escapeHtml(s) {
   return s
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """);
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function resolveBingLink(href) {
