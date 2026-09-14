@@ -24,26 +24,18 @@ const MIME = {
   ".txt": "text/plain; charset=utf-8"
 };
 
-const RAILWAY_COMPAT_SCRIPT = `<script>
-(function () {
-  // Some Base44 list responses can be wrapped as {data:[...]}, while the
-  // exported browser bundle expects the list itself to have .map().
-  if (Object.prototype.hasOwnProperty.call(Object.prototype, "__neoMapCompat")) return;
-  Object.defineProperty(Object.prototype, "__neoMapCompat", { value: true, enumerable: false });
-  Object.defineProperty(Object.prototype, "map", {
-    configurable: true,
-    enumerable: false,
-    writable: true,
-    value: function (callback, thisArg) {
-      var list = Array.isArray(this) ? this :
-        Array.isArray(this.data) ? this.data :
-        Array.isArray(this.items) ? this.items :
-        Array.isArray(this.results) ? this.results : null;
-      return list ? Array.prototype.map.call(list, callback, thisArg) : [];
-    }
-  });
-})();
-</script>`;
+function normalizeListExpression(expression) {
+  return `Array.isArray(${expression}) ? ${expression} : (${expression} && Array.isArray(${expression}.data) ? ${expression}.data : ${expression} && Array.isArray(${expression}.items) ? ${expression}.items : ${expression} && Array.isArray(${expression}.results) ? ${expression}.results : [])`;
+}
+
+function patchBrowserBundle(js) {
+  // The exported Base44 bundle passes CE.list() directly into React state.
+  // On Railway the SDK can return a wrapper such as { data: [...] } instead
+  // of the raw array. Normalize only those known list callbacks so the app
+  // receives the array it expects. This avoids changing Object.prototype.
+  const normalized = normalizeListExpression("x");
+  return js.replace(/CE\.list\(\)\.then\(t\)/g, `CE.list().then(x=>t(${normalized}))`);
+}
 
 function createResponse(res) {
   let statusCode = 200;
@@ -119,7 +111,7 @@ function serveStatic(req, res, url) {
     };
 
     if (filePath.startsWith(path.join(ROOT, "assets") + path.sep)) {
-      headers["Cache-Control"] = "public, max-age=31536000, immutable";
+      headers["Cache-Control"] = "no-store";
     }
 
     if (req.method === "HEAD") {
@@ -133,9 +125,20 @@ function serveStatic(req, res, url) {
           res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
           return res.end("Failed to read page");
         }
-        const patched = html.includes("</head>")
-          ? html.replace("</head>", RAILWAY_COMPAT_SCRIPT + "</head>")
-          : html + RAILWAY_COMPAT_SCRIPT;
+        headers["Content-Length"] = Buffer.byteLength(html);
+        res.writeHead(200, headers);
+        res.end(html);
+      });
+      return;
+    }
+
+    if (ext === ".js" && path.basename(filePath) === "index-BtrMTjCx.js") {
+      fs.readFile(filePath, "utf8", (readErr, js) => {
+        if (readErr) {
+          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+          return res.end("Failed to read browser bundle");
+        }
+        const patched = patchBrowserBundle(js);
         headers["Content-Length"] = Buffer.byteLength(patched);
         res.writeHead(200, headers);
         res.end(patched);
