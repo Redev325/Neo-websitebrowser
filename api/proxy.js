@@ -28,7 +28,7 @@ function targetUrl(raw, base) {
 const prox = u => "/api/proxy?url=" + encodeURIComponent(u.toString());
 
 function rewriteAttr(tag, attr, base) {
-  const re = new RegExp("(" + attr + "\\s*=\\s*[\"'])([^\"']+)([\"'])", "i");
+  const re = new RegExp("(" + attr + "\\s*=\\s*[\\\"'])([^\\\"']+)([\\\"'])", "i");
   return tag.replace(re, (all, a, raw, b) => {
     if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(raw)) return all;
     const u = targetUrl(raw, base);
@@ -71,6 +71,9 @@ function rewriteHtml(html, base) {
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy[\"'][^>]*>/gi, "");
   html = html.replace(/<meta\b[^>]*content-security-policy[^>]*>/gi, "");
 
+  // Hide the iframe's native cursor and forward its coordinates to Neo.
+  // DuckDuckGo's normal search page fetches organic results from
+  // links.duckduckgo.com, so those requests must also pass through Neo.
   const bridge = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}#neo-proxy-cursor{display:none!important}</style><script id="neo-proxy-cursor-script">(function(){
 if(window.__neoProxyCursor)return;window.__neoProxyCursor=1;
 function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}
@@ -81,9 +84,9 @@ document.addEventListener('mouseleave',function(){parent.postMessage({source:'ne
 function isDdgApi(value){try{var u=new URL(value,location.href);return u.hostname.toLowerCase()==='links.duckduckgo.com'}catch(_){return false}}
 function proxyDdgApi(value){try{var u=new URL(value,location.href);return '/api/proxy?url='+encodeURIComponent(u.toString())}catch(_){return value}}
 var nativeFetch=window.fetch;
-if(nativeFetch){window.fetch=function(input,init){try{var raw=typeof input==='string'?input:(input&&input.url)||'';if(isDdgApi(raw)){if(typeof input==='string')input=proxyDdgApi(raw);else input=new Request(proxyDdgApi(raw),input)}}catch(_){}return nativeFetch.call(this,input,init)}}
+if(nativeFetch){window.fetch=function(input,init){try{var raw=typeof input==='string'?input:(input&&input.url)||'';if(isDdgApi(raw)){var p=proxyDdgApi(raw);input=typeof input==='string'?p:new Request(p,input)}}catch(_){}return nativeFetch.call(this,input,init)}}
 var nativeOpen=XMLHttpRequest.prototype.open;
-XMLHttpRequest.prototype.open=function(method,url){try{if(isDdgApi(url))url=proxyDdgApi(url)}catch(_){}return nativeOpen.apply(this,arguments)};
+XMLHttpRequest.prototype.open=function(method,url){try{if(isDdgApi(url))url=proxyDdgApi(url)}catch(_){}var rest=Array.prototype.slice.call(arguments,2);return nativeOpen.call(this,method,url.apply?url:url,...rest)};
 })();</script>`;
 
   if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, bridge + "</body>");
@@ -106,16 +109,21 @@ function charsetOf(contentType) {
 async function fetchChecked(start, req) {
   let current = start;
   for (let i=0; i<6; i++) {
-    const r = await fetch(current.toString(), {
-      redirect:"manual",
-      headers:{
-        "accept": req.headers.accept || "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "accept-language": req.headers["accept-language"] || "en-US,en;q=0.9",
-        "user-agent": req.headers["user-agent"] || "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-        "referer": current.hostname.endsWith("duckduckgo.com") ? "https://duckduckgo.com/" : current.origin + "/",
-        "upgrade-insecure-requests": "1"
-      }
-    });
+    const isDdg = current.hostname.toLowerCase().endsWith("duckduckgo.com");
+    const headers = {
+      "accept": req.headers.accept || "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "accept-language": req.headers["accept-language"] || "en-US,en;q=0.9",
+      "user-agent": req.headers["user-agent"] || "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+      "referer": isDdg ? "https://duckduckgo.com/" : current.origin + "/",
+      "upgrade-insecure-requests": "1"
+    };
+    if (req.headers.cookie) headers.cookie = req.headers.cookie;
+    if (isDdg) {
+      headers.origin = "https://duckduckgo.com";
+      headers["sec-fetch-site"] = "same-site";
+    }
+
+    const r = await fetch(current.toString(), { redirect:"manual", headers });
     if (!(r.status >= 300 && r.status < 400)) return {r,current};
     const loc=r.headers.get("location");
     if(!loc) return {r,current};
