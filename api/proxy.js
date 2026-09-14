@@ -30,13 +30,20 @@ const prox = u => "/api/proxy?url=" + encodeURIComponent(u.toString());
 // Shared bridge injected into every proxied HTML document. Hides the native
 // cursor and forwards pointer coordinates to the parent Neo Browser shell so
 // the custom cursor keeps tracking over proxied content.
-const CURSOR_BRIDGE = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}#neo-proxy-cursor{display:none!important}</style><script id="neo-proxy-cursor-script">(function(){
+const CURSOR_BRIDGE = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}</style><script id="neo-proxy-cursor-script">(function(){
 if(window.__neoProxyCursor)return;window.__neoProxyCursor=1;
+var styleEl=document.getElementById('neo-proxy-cursor-style');
+function setNative(on){if(styleEl)styleEl.textContent=on?'html,body,*{cursor:auto!important}':'html,body,*{cursor:none!important}'}
 function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}
 function send(e,click){var p=screenPoint(e);parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}
 document.addEventListener('mousemove',function(e){send(e,false)},{passive:true});
 document.addEventListener('mousedown',function(e){send(e,true)},{passive:true});
 document.addEventListener('mouseleave',function(){parent.postMessage({source:'neo-browser-cursor',leave:true},'*')},{passive:true});
+// The shell tells us whether to show the real OS cursor (used in fullscreen,
+// where the parent's custom cursor element cannot render over this frame).
+window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-shell')return;if('nativeCursor' in d)setNative(!!d.nativeCursor)},{passive:true});
+// Ask the shell for the current cursor mode as soon as we load.
+try{parent.postMessage({source:'neo-browser-cursor',hello:true},'*')}catch(_){}
 })();</script>`;
 
 function rewriteAttr(tag, attr, base) {
@@ -241,10 +248,9 @@ function renderSearchPage(query, results) {
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;cursor:none}
   .wrap{max-width:720px;margin:0 auto;padding:28px 24px 80px}
-  header{display:flex;align-items:center;gap:12px;padding-bottom:18px;border-bottom:1px solid var(--border);margin-bottom:24px}
-  .mark{width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 50% 45%,#fff 0%,#ff5a5a 30%,var(--accent) 60%,#7a0000 100%);box-shadow:0 0 18px rgba(255,45,45,.55);flex:0 0 auto}
-  .brand{font-weight:700;letter-spacing:.3px}
-  .brand span{color:var(--accent)}
+  header{display:flex;align-items:center;gap:10px;padding-bottom:18px;border-bottom:1px solid var(--border);margin-bottom:24px}
+  .mark{width:38px;height:38px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 0 10px rgba(255,45,45,.5))}
+  .wordmark{height:40px;width:auto;object-fit:contain;display:block}
   .meta{color:var(--muted);font-size:13px;margin:0 0 20px}
   .meta strong{color:var(--text)}
   .res{padding:14px 0;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -261,8 +267,8 @@ function renderSearchPage(query, results) {
 <body>
   <div class="wrap">
     <header>
-      <div class="mark" aria-hidden="true"></div>
-      <div class="brand">Neo<span>Search</span></div>
+      <img class="mark" src="/assets/neo-logo-diamond.png" alt="Neo" />
+      <img class="wordmark" src="/assets/neo-search-wordmark.png" alt="Neo Search" />
     </header>
     <p class="meta">Results for <strong>${q}</strong></p>
     ${results.length ? items : empty}

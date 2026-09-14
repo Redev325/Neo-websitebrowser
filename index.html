@@ -219,6 +219,24 @@
       0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
       100% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
     }
+
+    /* When the browser frame is fullscreen, the custom cursor element lives
+       outside the fullscreen subtree and can't render, so restore the real OS
+       cursor and hide the custom one. Higher specificity + !important beats the
+       app's own ".neo-cursor-in-frame #custom-cursor" show rule. */
+    html.neo-native-cursor,
+    html.neo-native-cursor * { cursor: auto !important; }
+    html.neo-native-cursor #custom-cursor { display: none !important; }
+
+    /* Keep the browser frame inside the viewport so the bottom dock and the top
+       chrome are never clipped. --neo-frame-reserve is the vertical space taken
+       by the top bar + dock; tweak it if your chrome height differs. */
+    :root { --neo-frame-reserve: 210px; }
+    .neo-browser-frame-wrap {
+      height: min(calc(100vh - var(--neo-frame-reserve)), 820px) !important;
+      max-height: calc(100vh - var(--neo-frame-reserve)) !important;
+      min-height: 320px !important;
+    }
   </style>
  </head>
  <body class="has-top-ad">
@@ -515,6 +533,45 @@
       window.addEventListener('mousedown', function (e) {
         spawnClickBurst(e.clientX, e.clientY);
       }, { passive: true });
+    })();
+  </script>
+  <script>
+    // Fullscreen cursor coordinator. In fullscreen the frame's iframe fills the
+    // screen and the parent's custom cursor can't paint over it, so we switch
+    // to the real OS cursor: unhide it in the shell (via the neo-native-cursor
+    // class) and tell every proxied frame to unhide its own cursor too.
+    (function () {
+      function fsActive() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement);
+      }
+      function broadcast(state) {
+        var frames = document.querySelectorAll('iframe');
+        for (var i = 0; i < frames.length; i++) {
+          try {
+            frames[i].contentWindow.postMessage(
+              { source: 'neo-browser-shell', nativeCursor: state }, '*'
+            );
+          } catch (e) {}
+        }
+      }
+      function sync() {
+        var fs = fsActive();
+        document.documentElement.classList.toggle('neo-native-cursor', fs);
+        broadcast(fs);
+      }
+      document.addEventListener('fullscreenchange', sync);
+      document.addEventListener('webkitfullscreenchange', sync);
+      // A freshly-loaded proxied frame greets us; reply with the current mode
+      // so late-loading pages match the shell's fullscreen state.
+      window.addEventListener('message', function (e) {
+        var d = e && e.data;
+        if (!d || d.source !== 'neo-browser-cursor' || !d.hello) return;
+        try {
+          e.source.postMessage(
+            { source: 'neo-browser-shell', nativeCursor: fsActive() }, '*'
+          );
+        } catch (err) {}
+      });
     })();
   </script>
  
