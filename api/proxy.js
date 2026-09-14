@@ -29,17 +29,63 @@ function targetUrl(raw, base) {
 
 const prox = (u) => "/api/proxy?url=" + encodeURIComponent(u.toString());
 
-const CURSOR_BRIDGE = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}</style><script id="neo-proxy-cursor-script">(function(){
-if(window.__neoProxyCursor)return;window.__neoProxyCursor=1;
+// Injected into every proxied HTML page:
+// 1) Cursor bridge so the parent Neo cursor tracks inside the iframe
+// 2) Network interceptor so fetch/XHR/WebSocket-like absolute URLs go through our proxy
+const PAGE_BRIDGE = `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}</style>
+<script id="neo-proxy-bridge">(function(){
+if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;
+
+/* ---- cursor bridge ---- */
 var styleEl=document.getElementById('neo-proxy-cursor-style');
 function setNative(on){if(styleEl)styleEl.textContent=on?'html,body,*{cursor:auto!important}':'html,body,*{cursor:none!important}'}
 function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}
-function send(e,click){var p=screenPoint(e);parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}
+function send(e,click){var p=screenPoint(e);try{parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}catch(_){}}
 document.addEventListener('mousemove',function(e){send(e,false)},{passive:true});
 document.addEventListener('mousedown',function(e){send(e,true)},{passive:true});
-document.addEventListener('mouseleave',function(){parent.postMessage({source:'neo-browser-cursor',leave:true},'*')},{passive:true});
+document.addEventListener('mouseleave',function(){try{parent.postMessage({source:'neo-browser-cursor',leave:true},'*')}catch(_){}},{passive:true});
 window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-shell')return;if('nativeCursor' in d)setNative(!!d.nativeCursor)},{passive:true});
 try{parent.postMessage({source:'neo-browser-cursor',hello:true},'*')}catch(_){}
+
+/* ---- network interceptor: route http(s) through parent origin proxy ---- */
+function toProxy(url){
+  try{
+    var u=new URL(url,location.href);
+    if(u.protocol!=='http:'&&u.protocol!=='https:')return null;
+    // Already proxied
+    if(u.pathname==='/api/proxy'||u.pathname.indexOf('/api/proxy')===0)return null;
+    // Same-origin relative that already resolved to our host is fine if it's /api/
+    return location.origin+'/api/proxy?url='+encodeURIComponent(u.toString());
+  }catch(_){return null;}
+}
+
+// fetch
+var _fetch=window.fetch;
+window.fetch=function(input,init){
+  try{
+    var url=typeof input==='string'?input:(input&&input.url)||'';
+    var proxied=toProxy(url);
+    if(proxied){
+      if(typeof input==='string')input=proxied;
+      else if(input&&typeof Request!=='undefined'&&input instanceof Request){
+        input=new Request(proxied,input);
+      }
+    }
+  }catch(_){}
+  return _fetch.call(this,input,init);
+};
+
+// XMLHttpRequest
+var XO=XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open=function(method,url){
+  try{
+    var proxied=toProxy(url);
+    if(proxied)url=proxied;
+  }catch(_){}
+  return XO.apply(this,arguments);
+};
+
+// Optional: rewrite new Image().src assignments is harder; <img src> already rewritten server-side.
 })();</script>`;
 
 function rewriteAttr(tag, attr, base) {
@@ -52,7 +98,6 @@ function rewriteAttr(tag, attr, base) {
 }
 
 function rewriteHtml(html, base) {
-  // Inject <base> early so relative URLs resolve against the real site
   const baseTag = `<base href="${base.replace(/"/g, "&quot;")}">`;
   if (/<head[^>]*>/i.test(html)) {
     html = html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);
@@ -77,7 +122,6 @@ function rewriteHtml(html, base) {
     return rewriteAttr(tag, "href", base);
   });
 
-  // Anchors + form actions stay inside the proxy
   html = html.replace(/<a\b[^>]*>/gi, (tag) => rewriteAttr(tag, "href", base));
   html = html.replace(/<form\b[^>]*>/gi, (tag) => rewriteAttr(tag, "action", base));
 
@@ -99,16 +143,19 @@ function rewriteHtml(html, base) {
     return `style=${q}${rewritten}${q}`;
   });
 
-  // Strip CSP that would block proxied resources
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy[\"'][^>]*>/gi, "");
   html = html.replace(/<meta\b[^>]*content-security-policy[^>]*>/gi, "");
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy-report-only[\"'][^>]*>/gi, "");
-
-  // Remove X-Frame-Options style meta if present
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']x-frame-options[\"'][^>]*>/gi, "");
 
-  if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, CURSOR_BRIDGE + "</body>");
-  else html += CURSOR_BRIDGE;
+  // Inject bridge as early as possible in <head> so fetch is patched before app scripts run
+  if (/<head[^>]*>/i.test(html)) {
+    html = html.replace(/<head([^>]*)>/i, (m) => m + PAGE_BRIDGE);
+  } else if (/<\/body>/i.test(html)) {
+    html = html.replace(/<\/body>/i, PAGE_BRIDGE + "</body>");
+  } else {
+    html += PAGE_BRIDGE;
+  }
   return html;
 }
 
@@ -152,7 +199,6 @@ async function fetchChecked(start, req) {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
       referer: current.origin + "/",
       "upgrade-insecure-requests": "1",
-      // Prefer identity so we don't fight double-compression; Node fetch decompresses anyway
       "accept-encoding": "identity",
     };
     if (req.headers.cookie) headers.cookie = req.headers.cookie;
@@ -160,8 +206,7 @@ async function fetchChecked(start, req) {
     const r = await fetch(current.toString(), {
       redirect: "manual",
       headers,
-      // Abort very slow upstreams so the UI doesn't hang forever
-      signal: AbortSignal.timeout ? AbortSignal.timeout(20000) : undefined,
+      signal: AbortSignal.timeout ? AbortSignal.timeout(25000) : undefined,
     });
 
     if (!(r.status >= 300 && r.status < 400)) return { r, current };
@@ -173,8 +218,6 @@ async function fetchChecked(start, req) {
   }
   return { tooMany: true };
 }
-
-/* Search helpers (unchanged logic, kept for Bing results page) */
 
 function searchQueryOf(u) {
   const host = u.hostname.toLowerCase();
@@ -323,7 +366,7 @@ function renderSearchPage(query, results) {
     ${results.length ? items : empty}
     <footer>Neo Browser · Use responsibly</footer>
   </div>
-  ${CURSOR_BRIDGE}
+  ${PAGE_BRIDGE}
 </body>
 </html>`;
 }
@@ -345,8 +388,9 @@ module.exports = async function handler(req, res) {
 
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Access-Control-Allow-Origin", "*");
+    // Allow credentialed-ish patterns from iframe
+    res.setHeader("Access-Control-Allow-Headers", "*");
 
-    // Cache static assets so repeat loads are much faster
     if (isCacheableType(type)) {
       res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
     } else {
