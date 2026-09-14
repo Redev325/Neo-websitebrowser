@@ -86,13 +86,14 @@
     :root{--neo-frame-reserve:210px}
     .neo-browser-frame-wrap{height:min(calc(100vh - var(--neo-frame-reserve)),820px)!important;max-height:calc(100vh - var(--neo-frame-reserve))!important;min-height:320px!important}
 
-    /* Browser icon colors driven by html[data-neo-page] set by script below */
+    /* Browser icon: same grey as other inactive sidebar icons */
     html:not([data-neo-page="Browser"]) a[href="/Browser"] svg,
     html:not([data-neo-page="Browser"]) a[href="/Browser"] svg * {
-      color: #ffffff !important;
-      stroke: #ffffff !important;
+      color: rgb(166, 166, 166) !important;
+      stroke: rgb(166, 166, 166) !important;
       fill: none !important;
     }
+    /* Browser icon: red when on the Browser page */
     html[data-neo-page="Browser"] a[href="/Browser"] svg,
     html[data-neo-page="Browser"] a[href="/Browser"] svg * {
       color: hsl(var(--accent, 0 80% 55%)) !important;
@@ -119,7 +120,6 @@
       history.pushState = function () { _push.apply(null, arguments); sync(); };
       history.replaceState = function () { _replace.apply(null, arguments); sync(); };
       window.addEventListener('popstate', sync);
-      // Also re-sync after React finishes routing
       setInterval(sync, 400);
     })();
   </script>
