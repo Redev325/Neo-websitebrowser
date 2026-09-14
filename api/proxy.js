@@ -37,8 +37,6 @@ function rewriteAttr(tag, attr, base) {
 }
 
 function rewriteHtml(html, base) {
-  // Resource-bearing tags. We intentionally do not rewrite ordinary <a href>
-  // because doing so can break sites that use client-side routing.
   html = html.replace(/<(img|script|source|video|audio|track|iframe|embed|object)\b[^>]*>/gi,
     tag => {
       let out = tag;
@@ -46,14 +44,12 @@ function rewriteHtml(html, base) {
       return out;
     });
 
-  // Stylesheets/icons/preloads regardless of attribute ordering.
   html = html.replace(/<link\b[^>]*>/gi, tag => {
     const rel = (tag.match(/\brel\s*=\s*["']([^"']+)["']/i)?.[1] || "").toLowerCase();
     if (!/(stylesheet|icon|preload|modulepreload)/.test(rel)) return tag;
     return rewriteAttr(tag, "href", base);
   });
 
-  // srcset is common on images.
   html = html.replace(/\b(srcset)\s*=\s*(["'])(.*?)\2/gi, (all, attr, q, value) => {
     const parts = value.split(",").map(part => {
       const m = part.trim().match(/^(\S+)(\s+.*)?$/);
@@ -64,7 +60,6 @@ function rewriteHtml(html, base) {
     return `${attr}=${q}${parts.join(", ")}${q}`;
   });
 
-  // CSS-style URLs occasionally appear inline in style attributes.
   html = html.replace(/\bstyle\s*=\s*(["'])(.*?)\1/gi, (all, q, value) => {
     const rewritten = value.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (x, qq, raw) => {
       const u = targetUrl(raw.trim(), base);
@@ -73,18 +68,12 @@ function rewriteHtml(html, base) {
     return `style=${q}${rewritten}${q}`;
   });
 
-  // The main Neo cursor lives in the top document, but an iframe is its own
-  // browsing context. The top document cannot receive the iframe's pointer
-  // movement directly. Since this HTML is served from our own proxy origin,
-  // install the same visual cursor inside the proxied document as well.
-  // This makes the flare visibly continue through the Browser box while
-  // preserving normal interaction with the embedded page.
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']content-security-policy["'][^>]*>/gi, "");
   html = html.replace(/<meta\b[^>]*content-security-policy[^>]*>/gi, "");
 
   const bridge = `<style id="neo-proxy-cursor-style">
 html,body{cursor:none!important}
-#neo-proxy-cursor{position:fixed;left:0;top:0;width:58px;height:58px;margin:-29px 0 0 -29px;pointer-events:none;z-index:2147483647;display:none;background-repeat:no-repeat;background-position:center;background-size:contain;filter:drop-shadow(0 0 5px rgba(255,40,55,.95)) drop-shadow(0 0 14px rgba(255,40,55,.6)) drop-shadow(0 0 28px rgba(255,40,55,.38))}
+#neo-proxy-cursor{position:fixed;left:0;top:0;width:58px;height:58px;margin:-29px 0 0 -29px;pointer-events:none;z-index:2147483647;display:none;background-repeat:no-repeat;background-position:center;background-size:contain}
 #neo-proxy-cursor .r{position:absolute;top:50%;left:50%;width:26px;height:26px;margin:-13px;border-radius:50%;border:1.5px solid var(--neo-cursor);box-shadow:0 0 10px var(--neo-cursor);opacity:0;animation:neo-halo 2.6s ease-out infinite}
 #neo-proxy-cursor .r.r2{animation-delay:.87s}#neo-proxy-cursor .r.r3{animation-delay:1.74s}
 @keyframes neo-halo{0%{transform:scale(.3);opacity:0}14%{opacity:.8}100%{transform:scale(3.2);opacity:0}}
@@ -94,20 +83,30 @@ html,body{cursor:none!important}
 @keyframes neo-burst{0%{opacity:1;transform:translate(-50%,-50%) scale(.2)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.7)}}
 </style><script id="neo-proxy-cursor-script">(function(){
 if(window.__neoProxyCursor)return;window.__neoProxyCursor=1;
-var color='#ff3344';var cursor, trails=[];var lastTrail=0;
+var color='#ff3344',cursor,trails=[],lastTrail=0;
+function hexToRgb(hex){var h=String(hex||'').replace('#','');if(h.length===3)h=h.split('').map(function(c){return c+c}).join('');var n=parseInt(h,16);return isNaN(n)?{r:255,g:51,b:68}:{r:(n>>16)&255,g:(n>>8)&255,b:n&255}}
+function buildSvg(){
+  var rgb=hexToRgb(color);
+  var bright='rgb('+Math.min(255,rgb.r+45)+','+Math.min(255,rgb.g+45)+','+Math.min(255,rgb.b+45)+')';
+  var mid='rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
+  var deep='rgb('+Math.max(30,rgb.r-45)+','+Math.max(20,rgb.g-45)+','+Math.max(25,rgb.b-45)+')';
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><radialGradient id="g" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#fff"/><stop offset="25%" stop-color="'+bright+'"/><stop offset="60%" stop-color="'+mid+'"/><stop offset="100%" stop-color="'+deep+'"/></radialGradient></defs><circle cx="40" cy="40" r="36" fill="'+mid+'" fill-opacity=".20"/><path d="M40 4L50 30L76 40L50 50L40 76L30 50L4 40L30 30Z" fill="url(#g)" stroke="'+deep+'" stroke-width="1.8"/><circle cx="40" cy="40" r="8" fill="#fff"/></svg>';
+  return 'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';
+}
 function make(){
   if(cursor)return;
   cursor=document.createElement('div');cursor.id='neo-proxy-cursor';
   cursor.innerHTML='<span class="r r1"></span><span class="r r2"></span><span class="r r3"></span>';
-  document.documentElement.appendChild(cursor);
-  cursor.style.setProperty('--neo-cursor',color);
+  document.documentElement.appendChild(cursor);apply();
 }
-function setColor(v){if(!v)return;color=v;make();cursor.style.setProperty('--neo-cursor',color);cursor.style.filter='drop-shadow(0 0 5px '+color+') drop-shadow(0 0 14px '+color+') drop-shadow(0 0 28px '+color+')'}
+function apply(){if(!cursor)return;cursor.style.setProperty('--neo-cursor',color);cursor.style.backgroundImage=buildSvg();cursor.style.filter='drop-shadow(0 0 5px '+color+') drop-shadow(0 0 12px '+color+') drop-shadow(0 0 20px '+color+')'}
+function setColor(v){if(!v)return;color=v;make();apply()}
 function trail(x,y){var n=Date.now();if(n-lastTrail<45)return;lastTrail=n;var d=document.createElement('div');d.className='neo-proxy-trail';d.style.left=x+'px';d.style.top=y+'px';document.documentElement.appendChild(d);trails.push(d);if(trails.length>14){var old=trails.shift();if(old&&old.remove)old.remove()}setTimeout(function(){if(d&&d.remove)d.remove()},450)}
-function burst(x,y){var d=document.createElement('div');d.className='neo-proxy-burst';d.style.left=x+'px';d.style.top=y+'px';d.style.width='12px';d.style.height='12px';d.style.background='radial-gradient(circle,#fff 0%, '+color+' 45%, transparent 100%)';d.style.boxShadow='0 0 18px '+color+',0 0 35px '+color;d.style.animation='neo-burst .4s ease-out forwards';document.documentElement.appendChild(d);setTimeout(function(){if(d.remove)d.remove()},450)}
+function burst(x,y){var d=document.createElement('div');d.className='neo-proxy-burst';d.style.left=x+'px';d.style.top=y+'px';d.style.width='10px';d.style.height='10px';d.style.background='radial-gradient(circle,#fff 0%, '+color+' 45%, transparent 100%)';d.style.boxShadow='0 0 12px '+color+',0 0 24px '+color;d.style.animation='neo-burst .4s ease-out forwards';document.documentElement.appendChild(d);setTimeout(function(){if(d.remove)d.remove()},450)}
 function move(e){make();cursor.style.display='block';cursor.style.left=e.clientX+'px';cursor.style.top=e.clientY+'px';trail(e.clientX,e.clientY);parent.postMessage({source:'neo-browser-cursor',x:e.clientX,y:e.clientY,click:false},'*')}
 function down(e){make();cursor.style.display='block';burst(e.clientX,e.clientY);parent.postMessage({source:'neo-browser-cursor',x:e.clientX,y:e.clientY,click:true},'*')}
-function boot(){make();document.addEventListener('mousemove',move,{passive:true});document.addEventListener('mousedown',down,{passive:true});window.addEventListener('message',function(e){if(e.data&&e.data.source==='neo-browser-accent')setColor(e.data.color)})}
+function leave(){if(cursor)cursor.style.display='none';parent.postMessage({source:'neo-browser-cursor',leave:true},'*')}
+function boot(){make();document.addEventListener('mousemove',move,{passive:true});document.addEventListener('mousedown',down,{passive:true});document.addEventListener('mouseleave',leave,{passive:true});window.addEventListener('message',function(e){if(e.data&&e.data.source==='neo-browser-accent')setColor(e.data.color)})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();</script>`
 
@@ -181,8 +180,6 @@ module.exports = async function handler(req,res){
     res.setHeader("Cache-Control","no-store");
     res.setHeader("Access-Control-Allow-Origin","*");
 
-    // Upstream frame/CSP headers can prevent the proxied page from rendering.
-    // We intentionally do not forward those headers to our same-origin iframe.
     if(type.toLowerCase().includes("text/html")){
       const text=new TextDecoder(charsetOf(type)).decode(body);
       const lower=text.toLowerCase();
