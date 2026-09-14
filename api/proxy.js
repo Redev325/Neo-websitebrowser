@@ -273,22 +273,8 @@ module.exports = async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Cache-Control", "no-store");
-    // Force full-URL referrers on any subsequent navigation out of this
-    // page. Sites like YouTube often ship their own restrictive
-    // `<meta name="referrer">` tag, which would otherwise starve the
-    // escaped-navigation safety net (server.js) of the Referer info it
-    // needs to recover from a raw `location.href = "/relative"` jump.
-    // An HTTP Referrer-Policy header takes precedence over any in-page
-    // meta tag, so this overrides it regardless.
     res.setHeader("Referrer-Policy", "unsafe-url");
 
-    // Forward Set-Cookie from the upstream site back to the browser, scoped
-    // to our own domain (strip Domain= so it defaults to us). Without this,
-    // every request through the proxy looks like a brand-new anonymous
-    // visitor with no continuity between the page load and its follow-up
-    // data calls — which is exactly what makes sites like YouTube serve a
-    // stripped-down "signed out / no session" experience (empty sidebar,
-    // no feed) instead of their normal content.
     const rawSetCookies = typeof r.headers.getSetCookie === "function" ? r.headers.getSetCookie() : [];
     if (rawSetCookies.length) {
       const rewritten = rawSetCookies.map((c) =>
@@ -309,9 +295,6 @@ module.exports = async function handler(req, res) {
       }
       const bridge = buildBridge(proxyOrigin, current.toString());
       html = rewriteLinks(html, current.toString(), proxyOrigin);
-      // Strip any referrer meta tag the source page ships with — the
-      // Referrer-Policy header above already overrides it for spec-
-      // compliant browsers, but removing it too avoids any ambiguity.
       html = html.replace(/<meta\b[^>]*name\s*=\s*["']referrer["'][^>]*>/gi, "");
       if (/<head[^>]*>/i.test(html)) {
         html = html.replace(/<head([^>]*)>/i, (m) => m + bridge);
@@ -396,7 +379,7 @@ function buildBridge(proxyOrigin, pageBase) {
     'document.addEventListener("submit",function(e){var form=e.target;if(!form)return;e.preventDefault();try{var action=form.getAttribute("action")||PAGE_BASE;var method=(form.getAttribute("method")||"GET").toUpperCase();if(method==="GET"){var u=new URL(action,PAGE_BASE||location.href);if(form.elements.length)u.search=new URLSearchParams(new FormData(form)).toString();var p=toProxy(u.toString());if(p){location.href=p;return}}else{var fd=new FormData(form);var req=new XMLHttpRequest();req.open(method,action);req.send(fd)}}catch(e){}},{capture:true});' +
     'function rewriteHistoryUrl(url){if(url==null||url==="")return null;try{var s=String(url);if(s.indexOf("/api/proxy?url=")!==-1)return null;if(s.charAt(0)==="#")return null;var u=new URL(s,PAGE_BASE||location.href);return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
     'try{var _push=history.pushState.bind(history);var _repl=history.replaceState.bind(history);history.pushState=function(state,title,url){if(url!=null){var p=rewriteHistoryUrl(url);if(p){arguments[2]=p}}return _push.apply(this,arguments)};history.replaceState=function(state,title,url){if(url!=null){var p=rewriteHistoryUrl(url);if(p){arguments[2]=p}}return _repl.apply(this,arguments)}}catch(e){}' +
-    'try{var _href=Object.getOwnPropertyDescriptor(Location.prototype,"href");if(_href&&_href.set){var _set=_href.set;Object.defineProperty(Location.prototype,"href",{configurable:true,set:function(v){var p=toProxy(v);if(p){_set.call(this,p)}else{_set.call(this,v)}}})}}catch(e){}' +
+    'try{var srcDesc=Object.getOwnPropertyDescriptor(Location.prototype,"href");if(srcDesc&&srcDesc.set){var origSet=srcDesc.set;Object.defineProperty(Location.prototype,"href",{configurable:true,enumerable:true,set:function(v){if(typeof v==="string"&&v){var proxyUrl=toProxy(v);if(proxyUrl){return origSet.call(this,proxyUrl)}}return origSet.call(this,v)}})}}catch(e){}' +
     '})();</script>'
   );
 }
