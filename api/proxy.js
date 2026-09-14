@@ -40,28 +40,45 @@ if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;
 var PROXY_ORIGIN=${originJson};
 var PAGE_BASE=${baseJson};
 
-/* ---- cursor bridge ---- */
+/* ---- cursor bridge (respect pointer lock + fullscreen for games) ---- */
 var styleEl=document.getElementById('neo-proxy-cursor-style');
 function setNative(on){if(styleEl)styleEl.textContent=on?'html,body,*{cursor:auto!important}':'html,body,*{cursor:none!important}'}
+function gameCursorMode(){
+  return !!(document.pointerLockElement||document.fullscreenElement||document.webkitFullscreenElement);
+}
+function syncCursorMode(){
+  // Native cursor when pointer-locked / fullscreen (games); otherwise hide for Neo cursor
+  setNative(gameCursorMode());
+}
+document.addEventListener('pointerlockchange',syncCursorMode);
+document.addEventListener('fullscreenchange',syncCursorMode);
+document.addEventListener('webkitfullscreenchange',syncCursorMode);
 function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}
-function send(e,click){var p=screenPoint(e);try{parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}catch(_){}}
+function send(e,click){
+  if(gameCursorMode())return; // don't spam parent while playing
+  var p=screenPoint(e);try{parent.postMessage({source:'neo-browser-cursor',x:p.x,y:p.y,click:!!click},'*')}catch(_){}
+}
 document.addEventListener('mousemove',function(e){send(e,false)},{passive:true});
 document.addEventListener('mousedown',function(e){send(e,true)},{passive:true});
 document.addEventListener('mouseleave',function(){try{parent.postMessage({source:'neo-browser-cursor',leave:true},'*')}catch(_){}},{passive:true});
-window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-shell')return;if('nativeCursor' in d)setNative(!!d.nativeCursor)},{passive:true});
+window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-shell')return;if('nativeCursor' in d)setNative(!!d.nativeCursor||gameCursorMode())},{passive:true});
 try{parent.postMessage({source:'neo-browser-cursor',hello:true},'*')}catch(_){}
+syncCursorMode();
 
-/* ---- turn any http(s) URL into proxy URL ---- */
+/* ---- URL → proxy ---- */
 function toProxy(url){
   try{
-    var u=new URL(url,PAGE_BASE||location.href);
+    if(url==null||url==='')return null;
+    var s=String(url);
+    if(/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(s))return null;
+    var u=new URL(s,PAGE_BASE||location.href);
     if(u.protocol!=='http:'&&u.protocol!=='https:')return null;
     if(u.href.indexOf('/api/proxy?url=')!==-1)return null;
     return PROXY_ORIGIN+'/api/proxy?url='+encodeURIComponent(u.toString());
   }catch(_){return null;}
 }
 
-/* ---- fetch / XHR ---- */
+/* ---- fetch / XHR (games load lots of assets this way) ---- */
 var _fetch=window.fetch;
 window.fetch=function(input,init){
   try{
@@ -83,58 +100,61 @@ XMLHttpRequest.prototype.open=function(method,url){
   return XO.apply(this,arguments);
 };
 
-/* ---- CRITICAL: stop relative navigations from hitting the host SPA (/results → 404) ---- */
+/* ---- Web Workers (common in game engines) ---- */
+try{
+  var _Worker=window.Worker;
+  window.Worker=function(scriptURL,options){
+    var p=toProxy(scriptURL);
+    return new _Worker(p||scriptURL,options);
+  };
+  window.Worker.prototype=_Worker.prototype;
+}catch(_){}
+try{
+  if(window.SharedWorker){
+    var _SW=window.SharedWorker;
+    window.SharedWorker=function(scriptURL,options){
+      var p=toProxy(scriptURL);
+      return new _SW(p||scriptURL,options);
+    };
+    window.SharedWorker.prototype=_SW.prototype;
+  }
+}catch(_){}
+
+/* ---- importScripts inside workers can't be patched here; worker file itself is proxied ---- */
+
+/* ---- navigation guards (avoid host SPA 404) ---- */
 function proxyNavigate(href){
   var proxied=toProxy(href);
   if(!proxied)return false;
-  // Navigate this frame to the proxied URL (full load through our proxy)
   location.href=proxied;
   return true;
 }
-
 document.addEventListener('click',function(e){
   var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;
   if(!a)return;
   var href=a.getAttribute('href');
   if(!href||href.charAt(0)==='#'||/^(javascript:|mailto:|tel:)/i.test(href))return;
-  // Let modified clicks (new tab) through
   if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
   if(a.target&&a.target!=='_self'&&a.target!=='')return;
-  if(proxyNavigate(href)){
-    e.preventDefault();
-    e.stopPropagation();
-  }
+  if(proxyNavigate(href)){e.preventDefault();e.stopPropagation();}
 },true);
-
 document.addEventListener('submit',function(e){
   var form=e.target;
-  if(!form||!form.action)return;
+  if(!form)return;
   try{
     var action=form.getAttribute('action')||PAGE_BASE;
     var method=(form.getAttribute('method')||'GET').toUpperCase();
-    if(method!=='GET')return; // POST forms need more work
+    if(method!=='GET')return;
     var u=new URL(action,PAGE_BASE||location.href);
     var fd=new FormData(form);
     fd.forEach(function(v,k){u.searchParams.append(k,v);});
-    if(proxyNavigate(u.toString())){
-      e.preventDefault();
-      e.stopPropagation();
-    }
+    if(proxyNavigate(u.toString())){e.preventDefault();e.stopPropagation();}
   }catch(_){}
 },true);
-
-// Intercept location.assign / replace if sites use them
 try{
-  var _assign=Location.prototype.assign;
-  var _replace=Location.prototype.replace;
-  Location.prototype.assign=function(url){
-    var p=toProxy(url);
-    return _assign.call(this,p||url);
-  };
-  Location.prototype.replace=function(url){
-    var p=toProxy(url);
-    return _replace.call(this,p||url);
-  };
+  var _assign=Location.prototype.assign,_replace=Location.prototype.replace;
+  Location.prototype.assign=function(url){var p=toProxy(url);return _assign.call(this,p||url);};
+  Location.prototype.replace=function(url){var p=toProxy(url);return _replace.call(this,p||url);};
 }catch(_){}
 })();</script>`;
 }
@@ -216,18 +236,23 @@ function charsetOf(contentType) {
   return m ? m[1].trim().replace(/^[\"']|[\"']$/g, "") : "utf-8";
 }
 
-function isCacheableType(type) {
+function isCacheableType(type, urlPath) {
   const t = (type || "").toLowerCase();
+  const p = (urlPath || "").toLowerCase();
   return (
     t.includes("image/") ||
     t.includes("font/") ||
     t.includes("text/css") ||
     t.includes("javascript") ||
     t.includes("application/javascript") ||
+    t.includes("application/wasm") ||
+    t.includes("application/octet-stream") ||
+    t.includes("application/json") ||
     t.includes("application/font") ||
     t.includes("woff") ||
     t.includes("audio/") ||
-    t.includes("video/")
+    t.includes("video/") ||
+    /\.(wasm|data|bundle|pak|unity3d|pck|assets)(\?|$)/i.test(p)
   );
 }
 
@@ -255,11 +280,14 @@ async function fetchChecked(start, req) {
       "accept-encoding": "identity",
     };
     if (req.headers.cookie) headers.cookie = req.headers.cookie;
+    // Support Range requests (audio/video streaming in games)
+    if (req.headers.range) headers.range = req.headers.range;
 
     const r = await fetch(current.toString(), {
       redirect: "manual",
       headers,
-      signal: AbortSignal.timeout ? AbortSignal.timeout(25000) : undefined,
+      // Games often load large wasm/data packs
+      signal: AbortSignal.timeout ? AbortSignal.timeout(60000) : undefined,
     });
 
     if (!(r.status >= 300 && r.status < 400)) return { r, current };
@@ -446,12 +474,17 @@ module.exports = async function handler(req, res) {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
+    // Help wasm / cross-origin game assets
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 
-    if (isCacheableType(type)) {
-      res.setHeader("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
+    if (isCacheableType(type, current.pathname)) {
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
     } else {
       res.setHeader("Cache-Control", "no-store");
     }
+
+    // Forward partial content status for range requests
+    const status = r.status;
 
     if (type.toLowerCase().includes("text/html")) {
       const text = new TextDecoder(charsetOf(type)).decode(body);
@@ -467,18 +500,28 @@ module.exports = async function handler(req, res) {
 
       const html = rewriteHtml(text, current.toString(), proxyOrigin);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      return res.status(r.status).send(html);
+      return res.status(status).send(html);
     }
 
     if (type.toLowerCase().includes("text/css")) {
       const text = new TextDecoder(charsetOf(type)).decode(body);
       const css = rewriteCss(text, current.toString(), proxyOrigin);
       res.setHeader("Content-Type", "text/css; charset=utf-8");
-      return res.status(r.status).send(css);
+      return res.status(status).send(css);
     }
 
-    res.setHeader("Content-Type", type || "application/octet-stream");
-    return res.status(r.status).send(Buffer.from(body));
+    // Preserve Content-Type for wasm / binary game packs
+    let outType = type || "application/octet-stream";
+    if (!type && /\.wasm$/i.test(current.pathname)) outType = "application/wasm";
+    res.setHeader("Content-Type", outType);
+
+    // Forward content-range if present
+    const cr = r.headers.get("content-range");
+    if (cr) res.setHeader("Content-Range", cr);
+    const ar = r.headers.get("accept-ranges");
+    if (ar) res.setHeader("Accept-Ranges", ar);
+
+    return res.status(status).send(Buffer.from(body));
   } catch (e) {
     console.error(e);
     if (e && (e.name === "TimeoutError" || e.name === "AbortError")) {
