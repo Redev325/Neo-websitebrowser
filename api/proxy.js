@@ -31,6 +31,154 @@ function makeProx(proxyOrigin) {
   return (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
 }
 
+function searchQueryOf(u) {
+  const host = u.hostname.toLowerCase();
+  const isBing = host === "www.bing.com" || host === "bing.com";
+  if (!isBing) return null;
+  if (!/^\/search\/?$/.test(u.pathname)) return null;
+  const q = u.searchParams.get("q");
+  return q ? q.trim() : null;
+}
+
+function stripTags(s) {
+  return s.replace(/<[^>]*>/g, "");
+}
+
+function decodeEntities(s) {
+  return s
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)));
+}
+
+function clean(s) {
+  return decodeEntities(stripTags(s)).replace(/\s+/g, " ").trim();
+}
+
+function escapeHtml(s) {
+  return s
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
+}
+
+function resolveBingLink(href) {
+  const url = decodeEntities(href);
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  if (host.endsWith("bing.com")) {
+    try {
+      const enc = new URL(url).searchParams.get("u");
+      if (enc && enc.startsWith("a1")) {
+        const real = Buffer.from(enc.slice(2), "base64url").toString("utf-8");
+        if (/^https?:\/\//i.test(real)) return real;
+      }
+    } catch {}
+    return null;
+  }
+  if (host.endsWith("microsoft.com") || host.endsWith("msn.com")) return null;
+  return url;
+}
+
+function parseBingResults(html) {
+  const results = [];
+  const seen = new Set();
+  const marker = 'class="b_algo';
+  let idx = html.indexOf(marker);
+  while (idx !== -1 && results.length < 15) {
+    const next = html.indexOf(marker, idx + marker.length);
+    const block = html.slice(idx, next === -1 ? html.length : next);
+
+    const linkMatch = block.match(
+      /<h2[^>]*>[\s\S]*?<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i
+    );
+    if (linkMatch) {
+      const url = resolveBingLink(linkMatch[1]);
+      const title = clean(linkMatch[2]);
+      const snipMatch = block.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i);
+      const snippet = snipMatch ? clean(snipMatch[1]) : "";
+
+      if (url && title && !seen.has(url)) {
+        seen.add(url);
+        let display = url;
+        try {
+          const uu = new URL(url);
+          display =
+            uu.hostname.replace(/^www\./, "") +
+            (uu.pathname === "/" ? "" : uu.pathname);
+        } catch {}
+        results.push({ url, title, snippet, display });
+      }
+    }
+    idx = next;
+  }
+  return results;
+}
+
+function renderSearchPage(query, results, proxyOrigin) {
+  const prox = makeProx(proxyOrigin);
+  const bridge = buildBridge(proxyOrigin, "https://www.bing.com/");
+  const q = escapeHtml(query);
+  const items = results
+    .map(
+      (r) => `
+      <article class="res">
+        <a class="res-url" href="${escapeHtml(prox(new URL(r.url)))}">${escapeHtml(r.display)}</a>
+        <a class="res-title" href="${escapeHtml(prox(new URL(r.url)))}">${escapeHtml(r.title)}</a>
+        ${r.snippet ? `<p class="res-snip">${escapeHtml(r.snippet)}</p>` : ""}
+      </article>`
+    )
+    .join("");
+
+  const empty = `<div class="empty"><div class="empty-orb"></div><p>No results found for <strong>${q}</strong>.</p><p class="empty-sub">Try a different search or enter a full URL.</p></div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${q} — Neo Search</title>
+<style>
+  :root{--bg:#0a0a0b;--panel:#111114;--border:#1f1f24;--text:#e7e7ea;--muted:#8a8a93;--accent:#ff2d2d;--link:#8ab4ff;}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100%}
+  .wrap{max-width:720px;margin:0 auto;padding:28px 20px 60px}
+  .brand{font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:18px;font-weight:700}
+  .q{font-size:22px;font-weight:600;margin:0 0 6px}
+  .meta{color:var(--muted);font-size:13px;margin:0 0 28px}
+  .res{padding:16px 0;border-top:1px solid var(--border)}
+  .res-url{display:block;font-size:12px;color:var(--muted);text-decoration:none;margin-bottom:4px;word-break:break-all}
+  .res-title{display:block;font-size:18px;color:var(--link);text-decoration:none;margin-bottom:6px;line-height:1.3}
+  .res-title:hover{text-decoration:underline}
+  .res-snip{margin:0;font-size:14px;color:var(--muted);line-height:1.5}
+  .empty{text-align:center;padding:60px 20px;color:var(--muted)}
+  .empty-orb{width:48px;height:48px;border-radius:50%;margin:0 auto 16px;background:radial-gradient(circle at 30% 30%,#ff4d4d,#7a0000);box-shadow:0 0 24px rgba(255,45,45,0.35)}
+  .empty-sub{font-size:13px}
+</style>
+${bridge}
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">Neo Search</div>
+    <h1 class="q">${q}</h1>
+    <p class="meta">${results.length ? results.length + " results" : "No results"}</p>
+    ${results.length ? items : empty}
+  </div>
+</body>
+</html>`;
+}
+
 module.exports = async function handler(req, res) {
   const raw = req.query && req.query.url;
   if (!raw || typeof raw !== "string") return res.status(400).send("Missing ?url=");
@@ -80,6 +228,15 @@ module.exports = async function handler(req, res) {
 
     if (type.toLowerCase().includes("text/html")) {
       let html = new TextDecoder("utf-8").decode(body);
+      const query = searchQueryOf(current);
+      if (query) {
+        const results = parseBingResults(html);
+        if (results.length) {
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.setHeader("Cache-Control", "no-store");
+          return res.status(200).send(renderSearchPage(query, results, proxyOrigin));
+        }
+      }
       const bridge = buildBridge(proxyOrigin, current.toString());
       html = rewriteLinks(html, current.toString(), proxyOrigin);
       if (/<head[^>]*>/i.test(html)) {
