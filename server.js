@@ -9,21 +9,80 @@ const app = express();
 // Disable Express's own "X-Powered-By" header, matching Vercel's default.
 app.disable("x-powered-by");
 
-// --- API routes -----------------------------------------------------------
-// api/proxy.js and api/search.js already export `(req, res) => {...}`
-// handlers written for Vercel's Node runtime. Express's req/res objects are
-// a superset of what those functions use (req.query, req.headers,
-// res.status().send(), res.setHeader()), so they work unchanged here.
+// Parse JSON bodies for any future POST handlers
+app.use(express.json({ limit: "1mb" }));
+
+// --- Real API routes (proxy + search) ---------------------------------------
 app.get("/api/proxy", (req, res) => proxyHandler(req, res));
 app.get("/api/search", (req, res) => searchHandler(req, res));
 
+// --- Base44-compatible mocks ------------------------------------------------
+// The exported frontend was built on Base44 and expects these endpoints.
+// Without them the React app receives HTML (from the SPA fallback) and crashes
+// with "u.map is not a function". Returning empty/safe JSON lets the UI render.
+
+const APP_ID = "6a83d89cecbce69b361331b1";
+
+// Public settings
+app.get("/api/public/prod/public-settings/by-id/:id", (req, res) => {
+  res.json({
+    id: req.params.id || APP_ID,
+    appName: "Neo",
+    theme: "dark",
+    accent: "0 80% 55%",
+    features: {},
+  });
+});
+
+// Generic entity list / single entity – return empty array or empty object
+app.get("/api/apps/:appId/entities/:entity", (req, res) => {
+  // Most Base44 list endpoints expect an array
+  res.json([]);
+});
+
+app.get("/api/apps/:appId/entities/:entity/:id", (req, res) => {
+  res.json(null);
+});
+
+// App metadata
+app.get("/api/apps/:appId", (req, res) => {
+  res.json({
+    id: req.params.appId || APP_ID,
+    name: "Neo",
+    slug: "neo",
+  });
+});
+
+// Analytics / tracking – just accept and ignore
+app.post("/api/apps/:appId/analytics/track/batch", (req, res) => {
+  res.status(204).end();
+});
+
+app.post("/api/apps/:appId/analytics/*", (req, res) => {
+  res.status(204).end();
+});
+
+// App logs
+app.post("/api/app-logs/:appId/*", (req, res) => {
+  res.status(204).end();
+});
+
+// Catch-all for any other /api/* that we don't implement yet
+// (prevents the SPA fallback from returning HTML to the frontend)
+app.all("/api/*", (req, res) => {
+  console.log(`[api-mock] ${req.method} ${req.path}`);
+  if (req.method === "GET") {
+    // Prefer empty array – many list calls call .map()
+    res.json([]);
+  } else {
+    res.status(204).end();
+  }
+});
+
 // --- Static frontend --------------------------------------------------------
-// Serves index.html, /assets, /static, etc. exactly like Vercel did.
 const staticRoot = __dirname;
 app.use(
   express.static(staticRoot, {
-    // Don't cache index.html itself (it's small and may change on deploy),
-    // but let hashed asset filenames (assets/xxx-HASH.js) cache long-term.
     setHeaders(res, filePath) {
       if (path.basename(filePath) === "index.html") {
         res.setHeader("Cache-Control", "no-cache");
@@ -34,8 +93,7 @@ app.use(
   })
 );
 
-// SPA fallback: any other GET request gets index.html so client-side
-// routing (if any) keeps working.
+// SPA fallback
 app.get("*", (req, res) => {
   res.sendFile(path.join(staticRoot, "index.html"), (err) => {
     if (err) {
@@ -46,8 +104,6 @@ app.get("*", (req, res) => {
 });
 
 const port = process.env.PORT || 3000;
-// Railway (and most cloud platforms) require binding to 0.0.0.0 so the
-// platform proxy can reach the process. Listening only on localhost fails.
 app.listen(port, "0.0.0.0", () => {
   console.log(`Neo Browser listening on 0.0.0.0:${port}`);
   console.log(`Static root: ${staticRoot}`);
