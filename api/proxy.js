@@ -27,18 +27,18 @@ function targetUrl(raw, base) {
   }
 }
 
-// proxyOrigin is the public origin of THIS app (e.g. https://xxx.up.railway.app)
-// Must be absolute so <base href="https://youtube.com"> does not rewrite /api/proxy to youtube.com/api/proxy
 function makeProx(proxyOrigin) {
   return (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
 }
 
-function buildPageBridge(proxyOrigin) {
+function buildPageBridge(proxyOrigin, pageBase) {
   const originJson = JSON.stringify(proxyOrigin);
+  const baseJson = JSON.stringify(pageBase);
   return `<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}</style>
 <script id="neo-proxy-bridge">(function(){
 if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;
 var PROXY_ORIGIN=${originJson};
+var PAGE_BASE=${baseJson};
 
 /* ---- cursor bridge ---- */
 var styleEl=document.getElementById('neo-proxy-cursor-style');
@@ -51,16 +51,17 @@ document.addEventListener('mouseleave',function(){try{parent.postMessage({source
 window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-shell')return;if('nativeCursor' in d)setNative(!!d.nativeCursor)},{passive:true});
 try{parent.postMessage({source:'neo-browser-cursor',hello:true},'*')}catch(_){}
 
-/* ---- network interceptor ---- */
+/* ---- turn any http(s) URL into proxy URL ---- */
 function toProxy(url){
   try{
-    var u=new URL(url,location.href);
+    var u=new URL(url,PAGE_BASE||location.href);
     if(u.protocol!=='http:'&&u.protocol!=='https:')return null;
     if(u.href.indexOf('/api/proxy?url=')!==-1)return null;
     return PROXY_ORIGIN+'/api/proxy?url='+encodeURIComponent(u.toString());
   }catch(_){return null;}
 }
 
+/* ---- fetch / XHR ---- */
 var _fetch=window.fetch;
 window.fetch=function(input,init){
   try{
@@ -73,7 +74,6 @@ window.fetch=function(input,init){
   }catch(_){}
   return _fetch.call(this,input,init);
 };
-
 var XO=XMLHttpRequest.prototype.open;
 XMLHttpRequest.prototype.open=function(method,url){
   try{
@@ -82,6 +82,60 @@ XMLHttpRequest.prototype.open=function(method,url){
   }catch(_){}
   return XO.apply(this,arguments);
 };
+
+/* ---- CRITICAL: stop relative navigations from hitting the host SPA (/results → 404) ---- */
+function proxyNavigate(href){
+  var proxied=toProxy(href);
+  if(!proxied)return false;
+  // Navigate this frame to the proxied URL (full load through our proxy)
+  location.href=proxied;
+  return true;
+}
+
+document.addEventListener('click',function(e){
+  var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;
+  if(!a)return;
+  var href=a.getAttribute('href');
+  if(!href||href.charAt(0)==='#'||/^(javascript:|mailto:|tel:)/i.test(href))return;
+  // Let modified clicks (new tab) through
+  if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
+  if(a.target&&a.target!=='_self'&&a.target!=='')return;
+  if(proxyNavigate(href)){
+    e.preventDefault();
+    e.stopPropagation();
+  }
+},true);
+
+document.addEventListener('submit',function(e){
+  var form=e.target;
+  if(!form||!form.action)return;
+  try{
+    var action=form.getAttribute('action')||PAGE_BASE;
+    var method=(form.getAttribute('method')||'GET').toUpperCase();
+    if(method!=='GET')return; // POST forms need more work
+    var u=new URL(action,PAGE_BASE||location.href);
+    var fd=new FormData(form);
+    fd.forEach(function(v,k){u.searchParams.append(k,v);});
+    if(proxyNavigate(u.toString())){
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }catch(_){}
+},true);
+
+// Intercept location.assign / replace if sites use them
+try{
+  var _assign=Location.prototype.assign;
+  var _replace=Location.prototype.replace;
+  Location.prototype.assign=function(url){
+    var p=toProxy(url);
+    return _assign.call(this,p||url);
+  };
+  Location.prototype.replace=function(url){
+    var p=toProxy(url);
+    return _replace.call(this,p||url);
+  };
+}catch(_){}
 })();</script>`;
 }
 
@@ -96,10 +150,7 @@ function rewriteAttr(tag, attr, base, prox) {
 
 function rewriteHtml(html, base, proxyOrigin) {
   const prox = makeProx(proxyOrigin);
-  const bridge = buildPageBridge(proxyOrigin);
-
-  // Do NOT inject <base href> — it breaks absolute-path /api/proxy links.
-  // Instead rewrite all resource URLs to absolute proxy URLs.
+  const bridge = buildPageBridge(proxyOrigin, base);
 
   html = html.replace(
     /<(img|script|source|video|audio|track|iframe|embed|object)\b[^>]*>/gi,
@@ -142,7 +193,6 @@ function rewriteHtml(html, base, proxyOrigin) {
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy-report-only[\"'][^>]*>/gi, "");
   html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*[\"']x-frame-options[\"'][^>]*>/gi, "");
 
-  // Inject bridge early in <head>
   if (/<head[^>]*>/i.test(html)) {
     html = html.replace(/<head([^>]*)>/i, (m) => m + bridge);
   } else if (/<\/body>/i.test(html)) {
@@ -319,7 +369,7 @@ function parseBingResults(html) {
 
 function renderSearchPage(query, results, proxyOrigin) {
   const prox = makeProx(proxyOrigin);
-  const bridge = buildPageBridge(proxyOrigin);
+  const bridge = buildPageBridge(proxyOrigin, "https://www.bing.com/");
   const q = escapeHtml(query);
   const items = results
     .map(
