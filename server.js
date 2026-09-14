@@ -117,6 +117,7 @@ app.use((req, res, next) => {
   try {
     const encoded = referer.slice(idx + marker.length).split("&")[0];
     const originalUrl = new URL(decodeURIComponent(encoded));
+    // Include the full query string if present
     const escapedUrl = new URL(req.originalUrl, originalUrl.origin);
     const target = "/api/proxy?url=" + encodeURIComponent(escapedUrl.toString());
     return res.redirect(302, target);
