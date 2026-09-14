@@ -1,84 +1,43 @@
-const http = require("node:http");
-const fs = require("node:fs");
-const path = require("node:path");
-const proxyHandler = require("./api/proxy");
-const searchHandler = require("./api/search");
+const express = require("express");
+const path = require("path");
 
-const PORT = Number(process.env.PORT) || 3000;
-const ROOT = __dirname;
+const proxyHandler = require("./api/proxy.js");
+const searchHandler = require("./api/search.js");
 
-const MIME = { ".html":"text/html; charset=utf-8", ".css":"text/css; charset=utf-8", ".js":"text/javascript; charset=utf-8", ".json":"application/json; charset=utf-8", ".svg":"image/svg+xml", ".png":"image/png", ".jpg":"image/jpeg", ".jpeg":"image/jpeg", ".webp":"image/webp", ".gif":"image/gif", ".ico":"image/x-icon", ".woff":"font/woff", ".woff2":"font/woff2", ".txt":"text/plain; charset=utf-8" };
+const app = express();
 
-function createResponse(res) {
-  let statusCode = 200;
-  let sent = false;
-  const response = {
-    status(code) { statusCode = Number(code) || 200; return response; },
-    setHeader(name, value) { res.setHeader(name, value); return response; },
-    end(body) { if (sent) return response; sent = true; res.statusCode = statusCode; res.end(body); return response; },
-    send(body) { return response.end(body); }
-  };
-  return response;
-}
+// Disable Express's own "X-Powered-By" header, matching Vercel's default.
+app.disable("x-powered-by");
 
-async function runApi(handler, req, res, url) {
-  const apiReq = Object.create(req);
-  apiReq.query = Object.fromEntries(url.searchParams.entries());
-  const apiRes = createResponse(res);
-  await handler(apiReq, apiRes);
-}
+// --- API routes -----------------------------------------------------------
+// api/proxy.js and api/search.js already export `(req, res) => {...}`
+// handlers written for Vercel's Node runtime. Express's req/res objects are
+// a superset of what those functions use (req.query, req.headers,
+// res.status().send(), res.setHeader()), so they work unchanged here.
+app.get("/api/proxy", (req, res) => proxyHandler(req, res));
+app.get("/api/search", (req, res) => searchHandler(req, res));
 
-function safeStaticPath(urlPath) {
-  let decoded;
-  try { decoded = decodeURIComponent(urlPath); } catch { return null; }
-  const relative = decoded === "/" ? "index.html" : decoded.replace(/^\/+/, "");
-  const full = path.resolve(ROOT, relative);
-  const root = path.resolve(ROOT) + path.sep;
-  if (full !== path.resolve(ROOT) && !full.startsWith(root)) return null;
-  return full;
-}
-
-function serveStatic(req, res, url) {
-  let filePath = safeStaticPath(url.pathname);
-  if (!filePath) { res.writeHead(400, {"Content-Type":"text/plain; charset=utf-8"}); res.end("Invalid path"); return; }
-  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) filePath = path.join(ROOT, "index.html");
-
-  fs.stat(filePath, (err, stat) => {
-    if (err || !stat.isFile()) { res.writeHead(404, {"Content-Type":"text/plain; charset=utf-8"}); res.end("Not found"); return; }
-    const ext = path.extname(filePath).toLowerCase();
-    const headers = {"Content-Type":MIME[ext] || "application/octet-stream", "X-Content-Type-Options":"nosniff"};
-    if (filePath.startsWith(path.join(ROOT, "assets") + path.sep)) headers["Cache-Control"] = "no-store";
-    if (req.method === "HEAD") { res.writeHead(200, headers); return res.end(); }
-    if (ext === ".html") {
-      fs.readFile(filePath, "utf8", (readErr, html) => {
-        if (readErr) { res.writeHead(500, {"Content-Type":"text/plain; charset=utf-8"}); return res.end("Failed to read page"); }
-        headers["Content-Length"] = Buffer.byteLength(html);
-        res.writeHead(200, headers); res.end(html);
-      });
-      return;
-    }
-    res.writeHead(200, headers); fs.createReadStream(filePath).pipe(res);
-  });
-}
-
-const server = http.createServer(async (req, res) => {
-  try {
-    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-    if (req.method === "GET" || req.method === "HEAD") {
-      if (url.pathname === "/api/proxy") {
-        if (req.method === "HEAD") { res.writeHead(405, {"Content-Type":"text/plain; charset=utf-8"}); return res.end("Method not allowed"); }
-        return await runApi(proxyHandler, req, res, url);
+// --- Static frontend --------------------------------------------------------
+// Serves index.html, /assets, /static, etc. exactly like Vercel did.
+app.use(
+  express.static(__dirname, {
+    // Don't cache index.html itself (it's small and may change on deploy),
+    // but let hashed asset filenames (assets/xxx-HASH.js) cache long-term.
+    setHeaders(res, filePath) {
+      if (path.basename(filePath) === "index.html") {
+        res.setHeader("Cache-Control", "no-cache");
       }
-      if (url.pathname === "/api/search") return await runApi(searchHandler, req, res, url);
-      if (url.pathname === "/health") { res.writeHead(200, {"Content-Type":"text/plain; charset=utf-8"}); return res.end("ok"); }
-      return serveStatic(req, res, url);
-    }
-    res.writeHead(405, {"Content-Type":"text/plain; charset=utf-8", "Allow":"GET, HEAD"}); res.end("Method not allowed");
-  } catch (error) {
-    console.error(error);
-    if (!res.headersSent) res.writeHead(500, {"Content-Type":"text/plain; charset=utf-8"});
-    res.end("Server error");
-  }
+    },
+  })
+);
+
+// SPA fallback: any other GET request gets index.html so client-side
+// routing (if any) keeps working.
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
-server.listen(PORT, "0.0.0.0", () => console.log(`Neo Browser listening on port ${PORT}`));
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Neo Browser listening on port ${port}`);
+});
