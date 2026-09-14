@@ -24,15 +24,6 @@ const MIME = {
   ".txt": "text/plain; charset=utf-8"
 };
 
-function patchBrowserBundle(js) {
-  // The exported Base44 bundle expects CE.list() to resolve to an array.
-  // Some Railway responses can be wrapped as {data:[...]} / {items:[...]}
-  // / {results:[...]}. Normalize every CE.list() call before React sees it.
-  const helper = `const __neoNormalizeList=x=>Array.isArray(x)?x:(x&&Array.isArray(x.data)?x.data:(x&&Array.isArray(x.items)?x.items:(x&&Array.isArray(x.results)?x.results:[])));const __neoList=()=>Promise.resolve(CE.list()).then(__neoNormalizeList);`;
-  const patched = js.replace(/\bCE\.list\(\)/g, "__neoList()");
-  return `${helper}${patched}`;
-}
-
 function createResponse(res) {
   let statusCode = 200;
   let sent = false;
@@ -106,6 +97,9 @@ function serveStatic(req, res, url) {
       "X-Content-Type-Options": "nosniff"
     };
 
+    // Hashed frontend assets are immutable in the exported app. During
+    // troubleshooting we deliberately disable caching so Railway/browser
+    // cannot keep serving an older JavaScript bundle.
     if (filePath.startsWith(path.join(ROOT, "assets") + path.sep)) {
       headers["Cache-Control"] = "no-store";
     }
@@ -124,20 +118,6 @@ function serveStatic(req, res, url) {
         headers["Content-Length"] = Buffer.byteLength(html);
         res.writeHead(200, headers);
         res.end(html);
-      });
-      return;
-    }
-
-    if (ext === ".js" && path.basename(filePath) === "index-BtrMTjCx.js") {
-      fs.readFile(filePath, "utf8", (readErr, js) => {
-        if (readErr) {
-          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-          return res.end("Failed to read browser bundle");
-        }
-        const patched = patchBrowserBundle(js);
-        headers["Content-Length"] = Buffer.byteLength(patched);
-        res.writeHead(200, headers);
-        res.end(patched);
       });
       return;
     }
