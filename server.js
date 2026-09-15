@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 
 const proxyHandler = require("./api/proxy.js");
 const searchHandler = require("./api/search.js");
@@ -18,8 +19,8 @@ app.use(express.json({ limit: "1mb" }));
 // The in-page bridge script rewrites those calls to hit /api/proxy, but if
 // this route only matched GET, POST requests would fall through to the
 // generic "/api/*" mock catch-all below and silently get an empty 204
-// response instead of ever reaching the real proxy — which is what was
-// causing YouTube's sidebar and home feed to render empty.
+// response instead of ever reaching the real proxy — which was causing
+// YouTube's sidebar and home feed to render empty.
 app.all("/api/proxy", (req, res) => proxyHandler(req, res));
 app.all("/api/search", (req, res) => searchHandler(req, res));
 
@@ -43,7 +44,6 @@ app.get("/api/public/prod/public-settings/by-id/:id", (req, res) => {
 
 // Generic entity list / single entity – return empty array or empty object
 app.get("/api/apps/:appId/entities/:entity", (req, res) => {
-  // Most Base44 list endpoints expect an array
   res.json([]);
 });
 
@@ -79,28 +79,35 @@ app.post("/api/app-logs/:appId/*", (req, res) => {
 app.all("/api/*", (req, res) => {
   console.log(`[api-mock] ${req.method} ${req.path}`);
   if (req.method === "GET") {
-    // Prefer empty array – many list calls call .map()
     res.json([]);
   } else {
     res.status(204).end();
   }
 });
 
+// --- Neo Browser enhancement -----------------------------------------------
+// Keep the existing React application untouched. On Railway/Node hosting,
+// only the /Browser document gets one small additional script that adds
+// browser-local tabs and makes the address bar use NEO Search for search terms.
+// This is deliberately isolated from the rest of the app so the site layout,
+// sidebar and other pages are not replaced.
+app.get("/Browser", (req, res, next) => {
+  const indexPath = path.join(__dirname, "index.html");
+  fs.readFile(indexPath, "utf8", (err, html) => {
+    if (err) return next(err);
+    const script = '<script src="/browser-enhancer.js"></script>';
+    if (html.includes('/browser-enhancer.js')) return res.type('html').send(html);
+    const injected = html.replace(/<\/body>/i, script + '</body>');
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.type('html').send(injected);
+  });
+});
+
 // --- Escaped-navigation safety net ------------------------------------------
 // The in-page bridge script (api/proxy.js) intercepts <a> clicks, <form>
 // submits, and history.pushState/replaceState so in-page navigation stays
 // routed through our proxy. But some sites navigate via a direct
-// `location.href = "/relative/path"` assignment instead (YouTube's search
-// box does this) — that's not something a script can reliably intercept, so
-// the relative path resolves against the iframe's real same-origin address
-// (our own domain) and hits a path our own app doesn't recognize, which
-// showed up as our own app's "Page Not Found" screen rendered inside the
-// browser frame.
-//
-// Fix: if a GET request comes in for a path we don't otherwise serve, and
-// its Referer shows it came from a page we were proxying, reconstruct the
-// real destination from that referring page's original URL and redirect
-// back through the proxy instead of falling through to the SPA.
+// `location.href = "/relative/path"` assignment instead.
 app.use((req, res, next) => {
   if (req.method !== "GET" && req.method !== "HEAD") return next();
   if (
@@ -117,10 +124,8 @@ app.use((req, res, next) => {
   try {
     const encoded = referer.slice(idx + marker.length).split("&")[0];
     const originalUrl = new URL(decodeURIComponent(encoded));
-    // Build the escaped URL from the current request path + query + fragment
     const escapedUrl = new URL(req.originalUrl, originalUrl.origin);
     const target = "/api/proxy?url=" + encodeURIComponent(escapedUrl.toString());
-    // Use 307 Temporary Redirect to preserve the method and prevent infinite loops
     return res.redirect(307, target);
   } catch (e) {
     console.error("[escaped-nav] Error reconstructing URL:", e.message);
