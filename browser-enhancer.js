@@ -9,13 +9,15 @@
   var frame = null;
   var address = null;
   var lastFrameSrc = '';
-  var NEO_HOME = location.origin + '/';
+  var HOME_TOKEN = 'neo://home';
 
   function isBrowserPage() { return /^\/browser\/?$/i.test(location.pathname); }
   function findFrame() { return document.querySelector('iframe.neo-browser-frame'); }
   function findAddress() { return document.querySelector('.neo-browser-input'); }
+  function isHome(url) { return !url || url === HOME_TOKEN; }
 
   function originalUrl(url) {
+    if (isHome(url)) return '';
     try {
       var u = new URL(url, location.href);
       if (u.pathname === '/api/proxy') return decodeURIComponent(u.searchParams.get('url') || url);
@@ -24,6 +26,7 @@
   }
 
   function titleFor(url) {
+    if (isHome(url)) return 'Home';
     try {
       var u = new URL(originalUrl(url), location.href);
       if (u.pathname === '/' || u.pathname === '') return 'Home';
@@ -37,13 +40,50 @@
     try {
       var u = new URL(url, location.href);
       if (!/^https?:$/i.test(u.protocol)) return url;
-      // Neo's own pages must stay local. External sites go through the proxy.
       if (u.origin === location.origin) return u.href;
       return location.origin + '/api/proxy?url=' + encodeURIComponent(u.href);
     } catch (_) { return url; }
   }
 
-  function makeTab(url, title) { return { url: url || NEO_HOME, title: title || titleFor(url || NEO_HOME) }; }
+  function makeTab(url, title) {
+    return { url: isHome(url) ? HOME_TOKEN : url, title: title || titleFor(url) };
+  }
+
+  // This is the browser's actual new-tab screen. It lives inside the browser
+  // frame so every new tab gets the same start page instead of Neo's website.
+  function homeMarkup() {
+    return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' +
+      '*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Arial,Helvetica,sans-serif;background:#050505;color:#fff;overflow:hidden}' +
+      'body{display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 45%,rgba(120,0,0,.22),transparent 45%),radial-gradient(circle at 50% 100%,rgba(255,0,0,.10),transparent 55%),#050505}' +
+      '.wrap{width:min(760px,90%);text-align:center;transform:translateY(-2%)}' +
+      '.title{font-size:clamp(34px,6vw,64px);font-weight:800;letter-spacing:.16em;margin-bottom:18px;text-shadow:0 0 22px rgba(255,0,0,.55)}' +
+      '.sub{font-size:15px;color:#b9b9b9;margin-bottom:28px}' +
+      '.search{display:flex;align-items:center;gap:10px;width:100%;height:58px;padding:0 18px;border:1px solid rgba(255,60,60,.45);border-radius:14px;background:rgba(12,12,14,.92);box-shadow:0 0 30px rgba(255,0,0,.12),inset 0 0 18px rgba(255,0,0,.04)}' +
+      'input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:#fff;font-size:16px}input::placeholder{color:#777}' +
+      'button{border:1px solid rgba(255,55,55,.45);background:rgba(18,18,20,.9);color:#eee;border-radius:11px;padding:12px 18px;font-size:14px;cursor:pointer;transition:.15s ease}button:hover{border-color:#f33;box-shadow:0 0 18px rgba(255,0,0,.22);color:#fff}' +
+      '.go{background:rgba(150,0,0,.24);min-width:78px}.quick{display:flex;justify-content:center;gap:10px;margin-top:18px;flex-wrap:wrap}' +
+      '</style></head><body><div class="wrap"><div class="title">NEO BROWSER</div>' +
+      '<div class="sub">Search the web or enter a website address to get started.</div>' +
+      '<form class="search" id="f"><input id="q" autocomplete="off" autofocus placeholder="Search the web or enter a URL"><button class="go" type="submit">Search</button></form>' +
+      '<div class="quick"><button type="button" id="games">Game sites</button><button type="button" id="yt">YouTube</button><button type="button" id="search">Search</button></div>' +
+      '</div><script>' +
+      '(function(){function nav(v){try{if(parent&&parent.__neoBrowserEnhancerNavigate)parent.__neoBrowserEnhancerNavigate(v)}catch(e){}}' +
+      'var f=document.getElementById("f"),q=document.getElementById("q");f.addEventListener("submit",function(e){e.preventDefault();nav(q.value)});' +
+      'document.getElementById("games").onclick=function(){nav("/Explore")};' +
+      'document.getElementById("yt").onclick=function(){nav("https://www.youtube.com")};' +
+      'document.getElementById("search").onclick=function(){q.focus()};' +
+      '})();</script></body></html>';
+  }
+
+  function showHome() {
+    frame = findFrame();
+    address = findAddress();
+    if (!frame) return;
+    frame.removeAttribute('src');
+    frame.srcdoc = homeMarkup();
+    if (address) address.value = '';
+    lastFrameSrc = HOME_TOKEN;
+  }
 
   function ensureStrip() {
     frame = findFrame();
@@ -67,7 +107,7 @@
       button.type = 'button';
       button.className = 'neo-tab' + (index === active ? ' active' : '');
       button.dataset.index = String(index);
-      button.title = tab.url ? originalUrl(tab.url) : 'Home';
+      button.title = isHome(tab.url) ? 'Neo Browser home' : originalUrl(tab.url);
       button.style.pointerEvents = 'auto';
       var label = document.createElement('span');
       label.className = 'neo-tab-title';
@@ -95,33 +135,29 @@
     active = index;
     frame = findFrame();
     address = findAddress();
-    if (frame) frame.src = tabs[index].url || NEO_HOME;
-    if (address) address.value = tabs[index].url ? originalUrl(tabs[index].url) : '';
+    if (isHome(tabs[index].url)) showHome();
+    else if (frame) {
+      frame.removeAttribute('srcdoc');
+      frame.src = tabs[index].url;
+      if (address) address.value = originalUrl(tabs[index].url);
+    }
     renderTabs();
   }
 
   function newTab() {
-    tabs.push(makeTab(NEO_HOME, 'Home'));
+    tabs.push(makeTab(HOME_TOKEN, 'Home'));
     active = tabs.length - 1;
-    frame = findFrame();
-    address = findAddress();
-    if (frame) frame.src = NEO_HOME;
-    if (address) {
-      address.value = '';
-      setTimeout(function () { try { address.focus(); } catch (_) {} }, 0);
-    }
+    showHome();
+    setTimeout(function () { try { findAddress().focus(); } catch (_) {} }, 0);
     renderTabs();
   }
 
   function closeTab(index) {
     if (!tabs[index]) return;
     if (tabs.length === 1) {
-      tabs[0] = makeTab(NEO_HOME, 'Home');
+      tabs[0] = makeTab(HOME_TOKEN, 'Home');
       active = 0;
-      frame = findFrame();
-      address = findAddress();
-      if (frame) frame.src = NEO_HOME;
-      if (address) address.value = '';
+      showHome();
       renderTabs();
       return;
     }
@@ -134,17 +170,16 @@
   function navigate(value) {
     value = String(value || '').trim();
     if (!value) return;
-    if (!tabs.length) tabs.push(makeTab(NEO_HOME, 'Home'));
+    if (!tabs.length) tabs.push(makeTab(HOME_TOKEN, 'Home'));
 
     var looksLikeUrl = /^https?:\/\//i.test(value) || /^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(value);
     if (!looksLikeUrl) {
-      // Send searches through the real NEO Search route, never Bing/DDG.
       var searchUrl = location.origin + '/api/search?q=' + encodeURIComponent(value);
       tabs[active].url = searchUrl;
       tabs[active].title = 'NEO Search';
       frame = findFrame();
       address = findAddress();
-      if (frame) frame.src = searchUrl;
+      if (frame) { frame.removeAttribute('srcdoc'); frame.src = searchUrl; }
       if (address) address.value = value;
       renderTabs();
       return;
@@ -155,16 +190,19 @@
     tabs[active].title = titleFor(tabs[active].url);
     frame = findFrame();
     address = findAddress();
-    if (frame) frame.src = tabs[active].url;
+    if (frame) { frame.removeAttribute('srcdoc'); frame.src = tabs[active].url; }
     if (address) address.value = target;
     renderTabs();
   }
+
+  window.__neoBrowserEnhancerNavigate = navigate;
 
   function navigateFrameTo(url) {
     if (!url || !frame || !tabs[active]) return;
     var proxied = proxyFor(url);
     tabs[active].url = proxied;
     tabs[active].title = titleFor(proxied);
+    frame.removeAttribute('srcdoc');
     frame.src = proxied;
     if (address) address.value = url;
     renderTabs();
@@ -233,6 +271,11 @@
     frame = findFrame();
     address = findAddress();
     if (!frame) return;
+    if (isHome(tabs[active] && tabs[active].url)) {
+      if (address) address.value = '';
+      try { installYoutubeSearch(frame.contentDocument); } catch (_) {}
+      return;
+    }
     var src = frame.getAttribute('src') || frame.src || '';
     if (src === lastFrameSrc) {
       try { installYoutubeSearch(frame.contentDocument); } catch (_) {}
@@ -240,8 +283,8 @@
     }
     lastFrameSrc = src;
     if (tabs[active]) {
-      tabs[active].url = src || NEO_HOME;
-      tabs[active].title = titleFor(src || NEO_HOME);
+      tabs[active].url = src;
+      tabs[active].title = titleFor(src);
     }
     if (address) address.value = src ? originalUrl(src) : '';
     renderTabs();
@@ -267,9 +310,10 @@
     address = findAddress();
     if (!frame) return;
     if (!tabs.length) {
-      var initial = frame.getAttribute('src') || frame.src || '';
-      tabs.push(makeTab(initial || NEO_HOME, initial ? titleFor(initial) : 'Home'));
+      // Start the first tab on the same Neo Browser home screen as new tabs.
+      tabs.push(makeTab(HOME_TOKEN, 'Home'));
       active = 0;
+      showHome();
     }
     ensureStrip();
     renderTabs();
