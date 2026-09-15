@@ -10,10 +10,6 @@ app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 
 // --- Real API routes ---------------------------------------------------------
-// Unwrap accidental nested /api/proxy URLs before they reach the proxy.
-// The injected page bridge can otherwise proxy an already-proxied request
-// again, creating a request loop that makes heavy sites such as YouTube
-// appear to freeze.
 app.all("/api/proxy", (req, res) => {
   try {
     let raw = req.query && typeof req.query.url === "string" ? req.query.url : "";
@@ -32,6 +28,17 @@ app.all("/api/proxy", (req, res) => {
   return proxyHandler(req, res);
 });
 app.all("/api/search", (req, res) => searchHandler(req, res));
+
+// If YouTube's client-side navigation escapes the iframe and requests /results
+// from the Neo origin, keep it inside the proxied YouTube page instead of
+// allowing the Neo SPA to turn it into a 404 route.
+app.get("/results", (req, res, next) => {
+  const q = typeof req.query?.search_query === "string" ? req.query.search_query.trim() : "";
+  const referer = String(req.headers.referer || "");
+  if (!q || (!/youtube\.com/i.test(referer) && !/youtube\.com/i.test(referer))) return next();
+  const target = "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
+  return res.redirect(307, "/api/proxy?url=" + encodeURIComponent(target));
+});
 
 // --- Base44-compatible mocks ------------------------------------------------
 const APP_ID = "6a83d89cecbce69b361331b1";
@@ -62,13 +69,14 @@ function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
     if (err) return next(err);
-    // The freeze guard MUST load before browser-enhancer.js because the
-    // enhancer installs its MutationObserver as soon as it executes.
-    const scripts = '<script src="/browser-freeze-fix.js"></script><script src="/browser-enhancer.js"></script>';
+    // Cache-bust these files because static JS is intentionally served with a
+    // long immutable cache header. Without the version query, old tab code can
+    // remain cached even after a new Railway deployment.
+    const scripts = '<script src="/browser-freeze-fix.js?v=2"></script><script src="/browser-enhancer.js?v=3"></script>';
     const injected = html.includes('/browser-enhancer.js')
       ? html
       : html.replace(/<\/body>/i, scripts + '</body>');
-    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     return res.type("html").send(injected);
   });
 }
