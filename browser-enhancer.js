@@ -9,7 +9,7 @@
   var frame = null;
   var address = null;
   var lastFrameSrc = '';
-  var NEO_SEARCH_HOME = location.origin + '/Explore';
+  var NEO_HOME = location.origin + '/';
 
   function isBrowserPage() { return /^\/browser\/?$/i.test(location.pathname); }
   function findFrame() { return document.querySelector('iframe.neo-browser-frame'); }
@@ -26,10 +26,11 @@
   function titleFor(url) {
     try {
       var u = new URL(originalUrl(url), location.href);
+      if (u.pathname === '/' || u.pathname === '') return 'Home';
       if (/^\/Explore\/?$/i.test(u.pathname)) return 'NEO Search';
       if (/^\/api\/search$/i.test(u.pathname)) return 'NEO Search';
       return u.hostname.replace(/^www\./i, '') || 'New Tab';
-    } catch (_) { return url ? 'Page' : 'New Tab'; }
+    } catch (_) { return url ? 'Page' : 'Home'; }
   }
 
   function proxyFor(url) {
@@ -42,7 +43,7 @@
     } catch (_) { return url; }
   }
 
-  function makeTab(url, title) { return { url: url || NEO_SEARCH_HOME, title: title || titleFor(url || NEO_SEARCH_HOME) }; }
+  function makeTab(url, title) { return { url: url || NEO_HOME, title: title || titleFor(url || NEO_HOME) }; }
 
   function ensureStrip() {
     frame = findFrame();
@@ -66,11 +67,11 @@
       button.type = 'button';
       button.className = 'neo-tab' + (index === active ? ' active' : '');
       button.dataset.index = String(index);
-      button.title = tab.url ? originalUrl(tab.url) : 'NEO Search';
+      button.title = tab.url ? originalUrl(tab.url) : 'Home';
       button.style.pointerEvents = 'auto';
       var label = document.createElement('span');
       label.className = 'neo-tab-title';
-      label.textContent = tab.title || 'NEO Search';
+      label.textContent = tab.title || 'Home';
       var close = document.createElement('span');
       close.className = 'neo-tab-close';
       close.textContent = '×';
@@ -94,17 +95,17 @@
     active = index;
     frame = findFrame();
     address = findAddress();
-    if (frame) frame.src = tabs[index].url || NEO_SEARCH_HOME;
+    if (frame) frame.src = tabs[index].url || NEO_HOME;
     if (address) address.value = tabs[index].url ? originalUrl(tabs[index].url) : '';
     renderTabs();
   }
 
   function newTab() {
-    tabs.push(makeTab(NEO_SEARCH_HOME, 'NEO Search'));
+    tabs.push(makeTab(NEO_HOME, 'Home'));
     active = tabs.length - 1;
     frame = findFrame();
     address = findAddress();
-    if (frame) frame.src = NEO_SEARCH_HOME;
+    if (frame) frame.src = NEO_HOME;
     if (address) {
       address.value = '';
       setTimeout(function () { try { address.focus(); } catch (_) {} }, 0);
@@ -115,11 +116,11 @@
   function closeTab(index) {
     if (!tabs[index]) return;
     if (tabs.length === 1) {
-      tabs[0] = makeTab(NEO_SEARCH_HOME, 'NEO Search');
+      tabs[0] = makeTab(NEO_HOME, 'Home');
       active = 0;
       frame = findFrame();
       address = findAddress();
-      if (frame) frame.src = NEO_SEARCH_HOME;
+      if (frame) frame.src = NEO_HOME;
       if (address) address.value = '';
       renderTabs();
       return;
@@ -133,7 +134,7 @@
   function navigate(value) {
     value = String(value || '').trim();
     if (!value) return;
-    if (!tabs.length) tabs.push(makeTab(NEO_SEARCH_HOME, 'NEO Search'));
+    if (!tabs.length) tabs.push(makeTab(NEO_HOME, 'Home'));
 
     var looksLikeUrl = /^https?:\/\//i.test(value) || /^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(value);
     if (!looksLikeUrl) {
@@ -239,8 +240,8 @@
     }
     lastFrameSrc = src;
     if (tabs[active]) {
-      tabs[active].url = src || NEO_SEARCH_HOME;
-      tabs[active].title = titleFor(src || NEO_SEARCH_HOME);
+      tabs[active].url = src || NEO_HOME;
+      tabs[active].title = titleFor(src || NEO_HOME);
     }
     if (address) address.value = src ? originalUrl(src) : '';
     renderTabs();
@@ -267,7 +268,7 @@
     if (!frame) return;
     if (!tabs.length) {
       var initial = frame.getAttribute('src') || frame.src || '';
-      tabs.push(makeTab(initial || NEO_SEARCH_HOME, initial ? titleFor(initial) : 'NEO Search'));
+      tabs.push(makeTab(initial || NEO_HOME, initial ? titleFor(initial) : 'Home'));
       active = 0;
     }
     ensureStrip();
