@@ -178,10 +178,6 @@ module.exports = async function handler(req, res) {
     let r;
     let usedFallback = false;
 
-    // Forward the original method + body. Many sites (YouTube's sidebar/feed
-    // data in particular) load through POST requests with a JSON body, not
-    // plain GETs — silently downgrading everything to GET made those calls
-    // fail or return nothing, which is why the sidebar/home feed were blank.
     const method = (req.method || "GET").toUpperCase();
     const hasBody = !["GET", "HEAD"].includes(method);
     let outgoingBody;
@@ -195,7 +191,6 @@ module.exports = async function handler(req, res) {
         outgoingBody = req.body;
         outgoingContentType = ct || "text/plain;charset=UTF-8";
       } else if (req.body && typeof req.body === "object" && Object.keys(req.body).length) {
-        // express.json() already parsed it — re-serialize for forwarding.
         outgoingBody = JSON.stringify(req.body);
         outgoingContentType = "application/json";
       }
@@ -212,9 +207,7 @@ module.exports = async function handler(req, res) {
       };
       if (req.headers.cookie) headers.cookie = req.headers.cookie;
       if (req.headers.range) headers.range = req.headers.range;
-      if (useBody && outgoingBody !== undefined) {
-        headers["content-type"] = outgoingContentType;
-      }
+      if (useBody && outgoingBody !== undefined) headers["content-type"] = outgoingContentType;
       return fetch(url.toString(), {
         method,
         redirect: "manual",
@@ -226,9 +219,6 @@ module.exports = async function handler(req, res) {
 
     try {
       for (let i = 0; i < 6; i++) {
-        // Only resend the body on the first hop; a redirect (3xx) means the
-        // next request is a fresh one and, per normal HTTP semantics, POST
-        // bodies aren't replayed across redirects.
         r = await tryFetch(current, i === 0);
         if (!(r.status >= 300 && r.status < 400)) break;
         const loc = r.headers.get("location");
@@ -238,34 +228,21 @@ module.exports = async function handler(req, res) {
         current = next;
       }
     } catch (fetchErr) {
-      // The allorigins fallback only supports simple GETs, so it's no help
-      // for POST/PUT/etc. — just surface the original error for those.
       if (method !== "GET") throw fetchErr;
       try {
-        const fb = await fetch(
-          "https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()),
-          { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined }
-        );
-        if (fb.ok) { r = fb; usedFallback = true; }
-        else throw fetchErr;
-      } catch (_) {
-        throw fetchErr;
-      }
+        const fb = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()), { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined });
+        if (fb.ok) { r = fb; usedFallback = true; } else throw fetchErr;
+      } catch (_) { throw fetchErr; }
     }
 
     if (method === "GET" && !usedFallback && r && (r.status === 403 || r.status === 503 || r.status === 520 || r.status === 521 || r.status === 522)) {
       try {
-        const fb = await fetch(
-          "https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()),
-          { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined }
-        );
+        const fb = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()), { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined });
         if (fb.ok) { r = fb; usedFallback = true; }
       } catch (_) {}
     }
 
-    const type = usedFallback
-      ? (r.headers.get("content-type") || "text/html; charset=utf-8")
-      : (r.headers.get("content-type") || "");
+    const type = usedFallback ? (r.headers.get("content-type") || "text/html; charset=utf-8") : (r.headers.get("content-type") || "");
     const body = await r.arrayBuffer();
 
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -277,9 +254,7 @@ module.exports = async function handler(req, res) {
 
     const rawSetCookies = typeof r.headers.getSetCookie === "function" ? r.headers.getSetCookie() : [];
     if (rawSetCookies.length) {
-      const rewritten = rawSetCookies.map((c) =>
-        c.replace(/;\s*domain=[^;]*/i, "").replace(/;\s*samesite=[^;]*/i, "; SameSite=Lax")
-      );
+      const rewritten = rawSetCookies.map((c) => c.replace(/;\s*domain=[^;]*/i, "").replace(/;\s*samesite=[^;]*/i, "; SameSite=Lax"));
       res.setHeader("Set-Cookie", rewritten);
     }
 
@@ -296,11 +271,8 @@ module.exports = async function handler(req, res) {
       const bridge = buildBridge(proxyOrigin, current.toString());
       html = rewriteLinks(html, current.toString(), proxyOrigin);
       html = html.replace(/<meta\b[^>]*name\s*=\s*["']referrer["'][^>]*>/gi, "");
-      if (/<head[^>]*>/i.test(html)) {
-        html = html.replace(/<head([^>]*)>/i, (m) => m + bridge);
-      } else {
-        html = bridge + html;
-      }
+      if (/<head[^>]*>/i.test(html)) html = html.replace(/<head([^>]*)>/i, (m) => m + bridge);
+      else html = bridge + html;
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(r.status).send(html);
     }
@@ -312,9 +284,7 @@ module.exports = async function handler(req, res) {
           const u = new URL(raw.trim(), current.toString());
           if (u.protocol !== "http:" && u.protocol !== "https:") return all;
           return "url(\"" + proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString()) + "\")";
-        } catch {
-          return all;
-        }
+        } catch { return all; }
       });
       res.setHeader("Content-Type", "text/css; charset=utf-8");
       return res.status(r.status).send(css);
@@ -326,20 +296,15 @@ module.exports = async function handler(req, res) {
     return res.status(r.status).send(Buffer.from(body));
   } catch (e) {
     console.error(e);
-    const msg = (e && (e.name === "TimeoutError" || e.name === "AbortError"))
-      ? "The site took too long to respond."
-      : "This site could not be loaded through Neo Browser.";
+    const msg = (e && (e.name === "TimeoutError" || e.name === "AbortError")) ? "The site took too long to respond." : "This site could not be loaded through Neo Browser.";
     const detail = (e && e.message) ? String(e.message).slice(0, 200) : "";
     const bridge = buildBridge(proxyOrigin, "https://www.bing.com/");
     const html = "<!DOCTYPE html><html><head><meta charset=utf-8><title>Neo Browser</title>" +
       "<style>html,body{margin:0;background:#0a0a0b;color:#e7e7ea;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}" +
       ".box{text-align:center;padding:40px;max-width:420px}.t{font-size:18px;margin:0 0 10px}.s{color:#8a8a93;font-size:14px;margin:0}</style>" +
-      bridge + "</head>" +
-      "<body><div class=box><p class=t>" + msg + "</p><p class=s>" + detail.replace(/</g,"") + "</p></div></body></html>";
+      bridge + "</head><body><div class=box><p class=t>" + msg + "</p><p class=s>" + detail.replace(/</g,"") + "</p></div></body></html>";
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    if (e && (e.name === "TimeoutError" || e.name === "AbortError")) {
-      return res.status(504).send(html);
-    }
+    if (e && (e.name === "TimeoutError" || e.name === "AbortError")) return res.status(504).send(html);
     return res.status(502).send(html);
   }
 };
@@ -353,7 +318,7 @@ function buildBridge(proxyOrigin, pageBase) {
     'if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;' +
     'var PROXY_ORIGIN=' + O + ';' +
     'var PAGE_BASE=' + B + ';' +
-    'var DIRECT=/snokido\\.com$|kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i;' +
+    'var DIRECT=/kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i;' +
     'var styleEl=document.getElementById("neo-proxy-cursor-style");' +
     'function setNative(on){if(styleEl)styleEl.textContent=on?"html,body,*{cursor:auto!important}":"html,body,*{cursor:none!important}"}' +
     'function gameCursorMode(){return !!(document.pointerLockElement||document.fullscreenElement||document.webkitFullscreenElement)}' +
@@ -369,8 +334,8 @@ function buildBridge(proxyOrigin, pageBase) {
     'window.addEventListener("message",function(e){var d=e&&e.data;if(!d||d.source!=="neo-browser-shell")return;if("nativeCursor" in d)setNative(!!d.nativeCursor||gameCursorMode())},{passive:true});' +
     'try{parent.postMessage({source:"neo-browser-cursor",hello:true},"*")}catch(_){}' +
     'syncCursorMode();' +
-    'function toProxy(url){try{if(!url)return null;var s=String(url);if(/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(s))return null;var u=new URL(s,PAGE_BASE||location.href);if(u.protocol!=="http:"&&u.protocol!=="https:")return null;var h=u.hostname;if(/snokido\\.com$|kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i.test(h))return null;return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
-    'function shouldProxyIframe(url){try{var u=new URL(String(url),PAGE_BASE||location.href);if(DIRECT.test(u.hostname))return false;if(u.pathname.indexOf("/embed/")!==-1)return false;return true}catch(e){return true}}' +
+    'function toProxy(url){try{if(!url)return null;var s=String(url);if(/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(s))return null;var u=new URL(s,PAGE_BASE||location.href);if(u.protocol!=="http:"&&u.protocol!=="https:")return null;var h=u.hostname;if(/kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i.test(h))return null;return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
+    'function shouldProxyIframe(url){try{var u=new URL(String(url),PAGE_BASE||location.href);if(DIRECT.test(u.hostname))return false;if(/snokido\\.com$/i.test(u.hostname)&&u.pathname.indexOf("/game/")===0)return false;if(u.pathname.indexOf("/embed/")!==-1)return false;return true}catch(e){return true}}' +
     'var _f=window.fetch;window.fetch=function(input,init){try{var url=typeof input==="string"?input:(input&&input.url)||"";var p=toProxy(url);if(p){if(typeof input==="string")input=p;else if(typeof input==="object")input=Object.assign({},input,{url:p})}}catch(e){}return _f.apply(this,arguments)};' +
     'var XO=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,url){try{var p=toProxy(url);if(p)arguments[1]=p;}catch(e){}return XO.apply(this,arguments);};' +
     'try{var desc=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,"src");if(desc&&desc.set){var os=desc.set,og=desc.get;Object.defineProperty(HTMLIFrameElement.prototype,"src",{configurable:true,get:function(){return og.call(this)},set:function(v){try{if(shouldProxyIframe(v))v=toProxy(v)||v}catch(e){}return os.call(this,v)}})}}catch(e){}' +
@@ -394,7 +359,7 @@ function rewriteLinks(html, base, proxyOrigin) {
         const u = new URL(raw, base);
         if (u.protocol !== "http:" && u.protocol !== "https:") return all;
         const h = u.hostname;
-        if (/snokido\.com$|kbhgames\.com$|wgplayer\.com$|crazygames\.com$|poki\.com$|y8\.com$|itch\.io$/i.test(h)) return all;
+        if (/kbhgames\.com$|wgplayer\.com$|crazygames\.com$|poki\.com$|y8\.com$|itch\.io$/i.test(h)) return all;
         if (u.pathname.indexOf("/embed/") !== -1) return all;
         return a + prox(u) + b;
       } catch {
