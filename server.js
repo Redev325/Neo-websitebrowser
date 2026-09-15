@@ -10,7 +10,27 @@ app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 
 // --- Real API routes ---------------------------------------------------------
-app.all("/api/proxy", (req, res) => proxyHandler(req, res));
+// Unwrap accidental nested /api/proxy URLs before they reach the proxy.
+// The injected page bridge can otherwise proxy an already-proxied request
+// again, creating a request loop that makes heavy sites such as YouTube
+// appear to freeze.
+app.all("/api/proxy", (req, res) => {
+  try {
+    let raw = req.query && typeof req.query.url === "string" ? req.query.url : "";
+    const requestHost = String(req.headers.host || "").split(":")[0].toLowerCase();
+    for (let i = 0; i < 8 && raw; i++) {
+      const u = new URL(raw);
+      const host = u.hostname.toLowerCase();
+      const sameHost = requestHost && (host === requestHost || host === "localhost" || host === "127.0.0.1");
+      if (!sameHost || u.pathname !== "/api/proxy") break;
+      const nested = u.searchParams.get("url");
+      if (!nested) break;
+      raw = nested;
+    }
+    if (raw && req.query) req.query.url = raw;
+  } catch (_) {}
+  return proxyHandler(req, res);
+});
 app.all("/api/search", (req, res) => searchHandler(req, res));
 
 // --- Base44-compatible mocks ------------------------------------------------
@@ -38,10 +58,6 @@ app.all("/api/*", (req, res) => {
   else res.status(204).end();
 });
 
-// Inject the browser enhancer into every HTML document served by Railway,
-// not just a direct /Browser request. The React app is an SPA, so navigating
-// from Neo -> Browser does not cause a second document request; loading the
-// enhancer once on the main document lets it detect the Browser route itself.
 function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
@@ -55,9 +71,6 @@ function sendIndexWithBrowserEnhancer(req, res, next) {
   });
 }
 
-// Handle document routes before express.static so the enhancer is present
-// when the app is first opened, then the client-side router can move to
-// /Browser without losing it.
 app.get("/", sendIndexWithBrowserEnhancer);
 app.get("/Browser", sendIndexWithBrowserEnhancer);
 
@@ -81,7 +94,6 @@ app.use((req, res, next) => {
   }
 });
 
-// --- Static frontend --------------------------------------------------------
 const staticRoot = __dirname;
 app.use(express.static(staticRoot, {
   setHeaders(res, filePath) {
