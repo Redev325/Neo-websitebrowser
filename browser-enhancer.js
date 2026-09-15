@@ -8,8 +8,8 @@
   var tabStrip = null;
   var frame = null;
   var address = null;
-  var lastFrameSrc = '';
   var HOME_TOKEN = 'neo://home';
+  var lastFrameSrc = '';
 
   function isBrowserPage() { return /^\/browser\/?$/i.test(location.pathname); }
   function findFrame() { return document.querySelector('iframe.neo-browser-frame'); }
@@ -21,7 +21,7 @@
     try {
       var u = new URL(url, location.href);
       if (u.pathname === '/api/proxy') return decodeURIComponent(u.searchParams.get('url') || url);
-      return url;
+      return u.href;
     } catch (_) { return url; }
   }
 
@@ -29,11 +29,10 @@
     if (isHome(url)) return 'Home';
     try {
       var u = new URL(originalUrl(url), location.href);
-      if (u.pathname === '/' || u.pathname === '') return 'Home';
       if (/^\/Explore\/?$/i.test(u.pathname)) return 'NEO Search';
       if (/^\/api\/search$/i.test(u.pathname)) return 'NEO Search';
-      return u.hostname.replace(/^www\./i, '') || 'New Tab';
-    } catch (_) { return url ? 'Page' : 'Home'; }
+      return u.hostname.replace(/^www\./i, '') || 'Page';
+    } catch (_) { return 'Page'; }
   }
 
   function proxyFor(url) {
@@ -49,40 +48,38 @@
     return { url: isHome(url) ? HOME_TOKEN : url, title: title || titleFor(url) };
   }
 
-  // This is the browser's actual new-tab screen. It lives inside the browser
-  // frame so every new tab gets the same start page instead of Neo's website.
-  function homeMarkup() {
-    return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' +
-      '*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Arial,Helvetica,sans-serif;background:#050505;color:#fff;overflow:hidden}' +
-      'body{display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 45%,rgba(120,0,0,.22),transparent 45%),radial-gradient(circle at 50% 100%,rgba(255,0,0,.10),transparent 55%),#050505}' +
-      '.wrap{width:min(760px,90%);text-align:center;transform:translateY(-2%)}' +
-      '.title{font-size:clamp(34px,6vw,64px);font-weight:800;letter-spacing:.16em;margin-bottom:18px;text-shadow:0 0 22px rgba(255,0,0,.55)}' +
-      '.sub{font-size:15px;color:#b9b9b9;margin-bottom:28px}' +
-      '.search{display:flex;align-items:center;gap:10px;width:100%;height:58px;padding:0 18px;border:1px solid rgba(255,60,60,.45);border-radius:14px;background:rgba(12,12,14,.92);box-shadow:0 0 30px rgba(255,0,0,.12),inset 0 0 18px rgba(255,0,0,.04)}' +
-      'input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:#fff;font-size:16px}input::placeholder{color:#777}' +
-      'button{border:1px solid rgba(255,55,55,.45);background:rgba(18,18,20,.9);color:#eee;border-radius:11px;padding:12px 18px;font-size:14px;cursor:pointer;transition:.15s ease}button:hover{border-color:#f33;box-shadow:0 0 18px rgba(255,0,0,.22);color:#fff}' +
-      '.go{background:rgba(150,0,0,.24);min-width:78px}.quick{display:flex;justify-content:center;gap:10px;margin-top:18px;flex-wrap:wrap}' +
-      '</style></head><body><div class="wrap"><div class="title">NEO BROWSER</div>' +
-      '<div class="sub">Search the web or enter a website address to get started.</div>' +
-      '<form class="search" id="f"><input id="q" autocomplete="off" autofocus placeholder="Search the web or enter a URL"><button class="go" type="submit">Search</button></form>' +
-      '<div class="quick"><button type="button" id="games">Game sites</button><button type="button" id="yt">YouTube</button><button type="button" id="search">Search</button></div>' +
-      '</div><script>' +
-      '(function(){function nav(v){try{if(parent&&parent.__neoBrowserEnhancerNavigate)parent.__neoBrowserEnhancerNavigate(v)}catch(e){}}' +
-      'var f=document.getElementById("f"),q=document.getElementById("q");f.addEventListener("submit",function(e){e.preventDefault();nav(q.value)});' +
-      'document.getElementById("games").onclick=function(){nav("/Explore")};' +
-      'document.getElementById("yt").onclick=function(){nav("https://www.youtube.com")};' +
-      'document.getElementById("search").onclick=function(){q.focus()};' +
-      '})();</script></body></html>';
+  // Use the browser's own Home control whenever possible. This is important:
+  // the new-tab screen is part of Neo Browser, not the normal Neo website.
+  function clickNativeHome() {
+    var candidates = document.querySelectorAll('button, a, [role="button"]');
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      var label = ((el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('title') || '')).trim().toLowerCase();
+      if (label === 'home' || label.indexOf('home button') !== -1 || label.indexOf('go home') !== -1) {
+        try { el.click(); return true; } catch (_) {}
+      }
+    }
+    return false;
   }
 
   function showHome() {
     frame = findFrame();
     address = findAddress();
     if (!frame) return;
+
+    // First ask the actual browser UI to return to its built-in start screen.
+    if (clickNativeHome()) {
+      if (address) address.value = '';
+      lastFrameSrc = '';
+      return;
+    }
+
+    // Fallback only if the native Home control cannot be found.
     frame.removeAttribute('src');
-    frame.srcdoc = homeMarkup();
+    frame.removeAttribute('srcdoc');
+    try { frame.src = 'about:blank'; } catch (_) {}
     if (address) address.value = '';
-    lastFrameSrc = HOME_TOKEN;
+    lastFrameSrc = '';
   }
 
   function ensureStrip() {
@@ -108,14 +105,12 @@
       button.className = 'neo-tab' + (index === active ? ' active' : '');
       button.dataset.index = String(index);
       button.title = isHome(tab.url) ? 'Neo Browser home' : originalUrl(tab.url);
-      button.style.pointerEvents = 'auto';
       var label = document.createElement('span');
       label.className = 'neo-tab-title';
       label.textContent = tab.title || 'Home';
       var close = document.createElement('span');
       close.className = 'neo-tab-close';
       close.textContent = '×';
-      close.dataset.close = '1';
       close.setAttribute('aria-label', 'Close tab');
       button.appendChild(label);
       button.appendChild(close);
@@ -135,8 +130,9 @@
     active = index;
     frame = findFrame();
     address = findAddress();
-    if (isHome(tabs[index].url)) showHome();
-    else if (frame) {
+    if (isHome(tabs[index].url)) {
+      showHome();
+    } else if (frame) {
       frame.removeAttribute('srcdoc');
       frame.src = tabs[index].url;
       if (address) address.value = originalUrl(tabs[index].url);
@@ -148,7 +144,6 @@
     tabs.push(makeTab(HOME_TOKEN, 'Home'));
     active = tabs.length - 1;
     showHome();
-    setTimeout(function () { try { findAddress().focus(); } catch (_) {} }, 0);
     renderTabs();
   }
 
@@ -250,21 +245,6 @@
       target.searchParams.set('search_query', String(input.value).trim());
       navigateFrameTo(target.href);
     }, true);
-    doc.addEventListener('click', function (e) {
-      var el = e.target && e.target.closest ? e.target.closest('button, a') : null;
-      if (!el) return;
-      var form = el.closest ? el.closest('form') : null;
-      if (!form) return;
-      var input = form.querySelector('input[name="search_query"], input[name="query"]');
-      if (!input || !String(input.value || '').trim()) return;
-      var label = (el.getAttribute('aria-label') || el.textContent || '').toLowerCase();
-      var action = form.getAttribute('action') || '';
-      if (!/search/.test(label) && !/\/results/i.test(action)) return;
-      e.preventDefault(); e.stopImmediatePropagation();
-      var target = new URL('/results', 'https://www.youtube.com/');
-      target.searchParams.set('search_query', String(input.value).trim());
-      navigateFrameTo(target.href);
-    }, true);
   }
 
   function onFrameLoad() {
@@ -273,20 +253,14 @@
     if (!frame) return;
     if (isHome(tabs[active] && tabs[active].url)) {
       if (address) address.value = '';
-      try { installYoutubeSearch(frame.contentDocument); } catch (_) {}
       return;
     }
     var src = frame.getAttribute('src') || frame.src || '';
-    if (src === lastFrameSrc) {
-      try { installYoutubeSearch(frame.contentDocument); } catch (_) {}
-      return;
-    }
-    lastFrameSrc = src;
     if (tabs[active]) {
-      tabs[active].url = src;
-      tabs[active].title = titleFor(src);
+      tabs[active].url = src || tabs[active].url;
+      tabs[active].title = titleFor(tabs[active].url);
     }
-    if (address) address.value = src ? originalUrl(src) : '';
+    if (address) address.value = src ? originalUrl(src) : address.value;
     renderTabs();
     try { installYoutubeSearch(frame.contentDocument); } catch (_) {}
   }
@@ -309,18 +283,29 @@
     frame = findFrame();
     address = findAddress();
     if (!frame) return;
+
     if (!tabs.length) {
-      // Start the first tab on the same Neo Browser home screen as new tabs.
-      tabs.push(makeTab(HOME_TOKEN, 'Home'));
+      // Do not turn the browser's initial home screen into the normal Neo site.
+      var initial = frame.getAttribute('src') || frame.src || '';
+      tabs.push(makeTab(initial || HOME_TOKEN, initial ? titleFor(initial) : 'Home'));
       active = 0;
-      showHome();
     }
+
+    // React can re-render the iframe after the + button is pressed. If the
+    // active tab is Home, keep returning control to the browser's native Home.
+    if (isHome(tabs[active].url)) {
+      var current = frame.getAttribute('src') || '';
+      if (current && !/^about:blank$/i.test(current)) showHome();
+    }
+
     ensureStrip();
     renderTabs();
+
     if (!frame.__neoTabLoad) {
       frame.addEventListener('load', onFrameLoad, false);
       frame.__neoTabLoad = true;
     }
+
     if (address && !address.__neoAddress) {
       address.__neoAddress = true;
       address.addEventListener('keydown', function (e) {
@@ -329,6 +314,7 @@
         navigate(address.value);
       }, true);
     }
+
     if (tabStrip && !tabStrip.__neoClicks) {
       tabStrip.__neoClicks = true;
       tabStrip.addEventListener('click', function (e) {
@@ -341,6 +327,6 @@
     }
   }
 
-  setInterval(install, 350);
+  setInterval(install, 250);
   setTimeout(install, 0);
 })();
