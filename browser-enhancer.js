@@ -48,8 +48,6 @@
     return { url: isHome(url) ? HOME_TOKEN : url, title: title || titleFor(url) };
   }
 
-  // Use the browser's own Home control whenever possible. This is important:
-  // the new-tab screen is part of Neo Browser, not the normal Neo website.
   function clickNativeHome() {
     var candidates = document.querySelectorAll('button, a, [role="button"]');
     for (var i = 0; i < candidates.length; i++) {
@@ -66,15 +64,11 @@
     frame = findFrame();
     address = findAddress();
     if (!frame) return;
-
-    // First ask the actual browser UI to return to its built-in start screen.
     if (clickNativeHome()) {
       if (address) address.value = '';
       lastFrameSrc = '';
       return;
     }
-
-    // Fallback only if the native Home control cannot be found.
     frame.removeAttribute('src');
     frame.removeAttribute('srcdoc');
     try { frame.src = 'about:blank'; } catch (_) {}
@@ -247,6 +241,49 @@
     }, true);
   }
 
+  // Snokido is deliberately allowed to keep its game/asset iframes direct,
+  // but the proxy bridge used to cancel Snokido's normal navigation links.
+  // Catch those links here and route them through Neo's proxy/tab system.
+  function installSnokidoNavigation(doc) {
+    if (!doc || doc.__neoSnokidoNavigation) return;
+    var page = originalUrl(frame && frame.src ? frame.src : '');
+    try {
+      if (!/snokido\.com$/i.test(new URL(page).hostname)) return;
+    } catch (_) { return; }
+
+    doc.__neoSnokidoNavigation = true;
+
+    doc.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href');
+      if (!href || /^(#|javascript:|mailto:|tel:|data:|blob:)/i.test(href)) return;
+      try {
+        var target = new URL(href, page);
+        if (!/snokido\.com$/i.test(target.hostname)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        navigateFrameTo(target.href);
+      } catch (_) {}
+    }, true);
+
+    doc.addEventListener('submit', function (e) {
+      var form = e.target;
+      if (!form || !form.getAttribute) return;
+      try {
+        var action = new URL(form.getAttribute('action') || page, page);
+        if (!/snokido\.com$/i.test(action.hostname)) return;
+        var method = (form.getAttribute('method') || 'GET').toUpperCase();
+        if (method !== 'GET') return;
+        e.preventDefault();
+        e.stopPropagation();
+        var params = new URLSearchParams(new FormData(form));
+        if (params.toString()) action.search = params.toString();
+        navigateFrameTo(action.href);
+      } catch (_) {}
+    }, true);
+  }
+
   function onFrameLoad() {
     frame = findFrame();
     address = findAddress();
@@ -263,6 +300,7 @@
     if (address) address.value = src ? originalUrl(src) : address.value;
     renderTabs();
     try { installYoutubeSearch(frame.contentDocument); } catch (_) {}
+    try { installSnokidoNavigation(frame.contentDocument); } catch (_) {}
   }
 
   function injectStyles() {
@@ -285,14 +323,11 @@
     if (!frame) return;
 
     if (!tabs.length) {
-      // Do not turn the browser's initial home screen into the normal Neo site.
       var initial = frame.getAttribute('src') || frame.src || '';
       tabs.push(makeTab(initial || HOME_TOKEN, initial ? titleFor(initial) : 'Home'));
       active = 0;
     }
 
-    // React can re-render the iframe after the + button is pressed. If the
-    // active tab is Home, keep returning control to the browser's native Home.
     if (isHome(tabs[active].url)) {
       var current = frame.getAttribute('src') || '';
       if (current && !/^about:blank$/i.test(current)) showHome();
