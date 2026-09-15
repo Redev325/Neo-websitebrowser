@@ -8,8 +8,33 @@
   var tabStrip = null;
   var frame = null;
   var address = null;
-  var syncing = false;
-  var lastPath = '';
+  var lastFrameSrc = '';
+
+  function isBrowserPage() {
+    return /^\/browser\/?$/i.test(location.pathname);
+  }
+
+  function findFrame() { return document.querySelector('iframe.neo-browser-frame'); }
+  function findAddress() { return document.querySelector('.neo-browser-input'); }
+
+  function originalUrl(url) {
+    try {
+      var u = new URL(url, location.href);
+      if (u.pathname === '/api/proxy') {
+        return decodeURIComponent(u.searchParams.get('url') || url);
+      }
+      return url;
+    } catch (_) { return url; }
+  }
+
+  function titleFor(url) {
+    try {
+      var u = new URL(originalUrl(url), location.href);
+      if (/^\/Explore\/?$/i.test(u.pathname) && u.searchParams.has('q')) return 'Neo Search';
+      if (/^\/api\/search$/i.test(u.pathname)) return 'Neo Search';
+      return u.hostname.replace(/^www\./i, '') || 'New Tab';
+    } catch (_) { return url ? 'Page' : 'New Tab'; }
+  }
 
   function proxyFor(url) {
     try {
@@ -19,48 +44,34 @@
     } catch (_) { return url; }
   }
 
-  function originalUrl(url) {
-    try {
-      var u = new URL(url, location.href);
-      if (u.pathname === '/api/proxy') return decodeURIComponent(u.searchParams.get('url') || url);
-      return url;
-    } catch (_) { return url; }
+  function makeTab(url, title) {
+    return { url: url || '', title: title || titleFor(url) };
   }
 
-  function pretty(url) {
-    try {
-      var u = new URL(originalUrl(url));
-      return u.hostname.replace(/^www\./, '') || 'New Tab';
-    } catch (_) { return 'New Tab'; }
-  }
-
-  function findFrame() { return document.querySelector('iframe.neo-browser-frame'); }
-  function findAddress() { return document.querySelector('.neo-browser-input'); }
-  function makeTab(url, title) { return { url: url || '', title: title || (url ? pretty(url) : 'New Tab') }; }
-
-  function ensureTabForCurrent() {
+  function ensureStrip() {
     frame = findFrame();
-    address = findAddress();
-    if (!frame) return;
-    var current = frame.getAttribute('src') || frame.src || '';
-    if (!tabs.length) tabs.push(makeTab(current));
-    if (!tabs[active]) tabs[active] = makeTab(current);
-    if (current && tabs[active].url !== current) {
-      tabs[active].url = current;
-      tabs[active].title = pretty(current);
+    if (!frame) return false;
+    if (!tabStrip || !tabStrip.isConnected) {
+      tabStrip = document.createElement('div');
+      tabStrip.className = 'neo-browser-tabs';
+      tabStrip.setAttribute('role', 'tablist');
+      var anchor = frame.closest('main') || frame.parentElement;
+      if (anchor && anchor.parentElement) anchor.parentElement.insertBefore(tabStrip, anchor);
+      else if (document.body) document.body.insertBefore(tabStrip, document.body.firstChild);
     }
-    renderTabs();
-    attachFrameBridge();
+    return true;
   }
 
   function renderTabs() {
-    if (!tabStrip) return;
-    tabStrip.innerHTML = '';
+    if (!ensureStrip()) return;
+    tabStrip.replaceChildren();
     tabs.forEach(function (tab, index) {
       var button = document.createElement('button');
       button.type = 'button';
       button.className = 'neo-tab' + (index === active ? ' active' : '');
+      button.dataset.index = String(index);
       button.title = tab.url ? originalUrl(tab.url) : 'New Tab';
+      button.style.pointerEvents = 'auto';
 
       var label = document.createElement('span');
       label.className = 'neo-tab-title';
@@ -69,16 +80,11 @@
       var close = document.createElement('span');
       close.className = 'neo-tab-close';
       close.textContent = '×';
+      close.dataset.close = '1';
       close.setAttribute('aria-label', 'Close tab');
 
       button.appendChild(label);
       button.appendChild(close);
-      button.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.target === close) closeTab(index);
-        else switchTab(index);
-      });
       tabStrip.appendChild(button);
     });
 
@@ -87,11 +93,7 @@
     plus.className = 'neo-tab-new';
     plus.textContent = '+';
     plus.title = 'New tab';
-    plus.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      newTab();
-    });
+    plus.setAttribute('aria-label', 'New tab');
     tabStrip.appendChild(plus);
   }
 
@@ -100,16 +102,13 @@
     active = index;
     frame = findFrame();
     address = findAddress();
-    if (frame) {
-      syncing = true;
-      frame.src = tabs[index].url || 'about:blank';
-      setTimeout(function () { syncing = false; attachFrameBridge(); }, 350);
-    }
+    if (frame) frame.src = tabs[index].url || 'about:blank';
     if (address) address.value = tabs[index].url ? originalUrl(tabs[index].url) : '';
     renderTabs();
   }
 
   function newTab() {
+    if (!tabs.length) tabs.push(makeTab(''));
     tabs.push(makeTab(''));
     active = tabs.length - 1;
     frame = findFrame();
@@ -117,12 +116,13 @@
     if (frame) frame.src = 'about:blank';
     if (address) {
       address.value = '';
-      address.focus();
+      setTimeout(function () { try { address.focus(); } catch (_) {} }, 0);
     }
     renderTabs();
   }
 
   function closeTab(index) {
+    if (!tabs[index]) return;
     if (tabs.length === 1) {
       tabs[0] = makeTab('');
       active = 0;
@@ -134,20 +134,21 @@
       return;
     }
     tabs.splice(index, 1);
-    if (active >= tabs.length) active = tabs.length - 1;
     if (active > index) active--;
+    if (active >= tabs.length) active = tabs.length - 1;
     switchTab(active);
   }
 
   function navigate(value) {
-    value = (value || '').trim();
+    value = String(value || '').trim();
     if (!value) return;
+    if (!tabs.length) tabs.push(makeTab(''));
 
-    // Keep NEO Search for plain search terms. Only URL-looking input becomes a URL.
+    // NEO Search is the site's own search page. Do not send browser searches
+    // to Bing, DuckDuckGo, or another external search engine.
     var looksLikeUrl = /^https?:\/\//i.test(value) || /^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(value);
     if (!looksLikeUrl) {
-      var searchUrl = location.origin + '/api/search?q=' + encodeURIComponent(value);
-      if (!tabs.length) tabs.push(makeTab(''));
+      var searchUrl = location.origin + '/Explore?q=' + encodeURIComponent(value);
       tabs[active].url = searchUrl;
       tabs[active].title = 'Neo Search';
       frame = findFrame();
@@ -159,67 +160,80 @@
     }
 
     var target = /^https?:\/\//i.test(value) ? value : 'https://' + value;
-    var proxied = proxyFor(target);
-    if (!tabs.length) tabs.push(makeTab(''));
-    tabs[active].url = proxied;
-    tabs[active].title = pretty(proxied);
+    tabs[active].url = proxyFor(target);
+    tabs[active].title = titleFor(tabs[active].url);
     frame = findFrame();
     address = findAddress();
-    if (frame) frame.src = proxied;
+    if (frame) frame.src = tabs[active].url;
     if (address) address.value = target;
     renderTabs();
   }
 
   function navigateFrameTo(url) {
-    if (!frame || !url) return;
+    if (!url || !frame || !tabs[active]) return;
     var proxied = proxyFor(url);
     tabs[active].url = proxied;
-    tabs[active].title = pretty(proxied);
-    syncing = true;
+    tabs[active].title = titleFor(proxied);
     frame.src = proxied;
     if (address) address.value = url;
     renderTabs();
-    setTimeout(function () { syncing = false; attachFrameBridge(); }, 350);
   }
 
-  // YouTube is proxied into a same-origin iframe. Intercept its search form
-  // here before YouTube's SPA code can send the browser to Neo's /results route.
+  function patchFrameLocation(doc) {
+    try {
+      var win = doc.defaultView;
+      if (!win || win.__neoYoutubeLocationPatch) return;
+      win.__neoYoutubeLocationPatch = true;
+      var proto = win.Location && win.Location.prototype;
+      if (!proto) return;
+      ['assign', 'replace'].forEach(function (name) {
+        try {
+          var original = proto[name];
+          if (typeof original !== 'function') return;
+          proto[name] = function (url) {
+            try {
+              var u = new URL(String(url), originalUrl(frame.src));
+              if (/youtube\.com$/i.test(u.hostname) && u.pathname === '/results') {
+                navigateFrameTo(u.href);
+                return;
+              }
+            } catch (_) {}
+            return original.apply(this, arguments);
+          };
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+
   function installYoutubeSearch(doc) {
     if (!doc || doc.__neoYoutubeSearch) return;
     doc.__neoYoutubeSearch = true;
+    patchFrameLocation(doc);
 
     doc.addEventListener('submit', function (e) {
       var form = e.target;
       if (!form || !form.querySelector) return;
-      var action = form.getAttribute('action') || '';
       var input = form.querySelector('input[name="search_query"], input[name="query"]');
-      if (!input && !/\/results(?:\?|$)/i.test(action)) return;
-
-      var query = input ? String(input.value || '').trim() : '';
-      if (!query) return;
+      var action = form.getAttribute('action') || '';
+      if (!input || !String(input.value || '').trim()) return;
+      if (!/youtube\.com$/i.test((new URL(doc.location.href).hostname)) && !/\/results/i.test(action)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-
-      var base = 'https://www.youtube.com/';
-      try {
-        var current = new URL(originalUrl(frame.src));
-        if (/youtube\.com$/i.test(current.hostname)) base = current.origin + '/';
-      } catch (_) {}
-      var target = new URL('/results', base);
-      target.searchParams.set('search_query', query);
+      var target = new URL('/results', 'https://www.youtube.com/');
+      target.searchParams.set('search_query', String(input.value).trim());
       navigateFrameTo(target.href);
     }, true);
 
     doc.addEventListener('click', function (e) {
       var el = e.target && e.target.closest ? e.target.closest('button, a') : null;
       if (!el) return;
-      var text = (el.getAttribute('aria-label') || el.textContent || '').toLowerCase();
       var form = el.closest ? el.closest('form') : null;
       if (!form) return;
-      var action = form.getAttribute('action') || '';
-      if (!/search/i.test(text) && !/\/results(?:\?|$)/i.test(action)) return;
       var input = form.querySelector('input[name="search_query"], input[name="query"]');
       if (!input || !String(input.value || '').trim()) return;
+      var label = (el.getAttribute('aria-label') || el.textContent || '').toLowerCase();
+      var action = form.getAttribute('action') || '';
+      if (!/search/.test(label) && !/\/results/i.test(action)) return;
       e.preventDefault();
       e.stopImmediatePropagation();
       var target = new URL('/results', 'https://www.youtube.com/');
@@ -228,86 +242,92 @@
     }, true);
   }
 
-  function attachFrameBridge() {
-    frame = findFrame();
-    if (!frame) return;
-    try {
-      var doc = frame.contentDocument;
-      if (doc) installYoutubeSearch(doc);
-    } catch (_) {}
-  }
-
   function onFrameLoad() {
-    if (!frame || syncing) return;
+    frame = findFrame();
+    address = findAddress();
+    if (!frame) return;
     var src = frame.getAttribute('src') || frame.src || '';
-    if (!src || src === 'about:blank') {
-      attachFrameBridge();
+    if (src === lastFrameSrc) {
+      try { installYoutubeSearch(frame.contentDocument); } catch (_) {}
       return;
     }
-    if (!tabs.length) tabs.push(makeTab(src));
-    tabs[active].url = src;
-    tabs[active].title = src.indexOf('/api/search') !== -1 ? 'Neo Search' : pretty(src);
-    if (address) address.value = originalUrl(src);
+    lastFrameSrc = src;
+    if (tabs[active]) {
+      tabs[active].url = src;
+      tabs[active].title = titleFor(src);
+    }
+    if (address) address.value = src ? originalUrl(src) : '';
     renderTabs();
-    attachFrameBridge();
+    try { installYoutubeSearch(frame.contentDocument); } catch (_) {}
   }
 
   function injectStyles() {
     if (document.getElementById('neo-browser-tab-styles')) return;
     var s = document.createElement('style');
     s.id = 'neo-browser-tab-styles';
-    s.textContent = '.neo-browser-tabs{display:flex;align-items:center;gap:5px;width:min(100%,1400px);margin:8px auto 0;padding:0 5px;overflow-x:auto;scrollbar-width:none;position:relative;z-index:20}.neo-browser-tabs::-webkit-scrollbar{display:none}.neo-tab,.neo-tab-new{height:34px;border:1px solid rgba(255,255,255,.1);background:rgba(8,9,14,.92);color:rgba(255,255,255,.68);border-radius:10px 10px 6px 6px;padding:0 9px;display:flex;align-items:center;gap:8px;white-space:nowrap;transition:.18s;cursor:pointer!important}.neo-tab{min-width:120px;max-width:210px;justify-content:space-between}.neo-tab:hover,.neo-tab-new:hover{color:#fff;border-color:hsl(var(--accent)/.4);background:rgba(255,255,255,.08)}.neo-tab.active{color:#fff;border-color:hsl(var(--accent)/.55);box-shadow:0 0 18px hsl(var(--accent)/.12);background:rgba(255,255,255,.1)}.neo-tab-title{overflow:hidden;text-overflow:ellipsis}.neo-tab-close{font-size:17px;line-height:1;opacity:.65}.neo-tab-close:hover{opacity:1;color:hsl(var(--accent))}.neo-tab-new{width:34px;justify-content:center;font-size:21px;padding:0;flex:none}.neo-browser-tabs + main{padding-top:10px!important}';
+    s.textContent = '.neo-browser-tabs{display:flex!important;align-items:center!important;gap:6px!important;width:100%!important;margin:8px auto!important;padding:0 8px!important;overflow-x:auto!important;position:relative!important;z-index:2147483000!important;pointer-events:auto!important;min-height:38px!important}.neo-browser-tabs::-webkit-scrollbar{display:none}.neo-tab,.neo-tab-new{appearance:none!important;height:34px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(8,9,14,.96)!important;color:rgba(255,255,255,.75)!important;border-radius:9px!important;padding:0 10px!important;display:flex!important;align-items:center!important;gap:9px!important;white-space:nowrap!important;cursor:pointer!important;pointer-events:auto!important;position:relative!important;z-index:2147483001!important}.neo-tab{min-width:125px!important;max-width:220px!important;justify-content:space-between!important}.neo-tab:hover,.neo-tab-new:hover{color:#fff!important;background:rgba(255,255,255,.1)!important}.neo-tab.active{color:#fff!important;border-color:hsl(var(--accent)/.65)!important;box-shadow:0 0 16px hsl(var(--accent)/.14)!important}.neo-tab-title{overflow:hidden;text-overflow:ellipsis}.neo-tab-close{font-size:18px!important;line-height:1!important;opacity:.7!important}.neo-tab-close:hover{opacity:1!important;color:hsl(var(--accent))!important}.neo-tab-new{width:36px!important;min-width:36px!important;justify-content:center!important;font-size:21px!important;padding:0!important;flex:none!important}';
     document.head.appendChild(s);
   }
 
   function install() {
-    var pathNow = location.pathname;
-    if (pathNow !== lastPath) {
-      lastPath = pathNow;
-      if (pathNow !== '/Browser') {
-        if (tabStrip && tabStrip.parentNode) tabStrip.parentNode.removeChild(tabStrip);
-        tabStrip = null;
-        return;
-      }
+    if (!isBrowserPage()) {
+      if (tabStrip && tabStrip.isConnected) tabStrip.remove();
+      tabStrip = null;
+      return;
     }
-    if (pathNow !== '/Browser') return;
-
     injectStyles();
     frame = findFrame();
     address = findAddress();
     if (!frame) return;
 
-    if (!tabStrip) {
-      tabStrip = document.createElement('div');
-      tabStrip.className = 'neo-browser-tabs';
-      var anchor = frame.closest('main') || frame.parentElement;
-      if (anchor && anchor.parentElement) anchor.parentElement.insertBefore(tabStrip, anchor);
-      else if (document.body) document.body.appendChild(tabStrip);
+    if (!tabs.length) {
+      tabs.push(makeTab(frame.getAttribute('src') || frame.src || ''));
+      active = 0;
     }
+    ensureStrip();
+    renderTabs();
 
-    ensureTabForCurrent();
-    frame = findFrame();
-    address = findAddress();
-    if (frame && !frame.__neoTabLoad) {
-      frame.addEventListener('load', onFrameLoad);
+    if (!frame.__neoTabLoad) {
+      frame.addEventListener('load', onFrameLoad, false);
       frame.__neoTabLoad = true;
     }
+
     if (address && !address.__neoAddress) {
       address.__neoAddress = true;
       address.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter') return;
-        var v = address.value.trim();
         e.preventDefault();
         e.stopPropagation();
-        navigate(v);
+        navigate(address.value);
       }, true);
     }
-    attachFrameBridge();
+
+    if (tabStrip && !tabStrip.__neoClicks) {
+      tabStrip.__neoClicks = true;
+      tabStrip.addEventListener('click', function (e) {
+        var close = e.target && e.target.closest ? e.target.closest('.neo-tab-close') : null;
+        var tab = e.target && e.target.closest ? e.target.closest('.neo-tab') : null;
+        if (close && tab) {
+          e.preventDefault();
+          e.stopPropagation();
+          closeTab(Number(tab.dataset.index));
+          return;
+        }
+        if (tab) {
+          e.preventDefault();
+          e.stopPropagation();
+          switchTab(Number(tab.dataset.index));
+          return;
+        }
+        if (e.target && e.target.closest && e.target.closest('.neo-tab-new')) {
+          e.preventDefault();
+          e.stopPropagation();
+          newTab();
+        }
+      }, true);
+    }
   }
 
-  var observer = new MutationObserver(function () { install(); });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-  window.addEventListener('popstate', function () { setTimeout(install, 50); });
-  setInterval(install, 500);
+  setInterval(install, 350);
   setTimeout(install, 0);
 })();
