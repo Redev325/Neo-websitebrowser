@@ -62,10 +62,12 @@ function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
     if (err) return next(err);
-    const script = '<script src="/browser-enhancer.js"></script>';
+    // The freeze guard MUST load before browser-enhancer.js because the
+    // enhancer installs its MutationObserver as soon as it executes.
+    const scripts = '<script src="/browser-freeze-fix.js"></script><script src="/browser-enhancer.js"></script>';
     const injected = html.includes('/browser-enhancer.js')
       ? html
-      : html.replace(/<\/body>/i, script + '</body>');
+      : html.replace(/<\/body>/i, scripts + '</body>');
     res.setHeader("Cache-Control", "no-cache");
     return res.type("html").send(injected);
   });
