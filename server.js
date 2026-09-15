@@ -9,7 +9,6 @@ const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "1mb" }));
 
-// --- Real API routes ---------------------------------------------------------
 app.all("/api/proxy", (req, res) => {
   try {
     let raw = req.query && typeof req.query.url === "string" ? req.query.url : "";
@@ -29,62 +28,37 @@ app.all("/api/proxy", (req, res) => {
 });
 app.all("/api/search", (req, res) => searchHandler(req, res));
 
-// If YouTube's client-side navigation escapes the iframe and requests /results
-// from the Neo origin, keep it inside the proxied YouTube page instead of
-// allowing the Neo SPA to turn it into a 404 route.
 app.get("/results", (req, res, next) => {
   const q = typeof req.query?.search_query === "string" ? req.query.search_query.trim() : "";
   const referer = String(req.headers.referer || "");
-  if (!q || (!/youtube\.com/i.test(referer) && !/youtube\.com/i.test(referer))) return next();
+  if (!q || !/youtube\.com/i.test(referer)) return next();
   const target = "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
   return res.redirect(307, "/api/proxy?url=" + encodeURIComponent(target));
 });
 
-// --- Base44-compatible mocks ------------------------------------------------
 const APP_ID = "6a83d89cecbce69b361331b1";
-
-app.get("/api/public/prod/public-settings/by-id/:id", (req, res) => {
-  res.json({
-    id: req.params.id || APP_ID,
-    appName: "Neo",
-    theme: "dark",
-    accent: "0 80% 55%",
-    features: {},
-  });
-});
-
+app.get("/api/public/prod/public-settings/by-id/:id", (req, res) => res.json({ id: req.params.id || APP_ID, appName: "Neo", theme: "dark", accent: "0 80% 55%", features: {} }));
 app.get("/api/apps/:appId/entities/:entity", (req, res) => res.json([]));
 app.get("/api/apps/:appId/entities/:entity/:id", (req, res) => res.json(null));
 app.get("/api/apps/:appId", (req, res) => res.json({ id: req.params.appId || APP_ID, name: "Neo", slug: "neo" }));
 app.post("/api/apps/:appId/analytics/track/batch", (req, res) => res.status(204).end());
 app.post("/api/apps/:appId/analytics/*", (req, res) => res.status(204).end());
 app.post("/api/app-logs/:appId/*", (req, res) => res.status(204).end());
-app.all("/api/*", (req, res) => {
-  console.log(`[api-mock] ${req.method} ${req.path}`);
-  if (req.method === "GET") res.json([]);
-  else res.status(204).end();
-});
+app.all("/api/*", (req, res) => { if (req.method === "GET") res.json([]); else res.status(204).end(); });
 
 function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
     if (err) return next(err);
-    // Cache-bust these files because static JS is intentionally served with a
-    // long immutable cache header. Without the version query, old tab code can
-    // remain cached even after a new Railway deployment.
-    const scripts = '<script src="/browser-freeze-fix.js?v=2"></script><script src="/browser-enhancer.js?v=3"></script>';
-    const injected = html.includes('/browser-enhancer.js')
-      ? html
-      : html.replace(/<\/body>/i, scripts + '</body>');
+    const scripts = '<script src="/browser-freeze-fix.js?v=3"></script><script src="/browser-enhancer.js?v=4"></script>';
+    const injected = html.includes('/browser-enhancer.js') ? html : html.replace(/<\/body>/i, scripts + '</body>');
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     return res.type("html").send(injected);
   });
 }
-
 app.get("/", sendIndexWithBrowserEnhancer);
 app.get("/Browser", sendIndexWithBrowserEnhancer);
 
-// --- Escaped-navigation safety net ------------------------------------------
 app.use((req, res, next) => {
   if (req.method !== "GET" && req.method !== "HEAD") return next();
   if (req.path.startsWith("/api/") || req.path.startsWith("/assets/") || req.path.startsWith("/static/")) return next();
@@ -96,30 +70,17 @@ app.use((req, res, next) => {
     const encoded = referer.slice(idx + marker.length).split("&")[0];
     const originalUrl = new URL(decodeURIComponent(encoded));
     const escapedUrl = new URL(req.originalUrl, originalUrl.origin);
-    const target = "/api/proxy?url=" + encodeURIComponent(escapedUrl.toString());
-    return res.redirect(307, target);
-  } catch (e) {
-    console.error("[escaped-nav] Error reconstructing URL:", e.message);
-    return next();
-  }
+    return res.redirect(307, "/api/proxy?url=" + encodeURIComponent(escapedUrl.toString()));
+  } catch (_) { return next(); }
 });
 
 const staticRoot = __dirname;
-app.use(express.static(staticRoot, {
-  setHeaders(res, filePath) {
-    if (path.basename(filePath) === "index.html") res.setHeader("Cache-Control", "no-cache");
-    else if (/\.(js|css|webp|png|woff2|svg)$/i.test(filePath)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-  },
-}));
+app.use(express.static(staticRoot, { setHeaders(res, filePath) {
+  if (path.basename(filePath) === "index.html") res.setHeader("Cache-Control", "no-cache");
+  else if (/\.(js|css|webp|png|woff2|svg)$/i.test(filePath)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+} }));
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(staticRoot, "index.html"), (err) => {
-    if (err) {
-      console.error("Failed to send index.html:", err.message);
-      res.status(500).send("Internal Server Error");
-    }
-  });
-});
+app.get("*", (req, res) => res.sendFile(path.join(staticRoot, "index.html")));
 
 const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {
