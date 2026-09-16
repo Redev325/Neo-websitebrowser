@@ -80,7 +80,7 @@ app.use(express.static(staticRoot, { setHeaders(res, filePath) {
   else if (/\.(js|css|webp|png|woff2|svg)$/i.test(filePath)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
 } }));
 
-app.get("*", (req, res) => res.sendFile(path.join(staticRoot, "index.html"));
+app.get("*", (req, res) => res.sendFile(path.join(staticRoot, "index.html")));
 
 const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {
