@@ -50,7 +50,7 @@ function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
     if (err) return next(err);
-    const scripts = '<script src="/browser-freeze-fix.js?v=3"></script><script src="/browser-enhancer.js?v=6"></script><script src="/explore-card-override.js?v=5"></script>';
+    const scripts = '<script src="/browser-freeze-fix.js?v=3"></script><script src="/browser-enhancer.js?v=6"></script><script src="/explore-card-override.js?v=6"></script>';
     const injected = html.includes('/explore-card-override.js') ? html : html.replace(/<\/body>/i, scripts + '</body>');
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     return res.type("html").send(injected);
@@ -80,7 +80,7 @@ app.use(express.static(staticRoot, { setHeaders(res, filePath) {
   else if (/\.(js|css|webp|png|woff2|svg)$/i.test(filePath)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
 } }));
 
-app.get("*", (req, res) => res.sendFile(path.join(staticRoot, "index.html")));
+app.get("*", (req, res) => res.sendFile(path.join(staticRoot, "index.html"));
 
 const port = process.env.PORT || 3000;
 app.listen(port, "0.0.0.0", () => {
