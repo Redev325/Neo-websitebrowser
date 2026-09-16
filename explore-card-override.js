@@ -1,11 +1,12 @@
 (function () {
   'use strict';
-  if (window.__neoSimpleGameUIV3) return;
-  window.__neoSimpleGameUIV3 = true;
+  if (window.__neoSimpleGameUIV4) return;
+  window.__neoSimpleGameUIV4 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
+  var ICON_URL = '/vs-impostor-legacy-icon.svg?v=2';
 
   function leaf(el) { return el && !el.children.length ? String(el.textContent || '').trim() : ''; }
   function isExplorePage() { return /^\/Explore\/?$/i.test(location.pathname); }
@@ -47,6 +48,7 @@
   function simplifyCard(card, index) {
     var title = getCardTitle(card, index), preview = card.querySelector('.aspect-video');
     if (!title || !preview) return;
+
     card.style.overflow = 'hidden';
     card.style.height = 'auto';
     card.style.minHeight = '0';
@@ -108,7 +110,7 @@
     for (var i = 0; i < cards.length; i++) simplifyCard(cards[i], i);
   }
 
-  // The viewer is a modal over /Explore, so DO NOT require a different URL.
+  // The game viewer is a modal over /Explore. Keep its native bar, fullscreen button, and X.
   function findViewerTitle() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
     for (var i = 0; i < nodes.length; i++) {
@@ -119,6 +121,62 @@
       if (r.top >= -5 && r.top < 60 && r.left >= 20 && r.left < 500) return el;
     }
     return null;
+  }
+
+  function findViewerHeader(title) {
+    var node = title;
+    for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
+      var r = node.getBoundingClientRect();
+      if (r.top <= 5 && r.height >= 40 && r.height <= 70 && r.width >= window.innerWidth * 0.85) return node;
+    }
+    return title.parentElement;
+  }
+
+  function addViewerLogo(title) {
+    var header = findViewerHeader(title);
+    if (!header) return;
+
+    var hr = header.getBoundingClientRect();
+    var tr = title.getBoundingClientRect();
+    if (hr.width < window.innerWidth * 0.7) return;
+
+    var oldIcon = null;
+    var media = header.querySelectorAll('img,svg');
+    for (var i = 0; i < media.length; i++) {
+      var m = media[i];
+      if (m.id === 'neo-impostor-legacy-header-logo') continue;
+      var mr = m.getBoundingClientRect();
+      if (mr.width >= 10 && mr.width <= 45 && mr.height >= 10 && mr.height <= 45 && mr.left < tr.left + 2 && mr.right > hr.left && mr.top >= hr.top - 3 && mr.top < hr.top + 45) {
+        oldIcon = m;
+        break;
+      }
+    }
+    if (oldIcon) oldIcon.style.visibility = 'hidden';
+
+    var icon = header.querySelector('#neo-impostor-legacy-header-logo');
+    if (!icon) {
+      icon = document.createElement('img');
+      icon.id = 'neo-impostor-legacy-header-logo';
+      icon.src = ICON_URL;
+      icon.alt = '';
+      icon.draggable = false;
+      icon.style.position = 'absolute';
+      icon.style.objectFit = 'contain';
+      icon.style.pointerEvents = 'none';
+      icon.style.zIndex = '2147483646';
+      header.appendChild(icon);
+    }
+
+    var size = oldIcon ? Math.min(28, Math.max(20, oldIcon.getBoundingClientRect().height)) : 28;
+    var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left : Math.max(10, tr.left - hr.left - size - 8);
+    var top = oldIcon ? oldIcon.getBoundingClientRect().top - hr.top : Math.max(6, tr.top - hr.top - 2);
+    icon.style.left = Math.max(6, left) + 'px';
+    icon.style.top = Math.max(4, top) + 'px';
+    icon.style.width = size + 'px';
+    icon.style.height = size + 'px';
+
+    // Make room for the icon without changing the rest of the bar.
+    title.style.marginLeft = (size + 10) + 'px';
   }
 
   function simplifyViewer() {
@@ -132,8 +190,7 @@
     title.style.textOverflow = 'clip';
     title.style.maxWidth = 'none';
 
-    // Viewer example: keep the existing top bar, fullscreen button, and X.
-    // Remove the extra trophy/report buttons by keeping only the two rightmost viewer buttons.
+    // Keep only fullscreen + X, matching the placeholder viewer example.
     var buttons = document.querySelectorAll('button'), topButtons = [];
     for (var i = 0; i < buttons.length; i++) {
       var br = buttons[i].getBoundingClientRect();
@@ -144,7 +201,7 @@
       for (var j = 0; j < topButtons.length - 2; j++) topButtons[j].style.display = 'none';
     }
 
-    // Do not add a custom viewer, logo, launcher, or anything to the gray game area.
+    addViewerLogo(title);
   }
 
   function run() { try { simplifyExplore(); } catch (_) {} try { simplifyViewer(); } catch (_) {} }
