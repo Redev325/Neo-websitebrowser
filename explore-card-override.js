@@ -1,12 +1,14 @@
 (function () {
   'use strict';
-  if (window.__neoSimpleGameUIV4) return;
-  window.__neoSimpleGameUIV4 = true;
+  if (window.__neoSimpleGameUIV5) return;
+  window.__neoSimpleGameUIV5 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = '/vs-impostor-legacy-icon.svg?v=2';
+  // The large HTML5 build is hosted by the dedicated game Pages site and shown inside Neo's gray viewer area.
+  var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
 
   function leaf(el) { return el && !el.children.length ? String(el.textContent || '').trim() : ''; }
   function isExplorePage() { return /^\/Explore\/?$/i.test(location.pathname); }
@@ -84,7 +86,6 @@
     title.style.position = 'relative';
     title.style.zIndex = '2';
 
-    // Remove old text metadata, but never touch buttons so the favorite remains.
     var descendants = card.querySelectorAll('*');
     for (var d = 0; d < descendants.length; d++) {
       var el = descendants[d];
@@ -110,7 +111,6 @@
     for (var i = 0; i < cards.length; i++) simplifyCard(cards[i], i);
   }
 
-  // The game viewer is a modal over /Explore. Keep its native bar, fullscreen button, and X.
   function findViewerTitle() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
     for (var i = 0; i < nodes.length; i++) {
@@ -130,6 +130,15 @@
       if (r.top <= 5 && r.height >= 40 && r.height <= 70 && r.width >= window.innerWidth * 0.85) return node;
     }
     return title.parentElement;
+  }
+
+  function findViewerContainer(title, header) {
+    var node = header || title;
+    for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
+      var r = node.getBoundingClientRect();
+      if (r.width >= window.innerWidth * 0.85 && r.height >= window.innerHeight * 0.7 && r.top <= 15) return node;
+    }
+    return header && header.parentElement ? header.parentElement : null;
   }
 
   function addViewerLogo(title) {
@@ -174,9 +183,47 @@
     icon.style.top = Math.max(4, top) + 'px';
     icon.style.width = size + 'px';
     icon.style.height = size + 'px';
-
-    // Make room for the icon without changing the rest of the bar.
     title.style.marginLeft = (size + 10) + 'px';
+  }
+
+  function embedGame(container, header) {
+    if (!container || !header) return;
+
+    var iframe = container.querySelector('#neo-impostor-legacy-game');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'neo-impostor-legacy-game';
+      iframe.src = GAME_URL;
+      iframe.title = 'VS Impostor: Legacy';
+      iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('playsinline', '');
+      iframe.setAttribute('scrolling', 'no');
+      iframe.style.position = 'absolute';
+      iframe.style.border = '0';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+      iframe.style.background = '#333';
+      iframe.style.zIndex = '5';
+      container.appendChild(iframe);
+    }
+
+    var cr = container.getBoundingClientRect();
+    var hr = header.getBoundingClientRect();
+    var top = Math.max(48, hr.bottom - cr.top);
+
+    if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
+    iframe.style.left = '0';
+    iframe.style.top = top + 'px';
+    iframe.style.width = '100%';
+    iframe.style.height = Math.max(120, cr.height - top) + 'px';
+
+    // Keep the native viewer controls above the game frame.
+    var buttons = header.querySelectorAll('button');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].style.position = 'relative';
+      buttons[i].style.zIndex = '20';
+    }
   }
 
   function simplifyViewer() {
@@ -190,7 +237,7 @@
     title.style.textOverflow = 'clip';
     title.style.maxWidth = 'none';
 
-    // Keep only fullscreen + X, matching the placeholder viewer example.
+    var header = findViewerHeader(title);
     var buttons = document.querySelectorAll('button'), topButtons = [];
     for (var i = 0; i < buttons.length; i++) {
       var br = buttons[i].getBoundingClientRect();
@@ -202,6 +249,7 @@
     }
 
     addViewerLogo(title);
+    embedGame(findViewerContainer(title, header), header);
   }
 
   function run() { try { simplifyExplore(); } catch (_) {} try { simplifyViewer(); } catch (_) {} }
