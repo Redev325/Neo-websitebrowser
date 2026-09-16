@@ -50,14 +50,15 @@ function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
     if (err) return next(err);
-    const scripts = '<script src="/browser-freeze-fix.js?v=3"></script><script src="/browser-enhancer.js?v=6"></script><script src="/explore-card-override.js?v=9"></script><script src="/neo-impostor-header-fix.js?v=1"></script>';
-    const injected = html.includes('/explore-card-override.js')
-      ? (html.includes('/neo-impostor-header-fix.js') ? html : html.replace(/<\/body>/i, '<script src="/neo-impostor-header-fix.js?v=1"></script></body>'))
-      : html.replace(/<\/body>/i, scripts + '</body>');
+    const scripts = '<script src="/browser-freeze-fix.js?v=3"></script><script src="/browser-enhancer.js?v=6"></script><script src="/explore-card-override.js?v=10"></script>';
+    const injected = html.includes('/explore-card-override.js') ? html : html.replace(/<\/body>/i, scripts + '</body>');
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     return res.type("html").send(injected);
   });
 }
+
+// Use the same injected index for every SPA route, including /Explore refreshes
+// and direct native-viewer URLs, so the Impostor fix cannot disappear on reload.
 app.get("/", sendIndexWithBrowserEnhancer);
 app.get("/Browser", sendIndexWithBrowserEnhancer);
 
@@ -82,8 +83,6 @@ app.use(express.static(staticRoot, { setHeaders(res, filePath) {
   else if (/\.(js|css|webp|png|woff2|svg)$/i.test(filePath)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
 } }));
 
-// Use the same injected index for every SPA route, including /Explore refreshes
-// and direct native-viewer URLs, so the Impostor fix cannot disappear on reload.
 app.get("*", sendIndexWithBrowserEnhancer);
 
 const port = process.env.PORT || 3000;
