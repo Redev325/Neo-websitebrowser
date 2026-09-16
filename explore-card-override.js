@@ -1,20 +1,28 @@
 (function () {
   'use strict';
-  if (window.__neoImpostorLegacyOverrideV2) return;
-  window.__neoImpostorLegacyOverrideV2 = true;
+  if (window.__neoImpostorLegacyStableFix) return;
+  window.__neoImpostorLegacyStableFix = true;
 
   var CARD_TITLE = 'VS IMPOSTOR: LEGACY';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var DESCRIPTION = 'A from-the-ground-up remaster of the 2023 mod, VS IMPOSTOR V4! VS IMPOSTOR: LEGACY intends to be faithful to the original experience, while introducing new tweaks and features to make it the definitive version of the mod you know and love.';
   var CARD_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
+  var ICON_URL = '/vs-impostor-legacy-icon.svg';
+
+  function leafText(el) {
+    return el && !el.children.length ? String(el.textContent || '').trim() : '';
+  }
+
+  function visible(el) {
+    if (!el) return false;
+    var r = el.getBoundingClientRect();
+    var s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+  }
 
   function isExplore() {
     return /^\/Explore\/?$/i.test(location.pathname);
-  }
-
-  function leafText(el) {
-    return el && !el.children.length ? (el.textContent || '').trim() : '';
   }
 
   function findCardTitle() {
@@ -27,14 +35,11 @@
   }
 
   function findCard(titleEl) {
-    if (!titleEl) return null;
     var node = titleEl;
     for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
-      try {
-        if (node.querySelector && node.querySelector('.aspect-video')) return node;
-      } catch (_) {}
+      if (node.querySelector && node.querySelector('.aspect-video')) return node;
     }
-    return titleEl.parentElement;
+    return titleEl && titleEl.parentElement;
   }
 
   function updateCard() {
@@ -44,12 +49,12 @@
     var card = findCard(titleEl);
     if (!card) return;
 
-    if (leafText(titleEl) !== CARD_TITLE) titleEl.textContent = CARD_TITLE;
+    titleEl.textContent = CARD_TITLE;
     titleEl.setAttribute('title', CARD_TITLE);
 
-    var ps = card.querySelectorAll('p,span,div');
-    for (var i = 0; i < ps.length; i++) {
-      var el = ps[i];
+    var els = card.querySelectorAll('p,span,div');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
       if (el === titleEl || el.children.length) continue;
       if (leafText(el) === 'lorem ipsum dolor sit amet, consectetur adipiscing elit') {
         el.textContent = DESCRIPTION;
@@ -57,34 +62,26 @@
     }
 
     var preview = card.querySelector('.aspect-video');
-    if (preview) {
-      var img = preview.querySelector('img.neo-impostor-legacy-thumbnail');
-      if (!img) {
-        img = document.createElement('img');
-        img.className = 'neo-impostor-legacy-thumbnail';
-        img.alt = CARD_TITLE;
-        img.setAttribute('aria-hidden', 'true');
-        preview.appendChild(img);
-      }
-      img.src = CARD_IMAGE;
+    if (!preview) return;
+    var img = preview.querySelector('img.neo-impostor-legacy-thumbnail');
+    if (!img) {
+      img = document.createElement('img');
+      img.className = 'neo-impostor-legacy-thumbnail';
       img.alt = CARD_TITLE;
-      img.style.position = 'absolute';
-      img.style.inset = '0';
-      img.style.width = '100%';
-      img.style.height = '100%';
-      img.style.objectFit = 'cover';
-      img.style.display = 'block';
-      img.style.zIndex = '2';
-      preview.style.position = 'relative';
-      var oldIcon = preview.querySelectorAll('svg');
-      for (var j = 0; j < oldIcon.length; j++) oldIcon[j].style.display = 'none';
+      img.setAttribute('aria-hidden', 'true');
+      preview.appendChild(img);
     }
-  }
-
-  function visible(el) {
-    if (!el) return false;
-    var r = el.getBoundingClientRect();
-    return r.width > 0 && r.height > 0 && r.bottom >= 0 && r.right >= 0 && r.top <= window.innerHeight && r.left <= window.innerWidth;
+    img.src = CARD_IMAGE;
+    img.style.position = 'absolute';
+    img.style.inset = '0';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    img.style.display = 'block';
+    img.style.zIndex = '2';
+    preview.style.position = 'relative';
+    var icons = preview.querySelectorAll('svg');
+    for (var j = 0; j < icons.length; j++) icons[j].style.display = 'none';
   }
 
   function findViewerTitle() {
@@ -96,67 +93,158 @@
       if (text !== 'Placeholder 1' && text !== VIEWER_TITLE) continue;
       if (!visible(el)) continue;
       var r = el.getBoundingClientRect();
-      if (r.top < 90 && r.left < 360) return el;
-      fallback = fallback || el;
+      if (r.top >= -5 && r.top < 80 && r.left >= 20 && r.left < 400) return el;
+      if (!fallback) fallback = el;
     }
     return fallback;
   }
 
-  function findViewerRoot(titleEl) {
-    if (!titleEl) return null;
-    var node = titleEl.parentElement;
-    var best = null;
-    for (var i = 0; i < 14 && node; i++, node = node.parentElement) {
+  function findViewerHeader(titleEl) {
+    var node = titleEl;
+    for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
-      var style = getComputedStyle(node);
-      var coversScreen = r.width >= window.innerWidth * 0.82 && r.height >= window.innerHeight * 0.70;
-      var overlayish = style.position === 'fixed' || style.position === 'absolute';
-      if (coversScreen && (overlayish || i >= 2)) best = node;
-      if (r.width >= window.innerWidth * 0.96 && r.height >= window.innerHeight * 0.90) return node;
+      if (r.top <= 5 && r.height >= 40 && r.height <= 75 && r.width >= window.innerWidth * 0.8) return node;
     }
-    return best;
+    return titleEl.parentElement;
   }
 
-  function findViewerStage(root) {
-    if (!root) return null;
-    var rootRect = root.getBoundingClientRect();
-    var all = root.querySelectorAll('*');
+  function findViewerStage(titleEl) {
+    var header = findViewerHeader(titleEl);
+    var node = header;
     var best = null;
-    var bestArea = 0;
-    for (var i = 0; i < all.length; i++) {
-      var el = all[i];
-      if (el.id === 'neo-impostor-legacy-frame') continue;
-      var r = el.getBoundingClientRect();
-      if (r.width < rootRect.width * 0.72 || r.height < rootRect.height * 0.68) continue;
-      if (r.top < rootRect.top + 28) continue;
-      if (r.bottom > rootRect.bottom + 5) continue;
-      var area = r.width * r.height;
-      if (area > bestArea) {
-        best = el;
-        bestArea = area;
+    for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
+      var rr = node.getBoundingClientRect();
+      if (rr.width < window.innerWidth * 0.85 || rr.height < window.innerHeight * 0.75) continue;
+      var all = node.querySelectorAll('*');
+      for (var j = 0; j < all.length; j++) {
+        var el = all[j];
+        if (el.id === 'neo-impostor-legacy-game') continue;
+        var r = el.getBoundingClientRect();
+        if (r.top < rr.top + 35) continue;
+        if (r.width < rr.width * 0.72 || r.height < rr.height * 0.68) continue;
+        if (r.bottom > rr.bottom + 5) continue;
+        if (!best || r.width * r.height > best.getBoundingClientRect().width * best.getBoundingClientRect().height) best = el;
       }
-    }
-    if (best) return best;
-
-    var direct = root.children;
-    for (var j = 0; j < direct.length; j++) {
-      var d = direct[j].getBoundingClientRect();
-      if (d.top >= rootRect.top + 30 && d.width >= rootRect.width * 0.72 && d.height >= rootRect.height * 0.68) return direct[j];
+      if (best) return best;
     }
     return null;
   }
 
-  function ensureGameFrame(stage) {
+  function styleHeader(titleEl) {
+    var header = findViewerHeader(titleEl);
+    if (!header) return;
+    var hr = header.getBoundingClientRect();
+    if (hr.width < window.innerWidth * 0.7) return;
+    if (getComputedStyle(header).position === 'static') header.style.position = 'relative';
+
+    var oldTitle = titleEl;
+    var tr = oldTitle.getBoundingClientRect();
+    oldTitle.style.visibility = 'hidden';
+
+    var existing = header.querySelector('.neo-impostor-legacy-header-icon');
+    if (!existing) {
+      existing = document.createElement('img');
+      existing.className = 'neo-impostor-legacy-header-icon';
+      existing.src = ICON_URL;
+      existing.alt = '';
+      existing.draggable = false;
+      existing.style.position = 'absolute';
+      existing.style.objectFit = 'contain';
+      existing.style.pointerEvents = 'none';
+      existing.style.zIndex = '2147483646';
+      header.appendChild(existing);
+    }
+
+    var title = header.querySelector('.neo-impostor-legacy-header-title');
+    if (!title) {
+      title = document.createElement('span');
+      title.className = 'neo-impostor-legacy-header-title';
+      title.textContent = VIEWER_TITLE;
+      title.style.position = 'absolute';
+      title.style.whiteSpace = 'nowrap';
+      title.style.pointerEvents = 'none';
+      title.style.zIndex = '2147483646';
+      header.appendChild(title);
+    }
+
+    var cs = getComputedStyle(oldTitle);
+    title.style.fontFamily = cs.fontFamily;
+    title.style.fontSize = cs.fontSize;
+    title.style.fontWeight = cs.fontWeight;
+    title.style.fontStyle = cs.fontStyle;
+    title.style.letterSpacing = cs.letterSpacing;
+    title.style.lineHeight = cs.lineHeight;
+    title.style.color = cs.color;
+    title.style.textShadow = cs.textShadow;
+    title.style.left = (tr.left - hr.left) + 'px';
+    title.style.top = (tr.top - hr.top) + 'px';
+    title.style.height = tr.height + 'px';
+
+    var candidate = null;
+    var media = header.querySelectorAll('img,svg');
+    var best = Infinity;
+    for (var i = 0; i < media.length; i++) {
+      var m = media[i];
+      if (m === existing || m.className === 'neo-impostor-legacy-header-icon') continue;
+      if (m.closest && m.closest('.neo-impostor-legacy-header-icon')) continue;
+      var mr = m.getBoundingClientRect();
+      if (mr.width <= 0 || mr.height <= 0 || mr.width > 42 || mr.height > 42) continue;
+      if (mr.right > tr.left + 4) continue;
+      if (mr.bottom < hr.top || mr.top > tr.bottom + 14) continue;
+      var score = Math.abs(mr.right - tr.left) + Math.abs(((mr.top + mr.bottom) / 2) - ((tr.top + tr.bottom) / 2));
+      if (score < best) { best = score; candidate = m; }
+    }
+
+    var ir = candidate ? candidate.getBoundingClientRect() : { left: tr.left - 31, top: tr.top, width: 22, height: 22 };
+    if (candidate) candidate.style.visibility = 'hidden';
+    existing.style.left = (ir.left - hr.left) + 'px';
+    existing.style.top = (ir.top - hr.top) + 'px';
+    existing.style.width = Math.max(18, Math.min(26, ir.width)) + 'px';
+    existing.style.height = Math.max(18, Math.min(26, ir.height)) + 'px';
+  }
+
+  function addSafeGameLauncher(stage) {
     if (!stage) return;
-    var frame = stage.querySelector('#neo-impostor-legacy-frame');
-    if (!frame) {
-      frame = document.createElement('iframe');
-      frame.id = 'neo-impostor-legacy-frame';
+    var oldFrame = stage.querySelector('#neo-impostor-legacy-game');
+    if (oldFrame) oldFrame.remove();
+
+    var button = stage.querySelector('.neo-impostor-legacy-launch');
+    if (button) return;
+
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+
+    button = document.createElement('button');
+    button.className = 'neo-impostor-legacy-launch';
+    button.type = 'button';
+    button.textContent = 'Play VS IMPOSTOR: LEGACY';
+    button.style.position = 'absolute';
+    button.style.left = '50%';
+    button.style.top = '50%';
+    button.style.transform = 'translate(-50%, -50%)';
+    button.style.zIndex = '10';
+    button.style.padding = '12px 20px';
+    button.style.border = '1px solid rgba(255,255,255,.2)';
+    button.style.borderRadius = '10px';
+    button.style.background = '#202020';
+    button.style.color = '#fff';
+    button.style.fontWeight = '700';
+    button.style.cursor = 'pointer';
+
+    button.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (stage.querySelector('#neo-impostor-legacy-game')) return;
+      button.textContent = 'Loading VS IMPOSTOR: LEGACY...';
+      button.disabled = true;
+
+      var frame = document.createElement('iframe');
+      frame.id = 'neo-impostor-legacy-game';
       frame.title = VIEWER_TITLE;
       frame.src = GAME_URL;
+      frame.loading = 'lazy';
       frame.setAttribute('allow', 'fullscreen; autoplay; gamepad; pointer-lock; clipboard-read; clipboard-write; encrypted-media; accelerometer; gyroscope');
       frame.setAttribute('allowfullscreen', '');
-      frame.setAttribute('referrerpolicy', 'no-referrer');
       frame.style.position = 'absolute';
       frame.style.inset = '0';
       frame.style.width = '100%';
@@ -166,14 +254,12 @@
       frame.style.padding = '0';
       frame.style.display = 'block';
       frame.style.background = '#000';
-      frame.style.zIndex = '1';
+      frame.style.zIndex = '2';
       stage.appendChild(frame);
-    } else if (frame.src !== GAME_URL) {
-      frame.src = GAME_URL;
-    }
-    var stageStyle = getComputedStyle(stage);
-    if (stageStyle.position === 'static') stage.style.position = 'relative';
-    stage.style.overflow = 'hidden';
+      setTimeout(function () { if (button.isConnected) button.remove(); }, 1500);
+    }, { once: true });
+
+    stage.appendChild(button);
   }
 
   function updateViewer() {
@@ -182,11 +268,9 @@
     if (!titleEl) return;
     if (leafText(titleEl) === 'Placeholder 1') titleEl.textContent = VIEWER_TITLE;
     titleEl.setAttribute('title', VIEWER_TITLE);
-
-    var root = findViewerRoot(titleEl);
-    if (!root) return;
-    var stage = findViewerStage(root);
-    if (stage) ensureGameFrame(stage);
+    styleHeader(titleEl);
+    var stage = findViewerStage(titleEl);
+    if (stage) addSafeGameLauncher(stage);
   }
 
   function run() {
@@ -196,19 +280,16 @@
 
   function start() {
     run();
-    var observer = new MutationObserver(function () { run(); });
+    var timer = 0;
+    var observer = new MutationObserver(function () {
+      if (timer) return;
+      timer = setTimeout(function () { timer = 0; run(); }, 50);
+    });
     observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
-    setInterval(run, 250);
-    setTimeout(run, 300);
-    setTimeout(run, 800);
-    setTimeout(run, 1500);
-    setTimeout(run, 3000);
-    setTimeout(run, 5000);
+    setInterval(run, 1000);
+    [250, 750, 1500, 3000].forEach(function (ms) { setTimeout(run, ms); });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-  } else {
-    start();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
 })();
