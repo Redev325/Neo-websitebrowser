@@ -187,11 +187,21 @@
     var size = oldIcon ? Math.min(48, Math.max(40, oldIcon.getBoundingClientRect().height + 14)) : 48;
     var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left - 7 : Math.max(8, tr.left - hr.left - size - 8);
     var top = Math.max(-3, (hr.height - size) / 2);
+    var textLeft = Math.max(4, left) + size + 10;
     icon.style.left = Math.max(4, left) + 'px';
     icon.style.top = top + 'px';
     icon.style.width = size + 'px';
     icon.style.height = size + 'px';
-    title.style.marginLeft = (size + 8) + 'px';
+    title.style.position = 'absolute';
+    title.style.left = textLeft + 'px';
+    title.style.top = '50%';
+    title.style.transform = 'translateY(-50%)';
+    title.style.marginLeft = '0';
+    title.style.marginTop = '0';
+    title.style.width = 'auto';
+    title.style.padding = '0';
+    title.style.maxWidth = 'calc(100% - ' + textLeft + 'px - 140px)';
+    title.style.zIndex = '20';
   }
   function embedGame(container, header) {
     if (!container || !header) return;
