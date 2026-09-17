@@ -7,7 +7,6 @@
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
-  // The large HTML5 build is hosted by the dedicated game Pages site and shown inside Neo's gray viewer area.
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
 
   function leaf(el) { return el && !el.children.length ? String(el.textContent || '').trim() : ''; }
@@ -17,7 +16,6 @@
     var r = el.getBoundingClientRect(), s = getComputedStyle(el);
     return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
   }
-
   function cardFromTitle(title) {
     var node = title;
     for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
@@ -25,7 +23,6 @@
     }
     return title.parentElement;
   }
-
   function findCards() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
     for (var i = 0; i < nodes.length; i++) {
@@ -36,7 +33,6 @@
     }
     return cards;
   }
-
   function getCardTitle(card, index) {
     var nodes = card.querySelectorAll('p,h1,h2,h3,h4,span,div');
     for (var i = 0; i < nodes.length; i++) {
@@ -46,11 +42,9 @@
     }
     return null;
   }
-
   function simplifyCard(card, index) {
     var title = getCardTitle(card, index), preview = card.querySelector('.aspect-video');
     if (!title || !preview) return;
-
     card.style.overflow = 'hidden';
     card.style.height = 'auto';
     card.style.minHeight = '0';
@@ -63,7 +57,6 @@
     preview.style.minHeight = '0';
     preview.style.aspectRatio = '16 / 9';
     preview.style.flex = '0 0 auto';
-
     if (index === 0) {
       title.textContent = FIRST_TITLE;
       var image = preview.querySelector('.neo-simple-game-image');
@@ -74,7 +67,6 @@
       var svgs = preview.querySelectorAll('svg');
       for (var s = 0; s < svgs.length; s++) svgs[s].style.display = 'none';
     }
-
     title.style.display = 'block';
     title.style.width = '100%';
     title.style.boxSizing = 'border-box';
@@ -85,7 +77,6 @@
     title.style.lineHeight = '1.2';
     title.style.position = 'relative';
     title.style.zIndex = '2';
-
     var descendants = card.querySelectorAll('*');
     for (var d = 0; d < descendants.length; d++) {
       var el = descendants[d];
@@ -94,7 +85,6 @@
       var value = leaf(el);
       if (value === 'lorem ipsum dolor sit amet, consectetur adipiscing elit' || value === 'Featured' || /^(\d+)\s*Views?$/i.test(value)) el.style.display = 'none';
     }
-
     var buttons = card.querySelectorAll('button');
     for (var b = 0; b < buttons.length; b++) {
       buttons[b].style.display = '';
@@ -104,13 +94,11 @@
       buttons[b].style.zIndex = '20';
     }
   }
-
   function simplifyExplore() {
     if (!isExplorePage()) return;
     var cards = findCards();
     for (var i = 0; i < cards.length; i++) simplifyCard(cards[i], i);
   }
-
   function findViewerTitle() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
     for (var i = 0; i < nodes.length; i++) {
@@ -122,7 +110,6 @@
     }
     return null;
   }
-
   function findViewerHeader(title) {
     var node = title;
     for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
@@ -131,7 +118,6 @@
     }
     return title.parentElement;
   }
-
   function findViewerContainer(title, header) {
     var node = header || title;
     for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
@@ -140,15 +126,12 @@
     }
     return header && header.parentElement ? header.parentElement : null;
   }
-
   function addViewerLogo(title) {
     var header = findViewerHeader(title);
     if (!header) return;
-
     var hr = header.getBoundingClientRect();
     var tr = title.getBoundingClientRect();
     if (hr.width < window.innerWidth * 0.7) return;
-
     var oldIcon = null;
     var media = header.querySelectorAll('img,svg');
     for (var i = 0; i < media.length; i++) {
@@ -161,7 +144,6 @@
       }
     }
     if (oldIcon) oldIcon.style.visibility = 'hidden';
-
     var icon = header.querySelector('#neo-impostor-legacy-header-logo');
     if (!icon) {
       icon = document.createElement('img');
@@ -170,12 +152,15 @@
       icon.alt = '';
       icon.draggable = false;
       icon.style.position = 'absolute';
-      icon.style.objectFit = 'contain';
       icon.style.pointerEvents = 'none';
       icon.style.zIndex = '2147483646';
+      icon.style.borderRadius = '4px';
+      icon.style.display = 'block';
+      icon.style.boxSizing = 'border-box';
+      icon.style.objectFit = 'cover';
+      icon.style.objectPosition = 'center';
       header.appendChild(icon);
     }
-
     var size = oldIcon ? Math.min(28, Math.max(20, oldIcon.getBoundingClientRect().height)) : 28;
     var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left : Math.max(10, tr.left - hr.left - size - 8);
     var top = oldIcon ? oldIcon.getBoundingClientRect().top - hr.top : Math.max(6, tr.top - hr.top - 2);
@@ -185,10 +170,8 @@
     icon.style.height = size + 'px';
     title.style.marginLeft = (size + 10) + 'px';
   }
-
   function embedGame(container, header) {
     if (!container || !header) return;
-
     var iframe = container.querySelector('#neo-impostor-legacy-game');
     if (!iframe) {
       iframe = document.createElement('iframe');
@@ -207,36 +190,29 @@
       iframe.style.zIndex = '5';
       container.appendChild(iframe);
     }
-
     var cr = container.getBoundingClientRect();
     var hr = header.getBoundingClientRect();
     var top = Math.max(48, hr.bottom - cr.top);
-
     if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
     iframe.style.left = '0';
     iframe.style.top = top + 'px';
     iframe.style.width = '100%';
     iframe.style.height = Math.max(120, cr.height - top) + 'px';
-
-    // Keep the native viewer controls above the game frame.
     var buttons = header.querySelectorAll('button');
     for (var i = 0; i < buttons.length; i++) {
       buttons[i].style.position = 'relative';
       buttons[i].style.zIndex = '20';
     }
   }
-
   function simplifyViewer() {
     var title = findViewerTitle();
     if (!title) return;
-
     title.textContent = VIEWER_TITLE;
     title.setAttribute('title', VIEWER_TITLE);
     title.style.whiteSpace = 'nowrap';
     title.style.overflow = 'visible';
     title.style.textOverflow = 'clip';
     title.style.maxWidth = 'none';
-
     var header = findViewerHeader(title);
     var buttons = document.querySelectorAll('button'), topButtons = [];
     for (var i = 0; i < buttons.length; i++) {
@@ -247,13 +223,10 @@
     if (topButtons.length >= 3) {
       for (var j = 0; j < topButtons.length - 2; j++) topButtons[j].style.display = 'none';
     }
-
     addViewerLogo(title);
     embedGame(findViewerContainer(title, header), header);
   }
-
   function run() { try { simplifyExplore(); } catch (_) {} try { simplifyViewer(); } catch (_) {} }
-
   function start() {
     run();
     var queued = false;
@@ -265,7 +238,6 @@
     try { new MutationObserver(schedule).observe(document.documentElement, { childList:true, subtree:true, characterData:true }); } catch (_) {}
     setInterval(run, 300);
   }
-
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once:true });
   else start();
 })();
