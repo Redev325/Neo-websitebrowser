@@ -154,21 +154,23 @@
       icon.style.position = 'absolute';
       icon.style.pointerEvents = 'none';
       icon.style.zIndex = '2147483646';
-      icon.style.borderRadius = '4px';
       icon.style.display = 'block';
       icon.style.boxSizing = 'border-box';
-      icon.style.objectFit = 'cover';
+      icon.style.objectFit = 'contain';
       icon.style.objectPosition = 'center';
+      icon.style.background = 'transparent';
+      icon.style.border = '0';
+      icon.style.borderRadius = '0';
       header.appendChild(icon);
     }
-    var size = oldIcon ? Math.min(28, Math.max(20, oldIcon.getBoundingClientRect().height)) : 28;
-    var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left : Math.max(10, tr.left - hr.left - size - 8);
-    var top = oldIcon ? oldIcon.getBoundingClientRect().top - hr.top : Math.max(6, tr.top - hr.top - 2);
+    var size = oldIcon ? Math.min(40, Math.max(34, oldIcon.getBoundingClientRect().height + 10)) : 40;
+    var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left - 5 : Math.max(8, tr.left - hr.left - size - 8);
+    var top = Math.max(0, (hr.height - size) / 2);
     icon.style.left = Math.max(6, left) + 'px';
-    icon.style.top = Math.max(4, top) + 'px';
+    icon.style.top = top + 'px';
     icon.style.width = size + 'px';
     icon.style.height = size + 'px';
-    title.style.marginLeft = (size + 10) + 'px';
+    title.style.marginLeft = (size + 8) + 'px';
   }
   function embedGame(container, header) {
     if (!container || !header) return;
