@@ -139,9 +139,14 @@
   function addViewerLogo(title) {
     var header = findViewerHeader(title);
     if (!header) return;
+    clearVisualWrapper(header);
+    header.style.position = 'relative';
+    header.style.overflow = 'hidden';
+
     var hr = header.getBoundingClientRect();
     var tr = title.getBoundingClientRect();
     if (hr.width < window.innerWidth * 0.7) return;
+
     var oldIcon = null;
     var media = header.querySelectorAll('img,svg');
     for (var i = 0; i < media.length; i++) {
@@ -158,7 +163,7 @@
       clearVisualWrapper(oldIcon.parentElement);
       if (oldIcon.parentElement && oldIcon.parentElement.parentElement) clearVisualWrapper(oldIcon.parentElement.parentElement);
     }
-    clearVisualWrapper(header);
+
     var icon = header.querySelector('#neo-impostor-legacy-header-logo');
     if (!icon) {
       icon = document.createElement('img');
@@ -184,22 +189,26 @@
       icon.style.transformOrigin = 'center center';
       header.appendChild(icon);
     }
-    var size = oldIcon ? Math.min(48, Math.max(40, oldIcon.getBoundingClientRect().height + 14)) : 48;
-    var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left - 7 : Math.max(8, tr.left - hr.left - size - 8);
-    var top = Math.max(-3, (hr.height - size) / 2);
-    var textLeft = Math.max(4, left) + size + 10;
-    icon.style.left = Math.max(4, left) + 'px';
+
+    var headerHeight = Math.max(40, Math.min(70, hr.height));
+    var size = Math.min(44, Math.max(34, headerHeight - 6));
+    var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left : Math.max(8, tr.left - hr.left - size - 8);
+    left = Math.max(6, Math.min(left, hr.width - size - 6));
+    var top = Math.max(3, (hr.height - size) / 2);
+    var textLeft = left + size + 10;
+
+    icon.style.left = left + 'px';
     icon.style.top = top + 'px';
     icon.style.width = size + 'px';
     icon.style.height = size + 'px';
+
     title.style.position = 'absolute';
     title.style.left = textLeft + 'px';
     title.style.top = '50%';
     title.style.transform = 'translateY(-50%)';
-    title.style.marginLeft = '0';
-    title.style.marginTop = '0';
-    title.style.width = 'auto';
+    title.style.margin = '0';
     title.style.padding = '0';
+    title.style.width = 'auto';
     title.style.maxWidth = 'calc(100% - ' + textLeft + 'px - 140px)';
     title.style.zIndex = '20';
   }
