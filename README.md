@@ -1,4 +1,6 @@
 # Neo Browser
+<img width="2000" height="2000" alt="2026_09_16_0yg_Kleki (1)" src="https://github.com/user-attachments/assets/387f6d4b-a4d7-4998-b675-57bd4098a91f" />
+
 
 Neo Browser officially built in using NEO search™ you can now search up about anything in the neo browser (coulldn't use duckduck go or microsoft bing so i resorted to my own browser)
 enjoy playing games watching youtube or whatever might comfort you using the new browser The games section will be next to come.
