@@ -161,12 +161,16 @@
       icon.style.background = 'transparent';
       icon.style.border = '0';
       icon.style.borderRadius = '0';
+      icon.style.mixBlendMode = 'multiply';
+      icon.style.filter = 'contrast(1.08)';
+      icon.style.transform = 'scale(1.18)';
+      icon.style.transformOrigin = 'center center';
       header.appendChild(icon);
     }
-    var size = oldIcon ? Math.min(40, Math.max(34, oldIcon.getBoundingClientRect().height + 10)) : 40;
-    var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left - 5 : Math.max(8, tr.left - hr.left - size - 8);
-    var top = Math.max(0, (hr.height - size) / 2);
-    icon.style.left = Math.max(6, left) + 'px';
+    var size = oldIcon ? Math.min(48, Math.max(40, oldIcon.getBoundingClientRect().height + 14)) : 48;
+    var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left - 7 : Math.max(8, tr.left - hr.left - size - 8);
+    var top = Math.max(-3, (hr.height - size) / 2);
+    icon.style.left = Math.max(4, left) + 'px';
     icon.style.top = top + 'px';
     icon.style.width = size + 'px';
     icon.style.height = size + 'px';
