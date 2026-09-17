@@ -126,6 +126,16 @@
     }
     return header && header.parentElement ? header.parentElement : null;
   }
+  function clearVisualWrapper(el) {
+    if (!el) return;
+    el.style.background = 'transparent';
+    el.style.backgroundColor = 'transparent';
+    el.style.border = '0';
+    el.style.borderRadius = '0';
+    el.style.boxShadow = 'none';
+    el.style.outline = '0';
+    el.style.padding = '0';
+  }
   function addViewerLogo(title) {
     var header = findViewerHeader(title);
     if (!header) return;
@@ -143,7 +153,12 @@
         break;
       }
     }
-    if (oldIcon) oldIcon.style.visibility = 'hidden';
+    if (oldIcon) {
+      oldIcon.style.visibility = 'hidden';
+      clearVisualWrapper(oldIcon.parentElement);
+      if (oldIcon.parentElement && oldIcon.parentElement.parentElement) clearVisualWrapper(oldIcon.parentElement.parentElement);
+    }
+    clearVisualWrapper(header);
     var icon = header.querySelector('#neo-impostor-legacy-header-logo');
     if (!icon) {
       icon = document.createElement('img');
@@ -161,6 +176,8 @@
       icon.style.background = 'transparent';
       icon.style.border = '0';
       icon.style.borderRadius = '0';
+      icon.style.boxShadow = 'none';
+      icon.style.outline = '0';
       icon.style.mixBlendMode = 'normal';
       icon.style.filter = 'none';
       icon.style.transform = 'none';
