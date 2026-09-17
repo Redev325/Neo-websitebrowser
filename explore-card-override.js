@@ -161,9 +161,9 @@
       icon.style.background = 'transparent';
       icon.style.border = '0';
       icon.style.borderRadius = '0';
-      icon.style.mixBlendMode = 'multiply';
-      icon.style.filter = 'contrast(1.08)';
-      icon.style.transform = 'scale(1.18)';
+      icon.style.mixBlendMode = 'normal';
+      icon.style.filter = 'none';
+      icon.style.transform = 'none';
       icon.style.transformOrigin = 'center center';
       header.appendChild(icon);
     }
