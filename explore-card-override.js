@@ -5,6 +5,7 @@
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
   var SECOND_TITLE = 'Vs Sonic.exe(2.0-4.0)';
+  var SECOND_IMAGE = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/vs-sonic-exe-2-0-4-0.jpg';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
@@ -68,7 +69,16 @@
       var svgs = preview.querySelectorAll('svg');
       for (var s = 0; s < svgs.length; s++) svgs[s].style.display = 'none';
     }
-    if (index === 1) title.textContent = SECOND_TITLE;
+    if (index === 1) {
+      title.textContent = SECOND_TITLE;
+      var image2 = preview.querySelector('.neo-sonic-exe-card-image');
+      if (!image2) { image2 = document.createElement('img'); image2.className = 'neo-sonic-exe-card-image'; preview.appendChild(image2); }
+      image2.src = SECOND_IMAGE;
+      image2.alt = SECOND_TITLE;
+      image2.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;z-index:1;background:#000;';
+      var svgs2 = preview.querySelectorAll('svg');
+      for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
+    }
     title.style.display = 'block';
     title.style.width = '100%';
     title.style.boxSizing = 'border-box';
