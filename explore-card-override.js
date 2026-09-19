@@ -26,13 +26,22 @@
     return title.parentElement;
   }
   function findCards() {
-    var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
+    var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), first = null, second = null;
+    var markedSecond = document.querySelector('[data-neo-sonic-exe-card="true"]');
+    if (markedSecond) second = markedSecond;
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
-      if (!/^Placeholder \d+$/.test(t) && t !== FIRST_TITLE) continue;
-      var card = cardFromTitle(nodes[i]);
-      if (card && cards.indexOf(card) === -1) cards.push(card);
+      if (!first && (t === 'Placeholder 1' || t === FIRST_TITLE)) {
+        first = cardFromTitle(nodes[i]);
+      }
+      if (!second && t === 'Placeholder 2') {
+        second = cardFromTitle(nodes[i]);
+      }
+      if (first && second) break;
     }
+    var cards = [];
+    if (first) cards.push(first);
+    if (second && second !== first) cards.push(second);
     return cards;
   }
   function getCardTitle(card, index) {
@@ -70,6 +79,7 @@
       for (var s = 0; s < svgs.length; s++) svgs[s].style.display = 'none';
     }
     if (index === 1) {
+      card.setAttribute('data-neo-sonic-exe-card', 'true');
       title.textContent = SECOND_TITLE;
       var image2 = preview.querySelector('.neo-sonic-exe-card-image');
       if (!image2) { image2 = document.createElement('img'); image2.className = 'neo-sonic-exe-card-image'; preview.appendChild(image2); }
