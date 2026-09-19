@@ -26,22 +26,18 @@
     return title.parentElement;
   }
   function findCards() {
-    var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), first = null, second = null;
-    var markedSecond = document.querySelector('[data-neo-sonic-exe-card="true"]');
-    if (markedSecond) second = markedSecond;
+    var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
-      if (!first && (t === 'Placeholder 1' || t === FIRST_TITLE)) {
-        first = cardFromTitle(nodes[i]);
-      }
-      if (!second && t === 'Placeholder 2') {
-        second = cardFromTitle(nodes[i]);
-      }
-      if (first && second) break;
+      if (t !== FIRST_TITLE && !/^Placeholder \d+$/.test(t)) continue;
+      var card = cardFromTitle(nodes[i]);
+      if (card && cards.indexOf(card) === -1) cards.push(card);
     }
-    var cards = [];
-    if (first) cards.push(first);
-    if (second && second !== first) cards.push(second);
+    cards.sort(function (a, b) {
+      var ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
+      if (Math.abs(ar.top - br.top) > 8) return ar.top - br.top;
+      return ar.left - br.left;
+    });
     return cards;
   }
   function getCardTitle(card, index) {
@@ -88,6 +84,14 @@
       image2.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;z-index:1;background:#000;';
       var svgs2 = preview.querySelectorAll('svg');
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
+    }
+    if (index >= 2) {
+      preview.style.background = '#000';
+      preview.style.backgroundColor = '#000';
+      var genericImages = preview.querySelectorAll('img');
+      for (var gi = 0; gi < genericImages.length; gi++) genericImages[gi].style.display = 'none';
+      var genericSvgs = preview.querySelectorAll('svg');
+      for (var gs = 0; gs < genericSvgs.length; gs++) genericSvgs[gs].style.display = 'none';
     }
     title.style.display = 'block';
     title.style.width = '100%';
