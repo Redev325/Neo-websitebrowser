@@ -123,9 +123,16 @@
     }
   }
   function simplifyExplore() {
-    if (!isExplorePage()) return;
-    try { sessionStorage.removeItem('neo-sonic-viewer'); } catch (_) {}
-    window.__neoSonicViewer = false;
+    if (!isExplorePage()) {
+      window.__neoLastExplorePath = location.pathname;
+      return;
+    }
+    if (window.__neoLastExplorePath !== location.pathname || !window.__neoExploreStateInitialized) {
+      window.__neoLastExplorePath = location.pathname;
+      window.__neoExploreStateInitialized = true;
+      try { sessionStorage.removeItem('neo-sonic-viewer'); } catch (_) {}
+      window.__neoSonicViewer = false;
+    }
     var cards = findCards();
     for (var i = 0; i < cards.length; i++) {
       simplifyCard(cards[i], i);
@@ -190,7 +197,7 @@
     var media = header.querySelectorAll('img,svg');
     for (var i = 0; i < media.length; i++) {
       var m = media[i];
-      if (m.id === 'neo-impostor-legacy-header-logo') continue;
+      if (m.id === 'neo-impostor-legacy-header-logo' || m.id === 'neo-game-header-logo') continue;
       var mr = m.getBoundingClientRect();
       if (mr.width >= 10 && mr.width <= 45 && mr.height >= 10 && mr.height <= 45 && mr.left < tr.left + 2 && mr.right > hr.left && mr.top >= hr.top - 3 && mr.top < hr.top + 45) {
         oldIcon = m;
@@ -232,6 +239,7 @@
     try { sonicViewer = sonicViewer || sessionStorage.getItem('neo-sonic-viewer') === '1'; } catch (_) {}
     icon.src = sonicViewer ? SONIC_ICON_URL : ICON_URL;
     icon.alt = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    icon.style.visibility = 'visible';
 
     var headerHeight = Math.max(40, Math.min(70, hr.height));
     var size = Math.min(44, Math.max(34, headerHeight - 6));
@@ -298,7 +306,7 @@
     var sonicViewer = !!window.__neoSonicViewer;
     try { sonicViewer = sonicViewer || sessionStorage.getItem('neo-sonic-viewer') === '1'; } catch (_) {}
     title.textContent = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
-    title.setAttribute('title', VIEWER_TITLE);
+    title.setAttribute('title', sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE);
     title.style.whiteSpace = 'nowrap';
     title.style.overflow = 'visible';
     title.style.textOverflow = 'clip';
