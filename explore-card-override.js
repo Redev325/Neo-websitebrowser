@@ -377,9 +377,6 @@
       shell.id = 'neo-sonic-buttons-shell';
       shell.style.position = 'absolute';
       shell.style.inset = '0';
-      shell.style.display = 'flex';
-      shell.style.alignItems = 'center';
-      shell.style.justifyContent = 'center';
       shell.style.pointerEvents = 'none';
       shell.style.zIndex = '8';
 
@@ -397,73 +394,88 @@
       art.style.userSelect = 'none';
       shell.appendChild(art);
 
-      var hitArea = document.createElement('div');
-      hitArea.id = 'neo-sonic-buttons-hit-area';
-      hitArea.style.position = 'absolute';
-      hitArea.style.inset = '0';
-      hitArea.style.display = 'grid';
-      hitArea.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
-      hitArea.style.pointerEvents = 'auto';
-      shell.appendChild(hitArea);
+      // The image contains two actual button graphics. These are the only
+      // clickable areas; there are intentionally no four-column hitboxes.
+      var buttons = document.createElement('div');
+      buttons.id = 'neo-sonic-button-hits';
+      buttons.style.position = 'absolute';
+      buttons.style.inset = '0';
+      buttons.style.pointerEvents = 'none';
+      shell.appendChild(buttons);
 
-      for (var i = 0; i < 4; i++) {
+      function makeHit(id) {
         var button = document.createElement('button');
         button.type = 'button';
+        button.id = id;
         button.className = 'neo-sonic-button-hit';
-        button.setAttribute('aria-label', 'Sonic.EXE button ' + (i + 1));
-        button.dataset.sonicButton = String(i + 1);
-        button.style.appearance = 'none';
+        button.style.position = 'absolute';
+        button.style.padding = '0';
+        button.style.margin = '0';
         button.style.border = '0';
         button.style.outline = '0';
-        button.style.margin = '0';
-        button.style.padding = '0';
         button.style.background = 'transparent';
         button.style.cursor = 'pointer';
         button.style.pointerEvents = 'auto';
-        button.style.transition = 'transform .15s ease, background .15s ease, box-shadow .15s ease';
-        button.style.borderRadius = '10px';
+        button.style.borderRadius = '12px';
+        button.style.transition = 'transform .14s ease, background .14s ease, box-shadow .14s ease, filter .14s ease';
         button.addEventListener('mouseenter', function () {
-          this.style.background = 'rgba(255,255,255,.06)';
-          this.style.boxShadow = '0 0 18px rgba(255,255,255,.14) inset, 0 0 14px rgba(255,255,255,.08)';
-          this.style.transform = 'scale(1.015)';
+          this.style.transform = 'scale(1.025)';
+          this.style.background = 'rgba(255,255,255,.055)';
+          this.style.boxShadow = '0 0 20px rgba(255,255,255,.18), inset 0 0 16px rgba(255,255,255,.10)';
+          this.style.filter = 'brightness(1.08)';
         });
         button.addEventListener('mouseleave', function () {
+          this.style.transform = 'scale(1)';
           this.style.background = 'transparent';
           this.style.boxShadow = 'none';
-          this.style.transform = 'scale(1)';
+          this.style.filter = 'none';
         });
         button.addEventListener('mousedown', function () {
           this.style.transform = 'scale(.985)';
         });
         button.addEventListener('mouseup', function () {
-          this.style.transform = 'scale(1.015)';
+          this.style.transform = 'scale(1.025)';
         });
         button.addEventListener('click', function () {
           var event;
           try {
             event = new CustomEvent('neo-sonic-button-click', {
               bubbles: true,
-              detail: { index: Number(this.dataset.sonicButton) }
+              detail: { id: this.id }
             });
           } catch (_) {
             event = document.createEvent('CustomEvent');
-            event.initCustomEvent('neo-sonic-button-click', true, false, {
-              index: Number(this.dataset.sonicButton)
-            });
+            event.initCustomEvent('neo-sonic-button-click', true, false, { id: this.id });
           }
           stage.dispatchEvent(event);
         });
-        hitArea.appendChild(button);
+        buttons.appendChild(button);
+        return button;
       }
+
+      // Percentage positions are relative to the Sonic grey stage so the
+      // targets stay attached to the image when the viewer resizes.
+      var leftButton = makeHit('neo-sonic-button-1');
+      var rightButton = makeHit('neo-sonic-button-2');
+
+      leftButton.style.left = '32%';
+      leftButton.style.top = '48%';
+      leftButton.style.width = '16%';
+      leftButton.style.height = '18%';
+
+      rightButton.style.left = '52%';
+      rightButton.style.top = '48%';
+      rightButton.style.width = '16%';
+      rightButton.style.height = '18%';
 
       stage.appendChild(shell);
     }
 
-    shell.style.display = 'flex';
+    shell.style.display = 'block';
     shell.style.visibility = 'visible';
     shell.style.pointerEvents = 'none';
-    var hit = shell.querySelector('#neo-sonic-buttons-hit-area');
-    if (hit) hit.style.pointerEvents = 'auto';
+    var hits = shell.querySelector('#neo-sonic-button-hits');
+    if (hits) hits.style.pointerEvents = 'none';
   }
 
   function embedImpostor(root, stage) {
