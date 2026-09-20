@@ -31,7 +31,7 @@
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
-      if (t !== FIRST_TITLE && !/^Placeholder \d+$/.test(t)) continue;
+      if (t !== FIRST_TITLE && t !== SECOND_TITLE && !/^Placeholder \d+$/.test(t)) continue;
       var card = cardFromTitle(nodes[i]);
       if (card && cards.indexOf(card) === -1) cards.push(card);
     }
@@ -47,7 +47,8 @@
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
       if (index === 0 && (t === 'Placeholder 1' || t === FIRST_TITLE)) return nodes[i];
-      if (index !== 0 && /^Placeholder \d+$/.test(t)) return nodes[i];
+      if (index === 1 && (t === 'Placeholder 2' || t === SECOND_TITLE)) return nodes[i];
+      if (index >= 2 && /^Placeholder \d+$/.test(t)) return nodes[i];
     }
     return null;
   }
