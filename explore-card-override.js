@@ -584,7 +584,7 @@
     if (!root) return;
     root.classList.toggle('neo-native-cursor', !!active);
 
-    // Remove any already-rendered Neo cursor effects while a game is open.
+    // Remove any already-rendered Neo cursor effects while native mode is active.
     if (active) {
       var cursor = document.getElementById('custom-cursor');
       if (cursor) cursor.style.display = 'none';
@@ -592,15 +592,29 @@
       for (var i = 0; i < effects.length; i++) effects[i].remove();
     }
 
-    // The game iframe is cross-origin, so its own document cannot be styled
-    // directly. The shell already forwards the native-cursor state to frames;
-    // send it here as well for the current viewer.
     var frames = document.querySelectorAll('iframe');
     for (var f = 0; f < frames.length; f++) {
       try {
         frames[f].contentWindow.postMessage({source:'neo-browser-shell', nativeCursor:!!active}, '*');
       } catch (_) {}
     }
+  }
+
+  function bindViewerCursor(root) {
+    if (!root || root.__neoCursorBound) return;
+    root.__neoCursorBound = true;
+
+    function enterViewer() {
+      syncNativeCursorForViewer(true);
+    }
+
+    function leaveViewer() {
+      if (document.fullscreenElement === root || document.webkitFullscreenElement === root) return;
+      syncNativeCursorForViewer(false);
+    }
+
+    root.addEventListener('mouseenter', enterViewer, true);
+    root.addEventListener('mouseleave', leaveViewer, true);
   }
 
   function simplifyViewer() {
@@ -615,7 +629,13 @@
       syncNativeCursorForViewer(false);
       return;
     }
-    syncNativeCursorForViewer(true);
+    bindViewerCursor(root);
+    // Start with the normal Neo cursor unless the mouse is already over the viewer.
+    var currentX = typeof window.__neoCursorMouseX === 'number' ? window.__neoCursorMouseX : -1;
+    var currentY = typeof window.__neoCursorMouseY === 'number' ? window.__neoCursorMouseY : -1;
+    var rr = root.getBoundingClientRect();
+    var overViewer = currentX >= rr.left && currentX <= rr.right && currentY >= rr.top && currentY <= rr.bottom;
+    syncNativeCursorForViewer(overViewer || document.fullscreenElement === root || document.webkitFullscreenElement === root);
     var parts = getViewerParts(root);
     if (!parts || !parts.title) return;
 
@@ -686,6 +706,19 @@
     window.addEventListener('resize', schedule, {passive:true});
     document.addEventListener('fullscreenchange', keepNativeCursorInViewer);
     document.addEventListener('webkitfullscreenchange', keepNativeCursorInViewer);
+    document.addEventListener('mousemove', function (event) {
+      window.__neoCursorMouseX = event.clientX;
+      window.__neoCursorMouseY = event.clientY;
+      var root = findViewerRoot();
+      if (!root || !getSelectedGame()) {
+        syncNativeCursorForViewer(false);
+        return;
+      }
+      var r = root.getBoundingClientRect();
+      var inside = event.clientX >= r.left && event.clientX <= r.right &&
+                   event.clientY >= r.top && event.clientY <= r.bottom;
+      syncNativeCursorForViewer(inside || document.fullscreenElement === root || document.webkitFullscreenElement === root);
+    }, {passive:true});
   }
 
   if (document.readyState === 'loading') {
