@@ -579,14 +579,43 @@
     for (var i = 0; i < frames.length; i++) frames[i].remove();
   }
 
+  function syncNativeCursorForViewer(active) {
+    var root = document.documentElement;
+    if (!root) return;
+    root.classList.toggle('neo-native-cursor', !!active);
+
+    // Remove any already-rendered Neo cursor effects while a game is open.
+    if (active) {
+      var cursor = document.getElementById('custom-cursor');
+      if (cursor) cursor.style.display = 'none';
+      var effects = document.querySelectorAll('.cursor-trail-dot, .cursor-particle');
+      for (var i = 0; i < effects.length; i++) effects[i].remove();
+    }
+
+    // The game iframe is cross-origin, so its own document cannot be styled
+    // directly. The shell already forwards the native-cursor state to frames;
+    // send it here as well for the current viewer.
+    var frames = document.querySelectorAll('iframe');
+    for (var f = 0; f < frames.length; f++) {
+      try {
+        frames[f].contentWindow.postMessage({source:'neo-browser-shell', nativeCursor:!!active}, '*');
+      } catch (_) {}
+    }
+  }
+
   function simplifyViewer() {
     var root = findViewerRoot();
     if (!root) {
+      syncNativeCursorForViewer(false);
       removeStrayGameIframe();
       return;
     }
     var selectedGame = getSelectedGame();
-    if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
+    if (selectedGame !== 'impostor' && selectedGame !== 'sonic') {
+      syncNativeCursorForViewer(false);
+      return;
+    }
+    syncNativeCursorForViewer(true);
     var parts = getViewerParts(root);
     if (!parts || !parts.title) return;
 
