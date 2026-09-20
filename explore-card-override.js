@@ -222,8 +222,8 @@
       var r = el.getBoundingClientRect();
       if (r.top < -5 || r.top >= 70 || r.left < 0 || r.left >= 700) continue;
       // When a game is active, require this exact text node to belong to
-      // the actual full-width play-view header. This prevents the original
-      // card title (still mounted in React's tree) from being selected.
+      // the real full-width play-view header. This prevents the original
+      // card title from being selected.
       if (selectedGame && !findViewerHeader(el)) continue;
       return el;
     }
@@ -234,11 +234,11 @@
     var node = title;
     for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
-      // Match the actual top play bar: wide, near the top, and short.
-      // Do not require buttons here because React can briefly remove/rebuild
-      // the controls while the viewer is opening.
-      if (r.top <= 8 && r.height >= 32 && r.height <= 120 &&
-          r.width >= window.innerWidth * 0.60) return node;
+      // Match the actual game play bar: wide, short, near the top,
+      // and containing the viewer's native controls.
+      var buttons = node.querySelectorAll ? node.querySelectorAll('button') : [];
+      if (r.top <= 8 && r.height >= 32 && r.height <= 100 &&
+          r.width >= window.innerWidth * 0.70 && buttons.length >= 2) return node;
     }
     return null;
   }
@@ -330,143 +330,6 @@
     title.style.maxWidth = 'calc(100% - ' + textLeft + 'px - 140px)';
     title.style.zIndex = '20';
   }
-  function viewerButtonLabel(button) {
-    if (!button) return '';
-    return ((button.getAttribute('aria-label') || '') + ' ' +
-            (button.getAttribute('title') || '') + ' ' +
-            (button.textContent || '')).replace(/\s+/g, ' ').trim().toLowerCase();
-  }
-  function findViewerActionButton(header, kind) {
-    if (!header) return null;
-    var buttons = header.querySelectorAll('button:not(.neo-viewer-custom-control)');
-    var wanted = kind === 'close'
-      ? /(^|[\\s_-])(?:close|exit)(?:$|[\\s_-])|[×✕✖]/
-      : /full\\s*screen|fullscreen|maximize|expand/;
-    for (var i = 0; i < buttons.length; i++) {
-      if (wanted.test(viewerButtonLabel(buttons[i]))) return buttons[i];
-    }
-    return null;
-  }
-  function makeViewerSvg(type) {
-    if (type === 'close') {
-      return '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
-    }
-    return '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  }
-  function installViewerControls(title, header, container) {
-    if (!header) return;
-    var selectedGame = getSelectedGame();
-    if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
-
-    header.style.position = 'relative';
-    header.style.overflow = 'hidden';
-
-    var controls = header.querySelector('#neo-game-header-controls');
-    if (!controls) {
-      controls = document.createElement('div');
-      controls.id = 'neo-game-header-controls';
-      controls.style.position = 'absolute';
-      controls.style.right = '10px';
-      controls.style.top = '50%';
-      controls.style.transform = 'translateY(-50%)';
-      controls.style.display = 'flex';
-      controls.style.alignItems = 'center';
-      controls.style.gap = '4px';
-      controls.style.zIndex = '2147483647';
-      controls.style.height = '36px';
-      controls.style.pointerEvents = 'auto';
-      header.appendChild(controls);
-    }
-
-    function makeButton(id, type, titleText) {
-      var button = controls.querySelector('#' + id);
-      if (!button) {
-        button = document.createElement('button');
-        button.id = id;
-        button.className = 'neo-viewer-custom-control';
-        button.type = 'button';
-        button.innerHTML = makeViewerSvg(type);
-        controls.appendChild(button);
-      }
-      button.setAttribute('aria-label', titleText);
-      button.title = titleText;
-      button.style.width = '34px';
-      button.style.height = '34px';
-      button.style.minWidth = '34px';
-      button.style.minHeight = '34px';
-      button.style.padding = '0';
-      button.style.margin = '0';
-      button.style.display = 'flex';
-      button.style.alignItems = 'center';
-      button.style.justifyContent = 'center';
-      button.style.cursor = 'pointer';
-      button.style.pointerEvents = 'auto';
-      button.style.visibility = 'visible';
-      button.style.opacity = '1';
-      button.style.color = 'inherit';
-      button.style.background = 'transparent';
-      button.style.border = '0';
-      button.style.borderRadius = '6px';
-      button.style.position = 'relative';
-      button.style.zIndex = '2147483647';
-      return button;
-    }
-
-    var fullscreenButton = makeButton('neo-game-fullscreen', 'fullscreen', 'Fullscreen');
-    var closeButton = makeButton('neo-game-close', 'close', 'Exit');
-
-    if (!fullscreenButton.__neoBound) {
-      fullscreenButton.__neoBound = true;
-      fullscreenButton.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        var native = findViewerActionButton(header, 'fullscreen');
-        if (native) {
-          native.click();
-          return;
-        }
-        var target = container || findViewerContainer(title, header);
-        if (!target) return;
-        var request = target.requestFullscreen || target.webkitRequestFullscreen;
-        if (request) {
-          try { request.call(target); } catch (_) {}
-        }
-      });
-    }
-
-    if (!closeButton.__neoBound) {
-      closeButton.__neoBound = true;
-      closeButton.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        var native = findViewerActionButton(header, 'close');
-        if (native && native !== fullscreenButton && native !== closeButton) {
-          native.click();
-          return;
-        }
-        // Fallback: click the rightmost non-custom viewer button, which is
-        // the existing close/exit control in the native game viewer.
-        var buttons = header.querySelectorAll('button:not(.neo-viewer-custom-control)');
-        var best = null, bestLeft = -Infinity;
-        for (var i = 0; i < buttons.length; i++) {
-          var r = buttons[i].getBoundingClientRect();
-          if (r.width > 0 && r.height > 0 && r.left > bestLeft) {
-            best = buttons[i];
-            bestLeft = r.left;
-          }
-        }
-        if (best) best.click();
-      });
-    }
-
-    var nativeButtons = header.querySelectorAll('button:not(.neo-viewer-custom-control)');
-    for (var i = 0; i < nativeButtons.length; i++) {
-      nativeButtons[i].style.display = 'none';
-      nativeButtons[i].style.visibility = 'hidden';
-      nativeButtons[i].style.pointerEvents = 'none';
-    }
-  }
-
   function embedGame(container, header) {
     if (!container || !header) return;
     if (getSelectedGame() === 'sonic') return;
@@ -570,10 +433,43 @@
     title.style.textOverflow = 'clip';
     title.style.maxWidth = 'none';
     var viewerContainer = findViewerContainer(title, header);
+    var headerButtons = Array.prototype.slice.call(header.querySelectorAll('button'));
+    headerButtons.sort(function (a, b) {
+      return a.getBoundingClientRect().left - b.getBoundingClientRect().left;
+    });
+
+    // Keep the viewer's own Fullscreen and X controls in their original layout.
+    // Prefer accessible labels; otherwise the existing rightmost two controls
+    // are the viewer's Fullscreen and close buttons.
+    var wanted = [];
+    var others = [];
+    for (var h = 0; h < headerButtons.length; h++) {
+      var label = ((headerButtons[h].getAttribute('aria-label') || '') + ' ' +
+                   (headerButtons[h].getAttribute('title') || '') + ' ' +
+                   (headerButtons[h].textContent || '')).toLowerCase();
+      var isFullscreen = /full\\s*screen|fullscreen|maximize|expand/.test(label);
+      var isClose = /(^|[\\s_-])(?:close|exit)(?:$|[\\s_-])|[×✕✖]/.test(label);
+      if (isFullscreen || isClose) wanted.push(headerButtons[h]);
+      else others.push(headerButtons[h]);
+    }
+    if (wanted.length < 2 && headerButtons.length >= 2) {
+      wanted = headerButtons.slice(Math.max(0, headerButtons.length - 2));
+    }
+    for (var oh = 0; oh < others.length; oh++) {
+      others[oh].style.display = 'none';
+      others[oh].style.visibility = 'hidden';
+      others[oh].style.pointerEvents = 'none';
+    }
+    for (var wh = 0; wh < wanted.length; wh++) {
+      wanted[wh].style.display = '';
+      wanted[wh].style.visibility = 'visible';
+      wanted[wh].style.opacity = '1';
+      wanted[wh].style.pointerEvents = 'auto';
+    }
+
     header.setAttribute('data-neo-game-viewer-header', selectedGame);
     installViewerHeaderObserver(header);
     addViewerLogo(title);
-    installViewerControls(title, header, viewerContainer);
     embedGame(viewerContainer, header);
   }
   function run() {
