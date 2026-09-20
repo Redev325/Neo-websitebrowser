@@ -368,6 +368,104 @@
     }
   }
 
+  function setupSonicButtons(stage) {
+    if (!stage || getSelectedGame() !== 'sonic') return;
+
+    var shell = stage.querySelector('#neo-sonic-buttons-shell');
+    if (!shell) {
+      shell = document.createElement('div');
+      shell.id = 'neo-sonic-buttons-shell';
+      shell.style.position = 'absolute';
+      shell.style.inset = '0';
+      shell.style.display = 'flex';
+      shell.style.alignItems = 'center';
+      shell.style.justifyContent = 'center';
+      shell.style.pointerEvents = 'none';
+      shell.style.zIndex = '8';
+
+      var art = document.createElement('img');
+      art.id = 'neo-sonic-buttons-art';
+      art.alt = '';
+      art.draggable = false;
+      art.src = '/assets/sonic.exe_buttons.png';
+      art.style.position = 'absolute';
+      art.style.inset = '0';
+      art.style.width = '100%';
+      art.style.height = '100%';
+      art.style.objectFit = 'contain';
+      art.style.pointerEvents = 'none';
+      art.style.userSelect = 'none';
+      shell.appendChild(art);
+
+      var hitArea = document.createElement('div');
+      hitArea.id = 'neo-sonic-buttons-hit-area';
+      hitArea.style.position = 'absolute';
+      hitArea.style.inset = '0';
+      hitArea.style.display = 'grid';
+      hitArea.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
+      hitArea.style.pointerEvents = 'auto';
+      shell.appendChild(hitArea);
+
+      for (var i = 0; i < 4; i++) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'neo-sonic-button-hit';
+        button.setAttribute('aria-label', 'Sonic.EXE button ' + (i + 1));
+        button.dataset.sonicButton = String(i + 1);
+        button.style.appearance = 'none';
+        button.style.border = '0';
+        button.style.outline = '0';
+        button.style.margin = '0';
+        button.style.padding = '0';
+        button.style.background = 'transparent';
+        button.style.cursor = 'pointer';
+        button.style.pointerEvents = 'auto';
+        button.style.transition = 'transform .15s ease, background .15s ease, box-shadow .15s ease';
+        button.style.borderRadius = '10px';
+        button.addEventListener('mouseenter', function () {
+          this.style.background = 'rgba(255,255,255,.06)';
+          this.style.boxShadow = '0 0 18px rgba(255,255,255,.14) inset, 0 0 14px rgba(255,255,255,.08)';
+          this.style.transform = 'scale(1.015)';
+        });
+        button.addEventListener('mouseleave', function () {
+          this.style.background = 'transparent';
+          this.style.boxShadow = 'none';
+          this.style.transform = 'scale(1)';
+        });
+        button.addEventListener('mousedown', function () {
+          this.style.transform = 'scale(.985)';
+        });
+        button.addEventListener('mouseup', function () {
+          this.style.transform = 'scale(1.015)';
+        });
+        button.addEventListener('click', function () {
+          var event;
+          try {
+            event = new CustomEvent('neo-sonic-button-click', {
+              bubbles: true,
+              detail: { index: Number(this.dataset.sonicButton) }
+            });
+          } catch (_) {
+            event = document.createEvent('CustomEvent');
+            event.initCustomEvent('neo-sonic-button-click', true, false, {
+              index: Number(this.dataset.sonicButton)
+            });
+          }
+          stage.dispatchEvent(event);
+        });
+        hitArea.appendChild(button);
+      }
+
+      stage.appendChild(shell);
+    }
+
+    shell.style.display = 'flex';
+    shell.style.visibility = 'visible';
+    shell.style.pointerEvents = 'none';
+    var hit = shell.querySelector('#neo-sonic-buttons-hit-area');
+    if (hit) hit.style.pointerEvents = 'auto';
+  }
+
   function embedImpostor(root, stage) {
     if (!root || !stage || getSelectedGame() !== 'impostor') return;
     if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
@@ -418,6 +516,12 @@
     root.setAttribute('data-neo-game-viewer', selectedGame);
     updateViewerLogo(parts, selectedGame);
     updateViewerControls(parts, root);
+    if (selectedGame === 'sonic') {
+      setupSonicButtons(parts.stage);
+    } else {
+      var oldSonic = parts.stage && parts.stage.querySelector('#neo-sonic-buttons-shell');
+      if (oldSonic) oldSonic.remove();
+    }
     embedImpostor(root, parts.stage);
   }
 
