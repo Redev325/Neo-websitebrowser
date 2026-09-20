@@ -450,7 +450,7 @@
         var best = null, bestLeft = -Infinity;
         for (var i = 0; i < buttons.length; i++) {
           var r = buttons[i].getBoundingClientRect();
-          if (visible(buttons[i]) && r.left > bestLeft) {
+          if (r.width > 0 && r.height > 0 && r.left > bestLeft) {
             best = buttons[i];
             bestLeft = r.left;
           }
