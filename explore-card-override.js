@@ -197,12 +197,8 @@
       var el = nodes[i], t = leaf(el);
       if (t !== 'Placeholder 1' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE) continue;
       if (!visible(el) || isInsideExploreCard(el)) continue;
-      var header = findViewerHeader(el);
-      if (!header) continue;
-      var r = el.getBoundingClientRect(), hr = header.getBoundingClientRect();
-      if (r.top >= -5 && r.top < 60 && r.left >= 20 && r.left < 500 &&
-          hr.top <= 5 && hr.height >= 40 && hr.height <= 70 &&
-          hr.width >= window.innerWidth * 0.85) return el;
+      var r = el.getBoundingClientRect();
+      if (r.top >= -5 && r.top < 60 && r.left >= 20 && r.left < 600) return el;
     }
     return null;
   }
@@ -211,18 +207,18 @@
     var node = title;
     for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
-      if (r.top <= 5 && r.height >= 40 && r.height <= 70 && r.width >= window.innerWidth * 0.85) return node;
+      if (r.top <= 5 && r.height >= 40 && r.height <= 70 && r.width >= window.innerWidth * 0.70) return node;
     }
-    return null;
+    return title.parentElement || null;
   }
   function findViewerContainer(title, header) {
     if (!title || !header) return null;
     var node = header;
     for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
-      if (r.width >= window.innerWidth * 0.85 && r.height >= window.innerHeight * 0.7 && r.top <= 15) return node;
+      if (r.width >= window.innerWidth * 0.70 && r.height >= window.innerHeight * 0.60 && r.top <= 20) return node;
     }
-    return null;
+    return header.parentElement || null;
   }
   function removeStrayGameIframe() {
     if (!isExplorePage() || getSelectedGame()) return;
@@ -373,6 +369,7 @@
       var currentTitleText = leaf(title);
       if (currentTitleText === 'Placeholder 1' || currentTitleText === FIRST_TITLE || currentTitleText === VIEWER_TITLE) {
         selectedGame = 'impostor';
+        setSelectedGame('impostor');
       } else if (currentTitleText === SECOND_TITLE) {
         selectedGame = 'sonic';
         setSelectedGame('sonic');
@@ -424,9 +421,20 @@
         }
       }).observe(document.documentElement, { childList:true, subtree:true });
     } catch (_) {}
+    var originalPushState = history.pushState;
+    history.pushState = function () {
+      var result = originalPushState.apply(this, arguments);
+      schedule();
+      return result;
+    };
+    var originalReplaceState = history.replaceState;
+    history.replaceState = function () {
+      var result = originalReplaceState.apply(this, arguments);
+      schedule();
+      return result;
+    };
     window.addEventListener('popstate', schedule);
     window.addEventListener('hashchange', schedule);
-    document.addEventListener('click', schedule, true);
     window.addEventListener('resize', schedule, { passive:true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once:true });
