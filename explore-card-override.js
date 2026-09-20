@@ -27,13 +27,21 @@
     }
     return title.parentElement;
   }
+  function isLikelyExploreCard(card) {
+    if (!card) return false;
+    var r = card.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return false;
+    // Never treat the full-screen game/play viewer as an Explore card.
+    if (r.width >= window.innerWidth * 0.80 || r.height >= window.innerHeight * 0.65) return false;
+    return true;
+  }
   function findCards() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
       if (t !== FIRST_TITLE && t !== SECOND_TITLE && !/^Placeholder \d+$/.test(t)) continue;
       var card = cardFromTitle(nodes[i]);
-      if (card && cards.indexOf(card) === -1) cards.push(card);
+      if (card && isLikelyExploreCard(card) && cards.indexOf(card) === -1) cards.push(card);
     }
     cards.sort(function (a, b) {
       var ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
