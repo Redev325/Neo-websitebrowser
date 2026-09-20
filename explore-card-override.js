@@ -357,14 +357,46 @@
       fs.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
-        if (document.fullscreenElement) {
-          try { document.exitFullscreen(); } catch (_) {}
+
+        var activeFullscreen =
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement;
+
+        if (activeFullscreen) {
+          try {
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+            else if (document.msExitFullscreen) document.msExitFullscreen();
+          } catch (_) {}
           return;
         }
-        var request = root.requestFullscreen || root.webkitRequestFullscreen;
-        if (request) {
-          try { request.call(root); } catch (_) {}
+
+        // Prefer the actual game surface. For the Sonic.EXE 2.0 build this is
+        // the cross-origin iframe, which is explicitly marked allowfullscreen.
+        var target = null;
+        if (parts && parts.stage) {
+          target =
+            parts.stage.querySelector('#neo-sonic-old-build') ||
+            parts.stage.querySelector('#neo-impostor-legacy-game') ||
+            parts.stage;
         }
+        target = target || root;
+
+        try {
+          var request =
+            target.requestFullscreen ||
+            target.webkitRequestFullscreen ||
+            target.mozRequestFullScreen ||
+            target.msRequestFullscreen;
+
+          if (request) {
+            var result = request.call(target);
+            if (result && typeof result.catch === 'function') result.catch(function () {});
+          }
+        } catch (_) {}
       });
     }
   }
