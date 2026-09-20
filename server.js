@@ -50,9 +50,9 @@ function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
     if (err) return next(err);
-    const scripts = '<script src="/browser-freeze-fix.js?v=3"></script><script src="/browser-enhancer.js?v=6"></script><script src="/explore-card-override.js?v=38"></script>';
+    const scripts = '<script src="/browser-freeze-fix.js?v=3"></script><script src="/browser-enhancer.js?v=6"></script><script src="/explore-card-override.js?v=39"></script>';
     const injected = html.includes('/explore-card-override.js')
-      ? html.replace(/<script[^>]+explore-card-override\.js[^>]*><\/script>/gi, '<script src="/explore-card-override.js?v=38"></script>')
+      ? html.replace(/<script[^>]+explore-card-override\.js[^>]*><\/script>/gi, '<script src="/explore-card-override.js?v=39"></script>')
       : html.replace(/<\/body>/i, scripts + '</body>');
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     return res.type("html").send(injected);
