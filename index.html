@@ -159,8 +159,8 @@
   <script>
     (function(){
       var cursor=document.getElementById('custom-cursor'); if(!cursor)return;
-      var moved=false,lastTrailTime=0,activeTrailDots=[],MAX_TRAIL_DOTS=14,TRAIL_SPAWN_MS=45,TRAIL_LIFETIME_MS=450;
-      var mouseX=0,mouseY=0,lastMoveTime=0,IDLE_AFTER_MS=200,IDLE_PARTICLE_MS=90;
+      var moved=false,lastTrailTime=0,activeTrailDots=[],MAX_TRAIL_DOTS=10,TRAIL_SPAWN_MS=65,TRAIL_LIFETIME_MS=450;
+      var mouseX=0,mouseY=0,lastMoveTime=0,IDLE_AFTER_MS=200,IDLE_PARTICLE_MS=140;
       function getAccentHsl(){var s=getComputedStyle(document.documentElement),raw=(s.getPropertyValue('--accent')||'0 80% 55%').trim(),parts=raw.split(/\s+/);if(parts.length>=3)return{h:parseFloat(parts[0])||0,s:parseFloat(parts[1])||80,l:parseFloat(parts[2])||55};return{h:0,s:80,l:55};}
       function hslToHex(h,s,l){s/=100;l/=100;var a=s*Math.min(l,1-l);function f(n){var k=(n+h/30)%12,c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(255*c).toString(16).padStart(2,'0');}return'#'+f(0)+f(8)+f(4);}
       function buildCursorSvg(){var a=getAccentHsl(),bright=hslToHex(a.h,Math.min(a.s+5,100),Math.min(a.l+15,75)),mid=hslToHex(a.h,a.s,Math.max(Math.min(a.l,55),40)),deep=hslToHex(a.h,Math.min(a.s+10,100),Math.max(a.l-25,18));var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><radialGradient id="g" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffffff"/><stop offset="25%" stop-color="'+bright+'"/><stop offset="60%" stop-color="'+mid+'"/><stop offset="100%" stop-color="'+deep+'"/></radialGradient></defs><circle cx="40" cy="40" r="36" fill="'+mid+'" fill-opacity="0.25"/><path d="M40 4 L50 30 L76 40 L50 50 L40 76 L30 50 L4 40 L30 30 Z" fill="url(#g)"/><path d="M40 4 L50 30 L76 40 L50 50 L40 76 L30 50 L4 40 L30 30 Z" fill="none" stroke="'+deep+'" stroke-width="1.8"/><circle cx="40" cy="40" r="8" fill="#ffffff"/></svg>';return'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';}
