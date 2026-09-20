@@ -249,7 +249,7 @@
       logo.id = 'neo-game-header-logo';
       logo.alt = '';
       logo.draggable = false;
-      left.insertBefore(logo, titleWrap);
+      left.insertBefore(logo, parts.title);
     }
     logo.src = selectedGame === 'sonic' ? SONIC_ICON_URL : ICON_URL;
     logo.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
