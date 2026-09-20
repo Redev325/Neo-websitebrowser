@@ -8,7 +8,7 @@
   var SECOND_IMAGE = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/vs-sonic-exe-2-0-4-0.jpg';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
-  var SONIC_ICON_URL = 'https://i.yourimageshare.com/1foHkvTA8z.webp?response-content-type=image%2Fwebp&response-content-disposition=inline%3B%20filename%3D%221foHkvTA8z.webp%22&response-cache-control=public%2C%20max-age%3D31536000%2C%20immutable&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=0034f8db1d224640000000004%2F20260919%2Feu-central%2Fs3%2Faws4_request&X-Amz-Date=20260919T235750Z&X-Amz-SignedHeaders=host&X-Amz-Expires=600&X-Amz-Signature=a4daeba0fc993e9bbd60f806e7480cf5a742ce35ae14db2178d1ef0dd79028de';
+  var SONIC_ICON_URL = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/Vs.sonic.exe.png';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
