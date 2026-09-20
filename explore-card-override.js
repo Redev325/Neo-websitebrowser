@@ -658,6 +658,10 @@
     try { simplifyViewer(); } catch (_) {}
   }
 
+  function keepNativeCursorInViewer() {
+    try { syncNativeCursorForViewer(!!findViewerRoot() && !!getSelectedGame()); } catch (_) {}
+  }
+
   function start() {
     run();
     var queued = false;
@@ -680,6 +684,8 @@
       }).observe(document.documentElement, {childList:true, subtree:true, characterData:true});
     } catch (_) {}
     window.addEventListener('resize', schedule, {passive:true});
+    document.addEventListener('fullscreenchange', keepNativeCursorInViewer);
+    document.addEventListener('webkitfullscreenchange', keepNativeCursorInViewer);
   }
 
   if (document.readyState === 'loading') {
