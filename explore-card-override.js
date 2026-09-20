@@ -186,8 +186,16 @@
   }
   function isInsideExploreCard(el) {
     var node = el;
+    var er = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
     for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
-      if (node.getAttribute && node.getAttribute('data-neo-explore-card')) return true;
+      if (!node.getAttribute || !node.getAttribute('data-neo-explore-card')) continue;
+      var cr = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+      if (!cr || !er) return true;
+      // A play-view can remain mounted inside the card's React tree.
+      // Only reject the element when it is visually contained by the small card itself.
+      var contained = er.left >= cr.left - 4 && er.right <= cr.right + 4 &&
+                      er.top >= cr.top - 4 && er.bottom <= cr.bottom + 4;
+      return contained;
     }
     return false;
   }
@@ -378,21 +386,52 @@
     }
     if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
     sonicViewer = selectedGame === 'sonic';
+    title.setAttribute('data-neo-game-viewer-title', selectedGame);
     title.textContent = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
     title.setAttribute('title', sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE);
     title.style.whiteSpace = 'nowrap';
     title.style.overflow = 'visible';
     title.style.textOverflow = 'clip';
     title.style.maxWidth = 'none';
-    var buttons = document.querySelectorAll('button'), topButtons = [];
-    for (var i = 0; i < buttons.length; i++) {
-      var br = buttons[i].getBoundingClientRect();
-      if (br.top < 52 && br.right > window.innerWidth * 0.72 && br.width >= 20 && br.height >= 20 && br.width <= 60 && br.height <= 60) topButtons.push(buttons[i]);
+    var headerButtons = header.querySelectorAll('button');
+    var keepButtons = [], otherButtons = [];
+    for (var i = 0; i < headerButtons.length; i++) {
+      var button = headerButtons[i];
+      var label = ((button.getAttribute('aria-label') || '') + ' ' +
+                   (button.getAttribute('title') || '') + ' ' +
+                   (button.textContent || '')).trim().toLowerCase();
+      var isFullscreen = /full\s*screen|fullscreen|maximize|expand/.test(label);
+      var isClose = /(^|[\s_-])(?:close|exit)(?:$|[\s_-])|(?:^|[\s_-])x(?:$|[\s_-])/.test(label);
+      if (isFullscreen || isClose) keepButtons.push(button);
+      else otherButtons.push(button);
     }
-    topButtons.sort(function (a, b) { return a.getBoundingClientRect().left - b.getBoundingClientRect().left; });
-    if (topButtons.length >= 3) {
-      for (var j = 0; j < topButtons.length - 2; j++) topButtons[j].style.display = 'none';
+    // When the viewer controls have no accessible labels, the rightmost two
+    // controls are the existing Fullscreen and X controls.
+    if (keepButtons.length < 2 && headerButtons.length >= 2) {
+      keepButtons = Array.prototype.slice.call(headerButtons, Math.max(0, headerButtons.length - 2));
     }
+    for (var j = 0; j < otherButtons.length; j++) otherButtons[j].style.display = 'none';
+    // Keep only one Fullscreen and one X button, preserving their header order.
+    if (keepButtons.length > 2) {
+      keepButtons.sort(function (a, b) { return a.getBoundingClientRect().left - b.getBoundingClientRect().left; });
+      for (var k = 0; k < keepButtons.length - 2; k++) keepButtons[k].style.display = 'none';
+      keepButtons = keepButtons.slice(-2);
+    }
+    for (var q = 0; q < keepButtons.length; q++) {
+      keepButtons[q].style.display = '';
+      keepButtons[q].style.visibility = 'visible';
+      keepButtons[q].style.opacity = '1';
+      keepButtons[q].style.position = 'relative';
+      keepButtons[q].style.zIndex = '30';
+      keepButtons[q].style.marginLeft = q ? '4px' : '0';
+    }
+    if (keepButtons.length === 2) {
+      var buttonParent = keepButtons[0].parentElement;
+      if (buttonParent && buttonParent === keepButtons[1].parentElement) {
+        buttonParent.style.gap = '4px';
+      }
+    }
+    header.setAttribute('data-neo-game-viewer-header', selectedGame);
     addViewerLogo(title);
     embedGame(findViewerContainer(title, header), header);
   }
