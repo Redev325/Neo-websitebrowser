@@ -15,6 +15,7 @@
   var SELECTED_GAME_KEY = 'neo-selected-game';
 
   function leaf(el) { return el && !el.children.length ? String(el.textContent || '').trim() : ''; }
+  function exactText(el) { return el ? String(el.textContent || '').replace(/\s+/g, ' ').trim() : ''; }
   function isExplorePage() { return /^\/Explore\/?$/i.test(location.pathname); }
   function visible(el) {
     if (!el) return false;
@@ -202,7 +203,7 @@
   function findViewerTitle() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
     for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i], t = leaf(el);
+      var el = nodes[i], t = exactText(el);
       if (t !== 'Placeholder 1' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE) continue;
       if (!visible(el) || isInsideExploreCard(el)) continue;
       var r = el.getBoundingClientRect();
