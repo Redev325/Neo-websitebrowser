@@ -202,55 +202,25 @@
     }
     return false;
   }
-  function findViewerHeaderCandidate() {
-    var nodes = document.querySelectorAll('body *');
-    var best = null, bestArea = 0;
-    for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i];
-      if (!el || el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || isInsideExploreCard(el)) continue;
-      var r = el.getBoundingClientRect();
-      if (r.top > 20 || r.top < -10 || r.width < window.innerWidth * 0.70 || r.height < 40 || r.height > 80) continue;
-      var area = r.width * r.height;
-      if (area > bestArea) { best = el; bestArea = area; }
-    }
-    return best;
-  }
   function findViewerTitle() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i], t = exactText(el);
-      if (t !== 'Placeholder 1' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE && t !== 'Placeholder 2') continue;
+      if (t !== 'Placeholder 1' && t !== 'Placeholder 2' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE) continue;
       if (!visible(el) || isInsideExploreCard(el)) continue;
       var r = el.getBoundingClientRect();
-      if (r.top >= -5 && r.top < 60 && r.left >= 20 && r.left < 600) return el;
+      if (r.top >= -5 && r.top < 70 && r.left >= 0 && r.left < 700) return el;
     }
-
-    // Some play views render the old Placeholder title inside a large header
-    // where the text is nested differently. Find that bar and use its title text.
-    var header = findViewerHeaderCandidate();
-    if (!header) return null;
-    var headerNodes = header.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
-    var fallback = null, fallbackLeft = Infinity;
-    for (var j = 0; j < headerNodes.length; j++) {
-      var child = headerNodes[j];
-      if (child.tagName === 'BUTTON' || !visible(child) || isInsideExploreCard(child)) continue;
-      var text = exactText(child);
-      if (!text) continue;
-      var cr = child.getBoundingClientRect();
-      if (cr.top < -5 || cr.top >= 70 || cr.left < 20 || cr.left > 650 || cr.width < 20) continue;
-      if (/^(Placeholder \d+|VS IMPOSTOR: LEGACY|VS Impostor:Legacy|Vs Sonic\.exe\(2\.0-4\.0\))$/.test(text)) return child;
-      if (cr.left < fallbackLeft) { fallback = child; fallbackLeft = cr.left; }
-    }
-    return fallback;
+    return null;
   }
   function findViewerHeader(title) {
-    if (!title) return findViewerHeaderCandidate();
+    if (!title) return null;
     var node = title;
     for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
       if (r.top <= 5 && r.height >= 40 && r.height <= 80 && r.width >= window.innerWidth * 0.70) return node;
     }
-    return findViewerHeaderCandidate();
+    return null;
   }
   function findViewerContainer(title, header) {
     if (!title || !header) return null;
@@ -281,7 +251,6 @@
     if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
     var header = findViewerHeader(title);
     if (!header) return;
-    clearVisualWrapper(header);
     header.style.position = 'relative';
     header.style.overflow = 'hidden';
 
@@ -290,22 +259,6 @@
     if (hr.width < window.innerWidth * 0.7) return;
 
     var oldIcon = null;
-    var media = header.querySelectorAll('img,svg');
-    for (var i = 0; i < media.length; i++) {
-      var m = media[i];
-      if (m.id === 'neo-impostor-legacy-header-logo' || m.id === 'neo-game-header-logo') continue;
-      var mr = m.getBoundingClientRect();
-      if (mr.width >= 10 && mr.width <= 45 && mr.height >= 10 && mr.height <= 45 && mr.left < tr.left + 2 && mr.right > hr.left && mr.top >= hr.top - 3 && mr.top < hr.top + 45) {
-        oldIcon = m;
-        break;
-      }
-    }
-    if (oldIcon) {
-      oldIcon.style.visibility = 'hidden';
-      clearVisualWrapper(oldIcon.parentElement);
-      if (oldIcon.parentElement && oldIcon.parentElement.parentElement) clearVisualWrapper(oldIcon.parentElement.parentElement);
-    }
-
     var icon = header.querySelector('#neo-game-header-logo');
     if (!icon) {
       icon = document.createElement('img');
@@ -337,10 +290,9 @@
     icon.style.visibility = 'visible';
 
     var headerHeight = Math.max(40, Math.min(70, hr.height));
-    var size = Math.min(44, Math.max(34, headerHeight - 6));
-    var left = oldIcon ? oldIcon.getBoundingClientRect().left - hr.left : Math.max(8, tr.left - hr.left - size - 8);
-    left = Math.max(6, Math.min(left, hr.width - size - 6));
-    var top = Math.max(3, (hr.height - size) / 2);
+    var size = Math.min(44, Math.max(38, headerHeight - 4));
+    var left = 10;
+    var top = Math.max(2, (hr.height - size) / 2);
     var textLeft = left + size + 10;
 
     icon.style.left = left + 'px';
@@ -443,43 +395,30 @@
     title.style.overflow = 'visible';
     title.style.textOverflow = 'clip';
     title.style.maxWidth = 'none';
-    var headerButtons = header.querySelectorAll('button');
-    var keepButtons = [], otherButtons = [];
+    var headerButtons = Array.prototype.slice.call(header.querySelectorAll('button'));
+    headerButtons.sort(function (a, b) {
+      return a.getBoundingClientRect().left - b.getBoundingClientRect().left;
+    });
     for (var i = 0; i < headerButtons.length; i++) {
-      var button = headerButtons[i];
-      var label = ((button.getAttribute('aria-label') || '') + ' ' +
-                   (button.getAttribute('title') || '') + ' ' +
-                   (button.textContent || '')).trim().toLowerCase();
-      var isFullscreen = /full\s*screen|fullscreen|maximize|expand/.test(label);
-      var isClose = /(^|[\s_-])(?:close|exit)(?:$|[\s_-])|(?:^|[\s_-])x(?:$|[\s_-])/.test(label);
-      if (isFullscreen || isClose) keepButtons.push(button);
-      else otherButtons.push(button);
+      headerButtons[i].style.display = 'none';
+      headerButtons[i].style.visibility = 'hidden';
+      headerButtons[i].style.pointerEvents = 'none';
     }
-    // When the viewer controls have no accessible labels, the rightmost two
-    // controls are the existing Fullscreen and X controls.
-    if (keepButtons.length < 2 && headerButtons.length >= 2) {
-      keepButtons = Array.prototype.slice.call(headerButtons, Math.max(0, headerButtons.length - 2));
-    }
-    for (var j = 0; j < otherButtons.length; j++) otherButtons[j].style.display = 'none';
-    // Keep only one Fullscreen and one X button, preserving their header order.
-    if (keepButtons.length > 2) {
-      keepButtons.sort(function (a, b) { return a.getBoundingClientRect().left - b.getBoundingClientRect().left; });
-      for (var k = 0; k < keepButtons.length - 2; k++) keepButtons[k].style.display = 'none';
-      keepButtons = keepButtons.slice(-2);
-    }
+    var keepButtons = headerButtons.slice(Math.max(0, headerButtons.length - 2));
     for (var q = 0; q < keepButtons.length; q++) {
       keepButtons[q].style.display = '';
       keepButtons[q].style.visibility = 'visible';
       keepButtons[q].style.opacity = '1';
+      keepButtons[q].style.pointerEvents = 'auto';
       keepButtons[q].style.position = 'relative';
       keepButtons[q].style.zIndex = '30';
       keepButtons[q].style.marginLeft = q ? '4px' : '0';
+      keepButtons[q].style.marginRight = '0';
     }
-    if (keepButtons.length === 2) {
-      var buttonParent = keepButtons[0].parentElement;
-      if (buttonParent && buttonParent === keepButtons[1].parentElement) {
-        buttonParent.style.gap = '4px';
-      }
+    if (keepButtons.length === 2 && keepButtons[0].parentElement === keepButtons[1].parentElement) {
+      keepButtons[0].parentElement.style.display = 'flex';
+      keepButtons[0].parentElement.style.alignItems = 'center';
+      keepButtons[0].parentElement.style.gap = '4px';
     }
     header.setAttribute('data-neo-game-viewer-header', selectedGame);
     addViewerLogo(title);
