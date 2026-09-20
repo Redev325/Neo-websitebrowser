@@ -195,188 +195,237 @@
       }
     }
   }
-  function isInsideExploreCard(el) {
-    var node = el;
-    var er = el && el.getBoundingClientRect ? el.getBoundingClientRect() : null;
-    for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
-      if (!node.getAttribute || !node.getAttribute('data-neo-explore-card')) continue;
-      var cr = node.getBoundingClientRect ? node.getBoundingClientRect() : null;
-      if (!cr || !er) return true;
-      // A play-view can remain mounted inside the card's React tree.
-      // Only reject the element when it is visually contained by the small card itself.
-      var contained = er.left >= cr.left - 4 && er.right <= cr.right + 4 &&
-                      er.top >= cr.top - 4 && er.bottom <= cr.bottom + 4;
-      return contained;
-    }
-    return false;
-  }
-  function findViewerTitle() {
-    var selectedGame = getSelectedGame();
-    var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
+  function findViewerRoot() {
+    var nodes = document.querySelectorAll('div');
     for (var i = 0; i < nodes.length; i++) {
-      var el = nodes[i], t = exactText(el);
-      if (t !== 'Placeholder 1' && t !== 'Placeholder 2' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE) continue;
-      if (!visible(el)) continue;
-      // Before a game is selected, never touch text inside an Explore card.
-      if (!selectedGame && isInsideExploreCard(el)) continue;
+      var el = nodes[i], cls = el.classList;
+      if (!cls || !cls.contains('fixed') || !cls.contains('inset-0') ||
+          !cls.contains('flex') || !cls.contains('flex-col')) continue;
       var r = el.getBoundingClientRect();
-      if (r.top < -5 || r.top >= 70 || r.left < 0 || r.left >= 700) continue;
-      // When a game is active, require this exact text node to belong to
-      // the real full-width play-view header. This prevents the original
-      // card title from being selected.
-      if (selectedGame && !findViewerHeader(el)) continue;
+      if (r.width < window.innerWidth * 0.9 || r.height < window.innerHeight * 0.8) continue;
+      if (el.children.length < 2) continue;
+      var header = el.children[0], hr = header.getBoundingClientRect();
+      if (hr.height < 40 || hr.height > 64 || hr.width < window.innerWidth * 0.9) continue;
+      if (!header.querySelectorAll('button').length) continue;
       return el;
     }
     return null;
   }
-  function findViewerHeader(title) {
-    if (!title) return null;
-    var node = title;
-    for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
-      var r = node.getBoundingClientRect();
-      if (r.top >= -2 && r.top <= 2 && r.width >= window.innerWidth * 0.90 &&
-          r.height >= 40 && r.height <= 64) {
-        var buttons = node.querySelectorAll ? node.querySelectorAll('button') : [];
-        if (buttons.length >= 1) return node;
-      }
-      // The actual viewer shell is fixed full-screen; its first child is
-      // the 48px header. This is the reliable fallback.
-      var s = getComputedStyle(node);
-      if (s.position === 'fixed' && r.width >= window.innerWidth * 0.90 &&
-          r.height >= window.innerHeight * 0.80) {
-        var first = node.firstElementChild;
-        if (first) {
-          var fr = first.getBoundingClientRect();
-          var fb = first.querySelectorAll ? first.querySelectorAll('button') : [];
-          if (fr.height >= 40 && fr.height <= 64 && fb.length >= 1) return first;
+
+  function getViewerParts(root) {
+    if (!root || root.children.length < 2) return null;
+    var header = root.children[0];
+    var stage = root.children[1];
+    var left = header.children[0] || null;
+    var right = header.children[1] || null;
+    var title = null;
+    if (left) {
+      var spans = left.querySelectorAll('span');
+      for (var i = 0; i < spans.length; i++) {
+        var t = exactText(spans[i]);
+        if (t === 'Placeholder 1' || t === 'Placeholder 2' ||
+            t === FIRST_TITLE || t === SECOND_TITLE ||
+            t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE) {
+          title = spans[i];
+          break;
         }
       }
     }
-    return null;
+    return {header:header, stage:stage, left:left, right:right, title:title};
   }
-  function findViewerContainer(title, header) {
-    if (!title || !header) return null;
-    var node = header.parentElement;
-    for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
-      var r = node.getBoundingClientRect();
-      if (r.width >= window.innerWidth * 0.90 && r.height >= window.innerHeight * 0.80 &&
-          r.top <= 10) return node;
+
+  function updateViewerLogo(parts, selectedGame) {
+    if (!parts || !parts.left || !parts.title) return;
+    var left = parts.left;
+    var titleWrap = parts.title.parentElement || parts.title;
+    left.style.display = 'flex';
+    left.style.alignItems = 'center';
+    left.style.gap = '10px';
+    left.style.minWidth = '0';
+
+    var logo = left.querySelector('#neo-game-header-logo');
+    if (!logo) {
+      logo = document.createElement('img');
+      logo.id = 'neo-game-header-logo';
+      logo.alt = '';
+      logo.draggable = false;
+      left.insertBefore(logo, titleWrap);
     }
-    return header.parentElement || null;
-  }
-  function removeStrayGameIframe() {
-    if (!isExplorePage() || getSelectedGame()) return;
-    var frames = document.querySelectorAll('#neo-impostor-legacy-game');
-    for (var i = 0; i < frames.length; i++) frames[i].remove();
-  }
-  function clearVisualWrapper(el) {
-    if (!el) return;
-    el.style.background = 'transparent';
-    el.style.backgroundColor = 'transparent';
-    el.style.border = '0';
-    el.style.borderRadius = '0';
-    el.style.boxShadow = 'none';
-    el.style.outline = '0';
-    el.style.padding = '0';
-  }
-  function addViewerLogo(title) {
-    var selectedGame = getSelectedGame();
-    if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
-    var header = findViewerHeader(title);
-    if (!header) return;
+    logo.src = selectedGame === 'sonic' ? SONIC_ICON_URL : ICON_URL;
+    logo.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    logo.style.display = 'block';
+    logo.style.visibility = 'visible';
+    logo.style.width = '30px';
+    logo.style.height = '30px';
+    logo.style.flex = '0 0 30px';
+    logo.style.objectFit = 'contain';
+    logo.style.position = 'relative';
+    logo.style.pointerEvents = 'none';
+    logo.style.background = 'transparent';
+    logo.style.border = '0';
 
-    // The built app already has a left-side title row. Replace its generic
-    // icon with the selected game's real logo instead of absolutely
-    // positioning a second logo over the bar.
-    var titleRow = title.parentElement;
-    if (!titleRow) return;
-    titleRow.style.display = 'flex';
-    titleRow.style.alignItems = 'center';
-    titleRow.style.gap = '10px';
-    titleRow.style.minWidth = '0';
-
-    var icon = titleRow.querySelector('#neo-game-header-logo');
-    if (!icon) {
-      icon = document.createElement('img');
-      icon.id = 'neo-game-header-logo';
-      icon.alt = '';
-      icon.draggable = false;
-      titleRow.insertBefore(icon, titleRow.firstChild);
+    // Hide the app's generic 24px icon without moving the original row.
+    var first = left.firstElementChild;
+    if (first && first !== logo && first !== titleWrap) {
+      first.style.display = 'none';
     }
-    icon.src = selectedGame === 'sonic' ? SONIC_ICON_URL : ICON_URL;
-    icon.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
-    icon.style.display = 'block';
-    icon.style.width = '30px';
-    icon.style.height = '30px';
-    icon.style.flex = '0 0 30px';
-    icon.style.objectFit = 'contain';
-    icon.style.position = 'relative';
-    icon.style.visibility = 'visible';
-    icon.style.pointerEvents = 'none';
-    icon.style.background = 'transparent';
-    icon.style.border = '0';
 
-    title.style.position = 'relative';
-    title.style.left = 'auto';
-    title.style.top = 'auto';
-    title.style.transform = 'none';
-    title.style.margin = '0';
-    title.style.padding = '0';
-    title.style.width = 'auto';
-    title.style.minWidth = '0';
-    title.style.maxWidth = 'calc(100vw - 220px)';
-    title.style.zIndex = '2';
-    title.style.whiteSpace = 'nowrap';
-    title.style.overflow = 'hidden';
-    title.style.textOverflow = 'ellipsis';
-    title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    parts.title.title = parts.title.textContent;
+    parts.title.style.display = 'block';
+    parts.title.style.minWidth = '0';
+    parts.title.style.maxWidth = 'calc(100vw - 220px)';
+    parts.title.style.whiteSpace = 'nowrap';
+    parts.title.style.overflow = 'hidden';
+    parts.title.style.textOverflow = 'ellipsis';
+    parts.title.style.position = 'relative';
+    parts.title.style.left = 'auto';
+    parts.title.style.top = 'auto';
+    parts.title.style.transform = 'none';
+    parts.title.style.margin = '0';
+    parts.title.style.padding = '0';
   }
 
-  function embedGame(container, header) {
-    if (!container || !header) return;
-    if (getSelectedGame() === 'sonic') return;
-    var iframe = container.querySelector('#neo-impostor-legacy-game');
+  function updateViewerControls(parts, root) {
+    if (!parts || !parts.right) return;
+    var row = parts.right;
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.gap = '4px';
+    row.style.flexShrink = '0';
+
+    var buttons = Array.prototype.slice.call(row.querySelectorAll('button'));
+    if (!buttons.length) return;
+
+    // Built viewer: the last native button is the actual X/close handler.
+    var close = buttons[buttons.length - 1];
+    for (var i = 0; i < buttons.length - 1; i++) {
+      buttons[i].style.display = 'none';
+      buttons[i].style.visibility = 'hidden';
+      buttons[i].style.pointerEvents = 'none';
+    }
+    close.style.display = 'flex';
+    close.style.visibility = 'visible';
+    close.style.pointerEvents = 'auto';
+    close.style.opacity = '1';
+    close.style.width = '28px';
+    close.style.height = '28px';
+    close.style.padding = '0';
+    close.style.margin = '0';
+    close.setAttribute('aria-label', 'Exit');
+    close.title = 'Exit';
+
+    if (!close.__neoCloseBound) {
+      close.__neoCloseBound = true;
+      close.addEventListener('click', function () {
+        setSelectedGame('');
+      }, true);
+    }
+
+    var fs = row.querySelector('#neo-game-fullscreen');
+    if (!fs) {
+      fs = document.createElement('button');
+      fs.id = 'neo-game-fullscreen';
+      fs.type = 'button';
+      fs.setAttribute('aria-label', 'Fullscreen');
+      fs.title = 'Fullscreen';
+      fs.innerHTML = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      fs.style.width = '28px';
+      fs.style.height = '28px';
+      fs.style.padding = '0';
+      fs.style.margin = '0';
+      fs.style.border = '0';
+      fs.style.background = 'transparent';
+      fs.style.color = 'inherit';
+      fs.style.borderRadius = '4px';
+      fs.style.display = 'flex';
+      fs.style.alignItems = 'center';
+      fs.style.justifyContent = 'center';
+      fs.style.cursor = 'pointer';
+      fs.style.flex = '0 0 28px';
+      row.insertBefore(fs, close);
+    }
+    fs.style.display = 'flex';
+    fs.style.visibility = 'visible';
+    fs.style.pointerEvents = 'auto';
+
+    if (!fs.__neoBound) {
+      fs.__neoBound = true;
+      fs.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (document.fullscreenElement) {
+          try { document.exitFullscreen(); } catch (_) {}
+          return;
+        }
+        var request = root.requestFullscreen || root.webkitRequestFullscreen;
+        if (request) {
+          try { request.call(root); } catch (_) {}
+        }
+      });
+    }
+  }
+
+  function embedImpostor(root, stage) {
+    if (!root || !stage || getSelectedGame() !== 'impostor') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+    var iframe = stage.querySelector('#neo-impostor-legacy-game');
     if (!iframe) {
       iframe = document.createElement('iframe');
       iframe.id = 'neo-impostor-legacy-game';
       iframe.src = GAME_URL;
       iframe.title = 'VS Impostor: Legacy';
-      iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map';
+      iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map; pointer-lock';
       iframe.setAttribute('allowfullscreen', '');
       iframe.setAttribute('playsinline', '');
       iframe.setAttribute('scrolling', 'no');
       iframe.style.position = 'absolute';
+      iframe.style.inset = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
       iframe.style.border = '0';
       iframe.style.margin = '0';
       iframe.style.padding = '0';
-      iframe.style.background = '#333';
-      iframe.style.zIndex = '5';
-      container.appendChild(iframe);
-    }
-    var cr = container.getBoundingClientRect();
-    var hr = header.getBoundingClientRect();
-    var top = Math.max(48, hr.bottom - cr.top);
-    if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
-    iframe.style.left = '0';
-    iframe.style.top = top + 'px';
-    iframe.style.width = '100%';
-    iframe.style.height = Math.max(120, cr.height - top) + 'px';
-    var buttons = header.querySelectorAll('button');
-    for (var i = 0; i < buttons.length; i++) {
-      buttons[i].style.position = 'relative';
-      buttons[i].style.zIndex = '20';
+      iframe.style.display = 'block';
+      iframe.style.background = '#000';
+      iframe.style.zIndex = '1';
+      stage.appendChild(iframe);
     }
   }
-  function scheduleViewerActivation() {
-    if (window.__neoViewerActivationTimer) {
-      clearTimeout(window.__neoViewerActivationTimer);
-      window.__neoViewerActivationTimer = null;
+
+  function removeStrayGameIframe() {
+    if (!isExplorePage() || getSelectedGame()) return;
+    var frames = document.querySelectorAll('#neo-impostor-legacy-game');
+    for (var i = 0; i < frames.length; i++) frames[i].remove();
+  }
+
+  function simplifyViewer() {
+    var root = findViewerRoot();
+    if (!root) {
+      removeStrayGameIframe();
+      return;
     }
+    var selectedGame = getSelectedGame();
+    if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
+    var parts = getViewerParts(root);
+    if (!parts || !parts.title) return;
+
+    parts.title.setAttribute('data-neo-game-viewer-title', selectedGame);
+    parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    root.setAttribute('data-neo-game-viewer', selectedGame);
+    updateViewerLogo(parts, selectedGame);
+    updateViewerControls(parts, root);
+    embedImpostor(root, parts.stage);
+  }
+
+  function scheduleViewerActivation() {
+    if (window.__neoViewerActivationTimer) clearTimeout(window.__neoViewerActivationTimer);
     var attempts = 0;
     function retry() {
       attempts++;
       try { simplifyViewer(); } catch (_) {}
-      if (attempts < 24 && (getSelectedGame() === 'impostor' || getSelectedGame() === 'sonic')) {
+      if (attempts < 30 && getSelectedGame()) {
         window.__neoViewerActivationTimer = setTimeout(retry, 50);
       } else {
         window.__neoViewerActivationTimer = null;
@@ -384,139 +433,14 @@
     }
     retry();
   }
-  function installViewerHeaderObserver(header) {
-    if (!header) return;
-    if (window.__neoViewerHeaderObserver && window.__neoObservedViewerHeader === header) return;
-    if (window.__neoViewerHeaderObserver) {
-      try { window.__neoViewerHeaderObserver.disconnect(); } catch (_) {}
-    }
-    try {
-      var observer = new MutationObserver(function () {
-        var selected = getSelectedGame();
-        if (selected !== 'impostor' && selected !== 'sonic') return;
-        try { simplifyViewer(); } catch (_) {}
-      });
-      observer.observe(header, { childList:true, subtree:true, characterData:true });
-      window.__neoViewerHeaderObserver = observer;
-      window.__neoObservedViewerHeader = header;
-    } catch (_) {}
-  }
-  function simplifyViewer() {
-    var title = findViewerTitle();
-    if (!title) {
-      removeStrayGameIframe();
-      return;
-    }
-    var header = findViewerHeader(title);
-    if (!header) {
-      removeStrayGameIframe();
-      return;
-    }
-    var selectedGame = getSelectedGame();
-    var sonicViewer = selectedGame === 'sonic';
-    if (!selectedGame) {
-      var currentTitleText = leaf(title);
-      if (currentTitleText === 'Placeholder 1' || currentTitleText === FIRST_TITLE || currentTitleText === VIEWER_TITLE) {
-        selectedGame = 'impostor';
-        setSelectedGame('impostor');
-      } else if (currentTitleText === SECOND_TITLE) {
-        selectedGame = 'sonic';
-        setSelectedGame('sonic');
-        sonicViewer = true;
-      }
-    }
-    if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
-    sonicViewer = selectedGame === 'sonic';
-    title.setAttribute('data-neo-game-viewer-title', selectedGame);
-    title.textContent = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
-    title.setAttribute('title', sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE);
-    title.style.whiteSpace = 'nowrap';
-    title.style.overflow = 'visible';
-    title.style.textOverflow = 'clip';
-    title.style.maxWidth = 'none';
-    var viewerContainer = findViewerContainer(title, header);
 
-    // The original viewer creates four controls in this row. The last one
-    // is the wired Close/X action. Keep it and add exactly one real
-    // Fullscreen control immediately before it.
-    var headerButtons = Array.prototype.slice.call(header.querySelectorAll('button'));
-    if (headerButtons.length) {
-      var closeButton = headerButtons[headerButtons.length - 1];
-      for (var hb = 0; hb < headerButtons.length - 1; hb++) {
-        headerButtons[hb].style.display = 'none';
-        headerButtons[hb].style.visibility = 'hidden';
-        headerButtons[hb].style.pointerEvents = 'none';
-      }
-      closeButton.style.display = 'flex';
-      closeButton.style.visibility = 'visible';
-      closeButton.style.pointerEvents = 'auto';
-      closeButton.style.opacity = '1';
-      closeButton.style.width = '28px';
-      closeButton.style.height = '28px';
-      closeButton.style.margin = '0';
-      closeButton.setAttribute('aria-label', 'Exit');
-      closeButton.title = 'Exit';
-
-      var row = closeButton.parentElement;
-      if (row) {
-        row.style.display = 'flex';
-        row.style.alignItems = 'center';
-        row.style.gap = '4px';
-
-        var fs = row.querySelector('#neo-game-fullscreen');
-        if (!fs) {
-          fs = document.createElement('button');
-          fs.id = 'neo-game-fullscreen';
-          fs.type = 'button';
-          fs.setAttribute('aria-label', 'Fullscreen');
-          fs.title = 'Fullscreen';
-          fs.innerHTML = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-          fs.style.width = '28px';
-          fs.style.height = '28px';
-          fs.style.padding = '0';
-          fs.style.margin = '0';
-          fs.style.display = 'flex';
-          fs.style.alignItems = 'center';
-          fs.style.justifyContent = 'center';
-          fs.style.border = '0';
-          fs.style.background = 'transparent';
-          fs.style.color = 'inherit';
-          fs.style.borderRadius = '4px';
-          fs.style.cursor = 'pointer';
-          row.insertBefore(fs, closeButton);
-        }
-        fs.style.display = 'flex';
-        fs.style.visibility = 'visible';
-        fs.style.pointerEvents = 'auto';
-        if (!fs.__neoBound) {
-          fs.__neoBound = true;
-          fs.addEventListener('click', function (ev) {
-            ev.preventDefault();
-            ev.stopPropagation();
-            var shell = header.parentElement;
-            var target = shell || viewerContainer || header;
-            if (document.fullscreenElement) {
-              try { document.exitFullscreen(); } catch (_) {}
-              return;
-            }
-            var req = target.requestFullscreen || target.webkitRequestFullscreen;
-            if (req) {
-              try { req.call(target); } catch (_) {}
-            }
-          });
-        }
-      }
-    }
-
-    header.setAttribute('data-neo-game-viewer-header', selectedGame);
-    addViewerLogo(title);
-    installViewerHeaderObserver(header);
-    embedGame(viewerContainer, header);
-  }
   function run() {
-    try { simplifyExplore(); } catch (_) {}
+    if (!findViewerRoot()) {
+      try { simplifyExplore(); } catch (_) {}
+    }
     try { simplifyViewer(); } catch (_) {}
   }
+
   function start() {
     run();
     var queued = false;
@@ -531,29 +455,19 @@
     try {
       new MutationObserver(function (mutations) {
         for (var i = 0; i < mutations.length; i++) {
-          if (mutations[i].type === 'childList' && mutations[i].addedNodes && mutations[i].addedNodes.length) {
+          if (mutations[i].addedNodes && mutations[i].addedNodes.length) {
             schedule();
             break;
           }
         }
-      }).observe(document.documentElement, { childList:true, subtree:true });
+      }).observe(document.documentElement, {childList:true, subtree:true});
     } catch (_) {}
-    var originalPushState = history.pushState;
-    history.pushState = function () {
-      var result = originalPushState.apply(this, arguments);
-      schedule();
-      return result;
-    };
-    var originalReplaceState = history.replaceState;
-    history.replaceState = function () {
-      var result = originalReplaceState.apply(this, arguments);
-      schedule();
-      return result;
-    };
-    window.addEventListener('popstate', schedule);
-    window.addEventListener('hashchange', schedule);
-    window.addEventListener('resize', schedule, { passive:true });
+    window.addEventListener('resize', schedule, {passive:true});
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once:true });
-  else start();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, {once:true});
+  } else {
+    start();
+  }
 })();
