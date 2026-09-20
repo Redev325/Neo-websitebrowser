@@ -7,6 +7,8 @@
   var SECOND_TITLE = 'Vs Sonic.exe(2.0-4.0)';
   var SECOND_IMAGE = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/vs-sonic-exe-2-0-4-0.jpg';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
+  var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
+  var SONIC_ICON_URL = 'https://i.yourimageshare.com/1foHkvTA8z.webp?response-content-type=image%2Fwebp&response-content-disposition=inline%3B%20filename%3D%221foHkvTA8z.webp%22&response-cache-control=public%2C%20max-age%3D31536000%2C%20immutable&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=0034f8db1d224640000000004%2F20260919%2Feu-central%2Fs3%2Faws4_request&X-Amz-Date=20260919T235750Z&X-Amz-SignedHeaders=host&X-Amz-Expires=600&X-Amz-Signature=a4daeba0fc993e9bbd60f806e7480cf5a742ce35ae14db2178d1ef0dd79028de';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
@@ -122,14 +124,25 @@
   }
   function simplifyExplore() {
     if (!isExplorePage()) return;
+    try { sessionStorage.removeItem('neo-sonic-viewer'); } catch (_) {}
+    window.__neoSonicViewer = false;
     var cards = findCards();
-    for (var i = 0; i < cards.length; i++) simplifyCard(cards[i], i);
+    for (var i = 0; i < cards.length; i++) {
+      simplifyCard(cards[i], i);
+      if (i === 1 && !cards[i].__neoSonicClickBound) {
+        cards[i].__neoSonicClickBound = true;
+        cards[i].addEventListener('click', function () {
+          window.__neoSonicViewer = true;
+          try { sessionStorage.setItem('neo-sonic-viewer', '1'); } catch (_) {}
+        }, true);
+      }
+    }
   }
   function findViewerTitle() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i], t = leaf(el);
-      if (t !== 'Placeholder 1' && t !== FIRST_TITLE && t !== VIEWER_TITLE) continue;
+      if (t !== 'Placeholder 1' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE) continue;
       if (!visible(el)) continue;
       var r = el.getBoundingClientRect();
       if (r.top >= -5 && r.top < 60 && r.left >= 20 && r.left < 500) return el;
@@ -190,11 +203,10 @@
       if (oldIcon.parentElement && oldIcon.parentElement.parentElement) clearVisualWrapper(oldIcon.parentElement.parentElement);
     }
 
-    var icon = header.querySelector('#neo-impostor-legacy-header-logo');
+    var icon = header.querySelector('#neo-game-header-logo');
     if (!icon) {
       icon = document.createElement('img');
-      icon.id = 'neo-impostor-legacy-header-logo';
-      icon.src = ICON_URL;
+      icon.id = 'neo-game-header-logo';
       icon.alt = '';
       icon.draggable = false;
       icon.style.position = 'absolute';
@@ -215,6 +227,11 @@
       icon.style.transformOrigin = 'center center';
       header.appendChild(icon);
     }
+
+    var sonicViewer = !!window.__neoSonicViewer;
+    try { sonicViewer = sonicViewer || sessionStorage.getItem('neo-sonic-viewer') === '1'; } catch (_) {}
+    icon.src = sonicViewer ? SONIC_ICON_URL : ICON_URL;
+    icon.alt = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
 
     var headerHeight = Math.max(40, Math.min(70, hr.height));
     var size = Math.min(44, Math.max(34, headerHeight - 6));
@@ -240,6 +257,9 @@
   }
   function embedGame(container, header) {
     if (!container || !header) return;
+    var sonicViewer = !!window.__neoSonicViewer;
+    try { sonicViewer = sonicViewer || sessionStorage.getItem('neo-sonic-viewer') === '1'; } catch (_) {}
+    if (sonicViewer) return;
     var iframe = container.querySelector('#neo-impostor-legacy-game');
     if (!iframe) {
       iframe = document.createElement('iframe');
@@ -275,7 +295,9 @@
   function simplifyViewer() {
     var title = findViewerTitle();
     if (!title) return;
-    title.textContent = VIEWER_TITLE;
+    var sonicViewer = !!window.__neoSonicViewer;
+    try { sonicViewer = sonicViewer || sessionStorage.getItem('neo-sonic-viewer') === '1'; } catch (_) {}
+    title.textContent = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
     title.setAttribute('title', VIEWER_TITLE);
     title.style.whiteSpace = 'nowrap';
     title.style.overflow = 'visible';
