@@ -175,12 +175,14 @@
         cards[i].__neoImpostorClickBound = true;
         cards[i].addEventListener('click', function () {
           setSelectedGame('impostor');
+          scheduleViewerActivation();
         }, true);
       }
       if (i === 1 && !cards[i].__neoSonicClickBound) {
         cards[i].__neoSonicClickBound = true;
         cards[i].addEventListener('click', function () {
           setSelectedGame('sonic');
+          scheduleViewerActivation();
         }, true);
       }
     }
@@ -200,25 +202,55 @@
     }
     return false;
   }
+  function findViewerHeaderCandidate() {
+    var nodes = document.querySelectorAll('body *');
+    var best = null, bestArea = 0;
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (!el || el.tagName === 'SCRIPT' || el.tagName === 'STYLE' || isInsideExploreCard(el)) continue;
+      var r = el.getBoundingClientRect();
+      if (r.top > 20 || r.top < -10 || r.width < window.innerWidth * 0.70 || r.height < 40 || r.height > 80) continue;
+      var area = r.width * r.height;
+      if (area > bestArea) { best = el; bestArea = area; }
+    }
+    return best;
+  }
   function findViewerTitle() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i], t = exactText(el);
-      if (t !== 'Placeholder 1' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE) continue;
+      if (t !== 'Placeholder 1' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE && t !== 'Placeholder 2') continue;
       if (!visible(el) || isInsideExploreCard(el)) continue;
       var r = el.getBoundingClientRect();
       if (r.top >= -5 && r.top < 60 && r.left >= 20 && r.left < 600) return el;
     }
-    return null;
+
+    // Some play views render the old Placeholder title inside a large header
+    // where the text is nested differently. Find that bar and use its title text.
+    var header = findViewerHeaderCandidate();
+    if (!header) return null;
+    var headerNodes = header.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
+    var fallback = null, fallbackLeft = Infinity;
+    for (var j = 0; j < headerNodes.length; j++) {
+      var child = headerNodes[j];
+      if (child.tagName === 'BUTTON' || !visible(child) || isInsideExploreCard(child)) continue;
+      var text = exactText(child);
+      if (!text) continue;
+      var cr = child.getBoundingClientRect();
+      if (cr.top < -5 || cr.top >= 70 || cr.left < 20 || cr.left > 650 || cr.width < 20) continue;
+      if (/^(Placeholder \d+|VS IMPOSTOR: LEGACY|VS Impostor:Legacy|Vs Sonic\.exe\(2\.0-4\.0\))$/.test(text)) return child;
+      if (cr.left < fallbackLeft) { fallback = child; fallbackLeft = cr.left; }
+    }
+    return fallback;
   }
   function findViewerHeader(title) {
-    if (!title) return null;
+    if (!title) return findViewerHeaderCandidate();
     var node = title;
     for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
-      if (r.top <= 5 && r.height >= 40 && r.height <= 70 && r.width >= window.innerWidth * 0.70) return node;
+      if (r.top <= 5 && r.height >= 40 && r.height <= 80 && r.width >= window.innerWidth * 0.70) return node;
     }
-    return title.parentElement || null;
+    return findViewerHeaderCandidate();
   }
   function findViewerContainer(title, header) {
     if (!title || !header) return null;
@@ -360,6 +392,23 @@
       buttons[i].style.position = 'relative';
       buttons[i].style.zIndex = '20';
     }
+  }
+  function scheduleViewerActivation() {
+    if (window.__neoViewerActivationTimer) {
+      clearTimeout(window.__neoViewerActivationTimer);
+      window.__neoViewerActivationTimer = null;
+    }
+    var attempts = 0;
+    function retry() {
+      attempts++;
+      try { simplifyViewer(); } catch (_) {}
+      if (attempts < 24 && (getSelectedGame() === 'impostor' || getSelectedGame() === 'sonic')) {
+        window.__neoViewerActivationTimer = setTimeout(retry, 50);
+      } else {
+        window.__neoViewerActivationTimer = null;
+      }
+    }
+    retry();
   }
   function simplifyViewer() {
     var title = findViewerTitle();
