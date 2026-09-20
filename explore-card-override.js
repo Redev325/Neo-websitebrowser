@@ -203,11 +203,16 @@
     return false;
   }
   function findViewerTitle() {
+    var selectedGame = getSelectedGame();
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i], t = exactText(el);
       if (t !== 'Placeholder 1' && t !== 'Placeholder 2' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE) continue;
-      if (!visible(el) || isInsideExploreCard(el)) continue;
+      if (!visible(el)) continue;
+      // Before a game is selected, never touch text inside an Explore card.
+      // After selecting a game, the play view may still be mounted inside
+      // that same React card tree, so allow the visible top-bar title through.
+      if (!selectedGame && isInsideExploreCard(el)) continue;
       var r = el.getBoundingClientRect();
       if (r.top >= -5 && r.top < 70 && r.left >= 0 && r.left < 700) return el;
     }
