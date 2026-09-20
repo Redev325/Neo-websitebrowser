@@ -173,6 +173,9 @@
       window.__neoExploreStateInitialized = true;
       setSelectedGame('');
     }
+    // Once a game viewer is active, leave the React card tree alone.
+    // The viewer can remain mounted under the clicked card while it is open.
+    if (getSelectedGame()) return;
     var cards = findCards();
     for (var i = 0; i < cards.length; i++) {
       simplifyCard(cards[i], i);
@@ -231,7 +234,11 @@
     var node = title;
     for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
-      if (r.top <= 5 && r.height >= 40 && r.height <= 80 && r.width >= window.innerWidth * 0.70) return node;
+      var buttons = node.querySelectorAll ? node.querySelectorAll('button') : [];
+      // Match the actual top play bar: wide, near the top, and containing
+      // the viewer controls. Avoid the small Explore cards and the body.
+      if (r.top <= 8 && r.height >= 32 && r.height <= 120 &&
+          r.width >= window.innerWidth * 0.60 && buttons.length >= 2) return node;
     }
     return null;
   }
