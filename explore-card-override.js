@@ -237,7 +237,6 @@
   function updateViewerLogo(parts, selectedGame) {
     if (!parts || !parts.left || !parts.title) return;
     var left = parts.left;
-    var titleWrap = parts.title.parentElement || parts.title;
     left.style.display = 'flex';
     left.style.alignItems = 'center';
     left.style.gap = '10px';
@@ -264,10 +263,13 @@
     logo.style.background = 'transparent';
     logo.style.border = '0';
 
-    // Hide the app's generic 24px icon without moving the original row.
-    var first = left.firstElementChild;
-    if (first && first !== logo && first !== titleWrap) {
-      first.style.display = 'none';
+    // Hide the app's generic icon, leaving only the real game logo.
+    var children = left.children;
+    for (var ci = 0; ci < children.length; ci++) {
+      var child = children[ci];
+      if (child !== logo && child !== parts.title && child.tagName === 'DIV') {
+        child.style.display = 'none';
+      }
     }
 
     parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
@@ -460,7 +462,7 @@
             break;
           }
         }
-      }).observe(document.documentElement, {childList:true, subtree:true});
+      }).observe(document.documentElement, {childList:true, subtree:true, characterData:true});
     } catch (_) {}
     window.addEventListener('resize', schedule, {passive:true});
   }
