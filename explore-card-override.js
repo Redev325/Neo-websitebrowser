@@ -12,6 +12,7 @@
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
+  var SONIC_OLD_BUILD_URL = 'https://sonicrestored30.devs.surf/';
   var SELECTED_GAME_KEY = 'neo-selected-game';
 
   function leaf(el) { return el && !el.children.length ? String(el.textContent || '').trim() : ''; }
@@ -368,8 +369,50 @@
     }
   }
 
+  function embedSonicOldBuild(stage) {
+    if (!stage || getSelectedGame() !== 'sonic') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+
+    var shell = stage.querySelector('#neo-sonic-buttons-shell');
+    if (shell) {
+      shell.style.display = 'none';
+      shell.style.visibility = 'hidden';
+      shell.style.pointerEvents = 'none';
+    }
+
+    var iframe = stage.querySelector('#neo-sonic-old-build');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'neo-sonic-old-build';
+      iframe.src = SONIC_OLD_BUILD_URL;
+      iframe.title = 'Sonic.EXE 2.0 Old Build';
+      iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map; pointer-lock';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('playsinline', '');
+      iframe.setAttribute('scrolling', 'no');
+      iframe.style.position = 'absolute';
+      iframe.style.inset = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+      iframe.style.display = 'block';
+      iframe.style.background = '#000';
+      iframe.style.zIndex = '1';
+      stage.appendChild(iframe);
+    }
+  }
+
   function setupSonicButtons(stage) {
     if (!stage || getSelectedGame() !== 'sonic') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+
+    if (stage.getAttribute('data-neo-sonic-active-build') === 'old') {
+      embedSonicOldBuild(stage);
+      return;
+    }
 
     var shell = stage.querySelector('#neo-sonic-buttons-shell');
     if (!shell) {
@@ -434,6 +477,11 @@
         button.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
+          if (id === 'neo-sonic-button-old') {
+            stage.setAttribute('data-neo-sonic-active-build', 'old');
+            embedSonicOldBuild(stage);
+            return;
+          }
           var detail = { id:id, label:label };
           try {
             stage.dispatchEvent(new CustomEvent('neo-sonic-button-click', {
@@ -527,7 +575,7 @@
 
   function removeStrayGameIframe() {
     if (!isExplorePage() || getSelectedGame()) return;
-    var frames = document.querySelectorAll('#neo-impostor-legacy-game');
+    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build');
     for (var i = 0; i < frames.length; i++) frames[i].remove();
   }
 
@@ -552,6 +600,9 @@
     } else {
       var oldSonic = parts.stage && parts.stage.querySelector('#neo-sonic-buttons-shell');
       if (oldSonic) oldSonic.remove();
+      var oldSonicFrame = parts.stage && parts.stage.querySelector('#neo-sonic-old-build');
+      if (oldSonicFrame) oldSonicFrame.remove();
+      if (parts.stage) parts.stage.removeAttribute('data-neo-sonic-active-build');
     }
     embedImpostor(root, parts.stage);
   }
