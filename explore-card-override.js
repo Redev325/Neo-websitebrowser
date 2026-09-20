@@ -145,32 +145,56 @@
       }
     }
   }
+  function isInsideExploreCard(el) {
+    var node = el;
+    for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
+      if (node.getAttribute && node.getAttribute('data-neo-sonic-exe-card') === 'true') return true;
+      if (node.querySelector && node.querySelector('.aspect-video')) return true;
+    }
+    return false;
+  }
   function findViewerTitle() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div,button');
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i], t = leaf(el);
       if (t !== 'Placeholder 1' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE) continue;
-      if (!visible(el)) continue;
-      var r = el.getBoundingClientRect();
-      if (r.top >= -5 && r.top < 60 && r.left >= 20 && r.left < 500) return el;
+      if (!visible(el) || isInsideExploreCard(el)) continue;
+      var header = findViewerHeader(el);
+      if (!header) continue;
+      var r = el.getBoundingClientRect(), hr = header.getBoundingClientRect();
+      if (r.top >= -5 && r.top < 60 && r.left >= 20 && r.left < 500 &&
+          hr.top <= 5 && hr.height >= 40 && hr.height <= 70 &&
+          hr.width >= window.innerWidth * 0.85) return el;
     }
     return null;
   }
   function findViewerHeader(title) {
+    if (!title) return null;
     var node = title;
     for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
       if (r.top <= 5 && r.height >= 40 && r.height <= 70 && r.width >= window.innerWidth * 0.85) return node;
     }
-    return title.parentElement;
+    return null;
   }
   function findViewerContainer(title, header) {
-    var node = header || title;
+    if (!title || !header) return null;
+    var node = header;
     for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
       if (r.width >= window.innerWidth * 0.85 && r.height >= window.innerHeight * 0.7 && r.top <= 15) return node;
     }
-    return header && header.parentElement ? header.parentElement : null;
+    return null;
+  }
+  function removeStrayGameIframe() {
+    if (!isExplorePage()) return;
+    var frames = document.querySelectorAll('#neo-impostor-legacy-game');
+    for (var i = 0; i < frames.length; i++) {
+      var frame = frames[i];
+      var title = findViewerTitle();
+      var container = title ? findViewerContainer(title, findViewerHeader(title)) : null;
+      if (!container || !container.contains(frame)) frame.remove();
+    }
   }
   function clearVisualWrapper(el) {
     if (!el) return;
@@ -302,7 +326,15 @@
   }
   function simplifyViewer() {
     var title = findViewerTitle();
-    if (!title) return;
+    if (!title) {
+      removeStrayGameIframe();
+      return;
+    }
+    var header = findViewerHeader(title);
+    if (!header) {
+      removeStrayGameIframe();
+      return;
+    }
     var sonicViewer = !!window.__neoSonicViewer;
     try { sonicViewer = sonicViewer || sessionStorage.getItem('neo-sonic-viewer') === '1'; } catch (_) {}
     title.textContent = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
@@ -311,7 +343,6 @@
     title.style.overflow = 'visible';
     title.style.textOverflow = 'clip';
     title.style.maxWidth = 'none';
-    var header = findViewerHeader(title);
     var buttons = document.querySelectorAll('button'), topButtons = [];
     for (var i = 0; i < buttons.length; i++) {
       var br = buttons[i].getBoundingClientRect();
