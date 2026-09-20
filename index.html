@@ -81,7 +81,7 @@
     @keyframes burst-ray{0%{opacity:1;transform:translate(-50%,0) rotate(var(--rot,0deg)) scaleY(.3)}100%{opacity:0;transform:translate(-50%,0) rotate(var(--rot,0deg)) scaleY(1)}}
     .click-burst-particle{position:fixed;width:3px;height:3px;border-radius:50%;background:hsl(var(--accent));pointer-events:none;z-index:2147483645;transform:translate(-50%,-50%);animation:burst-particle .45s ease-out forwards}
     @keyframes burst-particle{0%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(.3)}}
-    html.neo-native-cursor,html.neo-native-cursor *{cursor:auto!important}
+    html.neo-native-cursor,html.neo-native-cursor *{cursor:none!important} html.neo-native-cursor [data-neo-game-viewer],html.neo-native-cursor [data-neo-game-viewer] *{cursor:auto!important}
     html.neo-native-cursor #custom-cursor{display:none!important}
     :root{--neo-frame-reserve:210px}
     .neo-browser-frame-wrap{height:min(calc(100vh - var(--neo-frame-reserve)),820px)!important;max-height:calc(100vh - var(--neo-frame-reserve))!important;min-height:320px!important}
@@ -107,7 +107,7 @@
 </head><body class="has-top-ad">
   <div id="root"></div>
   <div id="custom-cursor"><div class="cursor-halo-ring r1"></div><div class="cursor-halo-ring r2"></div><div class="cursor-halo-ring r3"></div></div>
-  <script src="explore-card-override.js?v=41"></script>
+  <script src="explore-card-override.js?v=42"></script>
   <script>
     (function () {
       function pageName() {
