@@ -13,6 +13,7 @@
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
   var SONIC_OLD_BUILD_URL = 'https://sonicrestored30.devs.surf/';
+  var SONIC_RESTORED_BUILD_URL = 'https://sonicexerealrestored.devs.surf/';
   var SELECTED_GAME_KEY = 'neo-selected-game';
 
   function leaf(el) { return el && !el.children.length ? String(el.textContent || '').trim() : ''; }
@@ -380,6 +381,7 @@
         if (parts && parts.stage) {
           target =
             parts.stage.querySelector('#neo-sonic-old-build') ||
+            parts.stage.querySelector('#neo-sonic-restored-build') ||
             parts.stage.querySelector('#neo-impostor-legacy-game') ||
             parts.stage;
         }
@@ -437,12 +439,53 @@
     }
   }
 
+  function embedSonicRestoredBuild(stage) {
+    if (!stage || getSelectedGame() !== 'sonic') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+
+    var shell = stage.querySelector('#neo-sonic-buttons-shell');
+    if (shell) {
+      shell.style.display = 'none';
+      shell.style.visibility = 'hidden';
+      shell.style.pointerEvents = 'none';
+    }
+
+    var iframe = stage.querySelector('#neo-sonic-restored-build');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'neo-sonic-restored-build';
+      iframe.src = SONIC_RESTORED_BUILD_URL;
+      iframe.title = 'Sonic.EXE V4 Restored Build';
+      iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map; pointer-lock';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('playsinline', '');
+      iframe.setAttribute('scrolling', 'no');
+      iframe.style.position = 'absolute';
+      iframe.style.inset = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+      iframe.style.display = 'block';
+      iframe.style.background = '#000';
+      iframe.style.zIndex = '1';
+      stage.appendChild(iframe);
+    }
+  }
+
   function setupSonicButtons(stage) {
     if (!stage || getSelectedGame() !== 'sonic') return;
     if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
 
-    if (stage.getAttribute('data-neo-sonic-active-build') === 'old') {
+    var activeBuild = stage.getAttribute('data-neo-sonic-active-build');
+    if (activeBuild === 'old') {
       embedSonicOldBuild(stage);
+      return;
+    }
+    if (activeBuild === 'restored') {
+      embedSonicRestoredBuild(stage);
       return;
     }
 
@@ -512,6 +555,11 @@
           if (id === 'neo-sonic-button-old') {
             stage.setAttribute('data-neo-sonic-active-build', 'old');
             embedSonicOldBuild(stage);
+            return;
+          }
+          if (id === 'neo-sonic-button-restored') {
+            stage.setAttribute('data-neo-sonic-active-build', 'restored');
+            embedSonicRestoredBuild(stage);
             return;
           }
           var detail = { id:id, label:label };
@@ -607,7 +655,7 @@
 
   function removeStrayGameIframe() {
     if (!isExplorePage() || getSelectedGame()) return;
-    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build');
+    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build, #neo-sonic-restored-build');
     for (var i = 0; i < frames.length; i++) frames[i].remove();
   }
 
@@ -687,6 +735,8 @@
       if (oldSonic) oldSonic.remove();
       var oldSonicFrame = parts.stage && parts.stage.querySelector('#neo-sonic-old-build');
       if (oldSonicFrame) oldSonicFrame.remove();
+      var restoredSonicFrame = parts.stage && parts.stage.querySelector('#neo-sonic-restored-build');
+      if (restoredSonicFrame) restoredSonicFrame.remove();
       if (parts.stage) parts.stage.removeAttribute('data-neo-sonic-active-build');
     }
     embedImpostor(root, parts.stage);
