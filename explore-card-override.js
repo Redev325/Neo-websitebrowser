@@ -145,6 +145,11 @@
     } catch (_) {}
     window.__neoSelectedGame = value || '';
     window.__neoSonicViewer = value === 'sonic';
+    if (!value && window.__neoViewerHeaderObserver) {
+      try { window.__neoViewerHeaderObserver.disconnect(); } catch (_) {}
+      window.__neoViewerHeaderObserver = null;
+      window.__neoObservedViewerHeader = null;
+    }
   }
   function getSelectedGame() {
     if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor') return window.__neoSelectedGame;
@@ -210,11 +215,14 @@
       if (t !== 'Placeholder 1' && t !== 'Placeholder 2' && t !== FIRST_TITLE && t !== VIEWER_TITLE && t !== SECOND_TITLE) continue;
       if (!visible(el)) continue;
       // Before a game is selected, never touch text inside an Explore card.
-      // After selecting a game, the play view may still be mounted inside
-      // that same React card tree, so allow the visible top-bar title through.
       if (!selectedGame && isInsideExploreCard(el)) continue;
       var r = el.getBoundingClientRect();
-      if (r.top >= -5 && r.top < 70 && r.left >= 0 && r.left < 700) return el;
+      if (r.top < -5 || r.top >= 70 || r.left < 0 || r.left >= 700) continue;
+      // When a game is active, require this exact text node to belong to
+      // the actual full-width play-view header. This prevents the original
+      // card title (still mounted in React's tree) from being selected.
+      if (selectedGame && !findViewerHeader(el)) continue;
+      return el;
     }
     return null;
   }
@@ -367,6 +375,23 @@
     }
     retry();
   }
+  function installViewerHeaderObserver(header) {
+    if (!header) return;
+    if (window.__neoViewerHeaderObserver && window.__neoObservedViewerHeader === header) return;
+    if (window.__neoViewerHeaderObserver) {
+      try { window.__neoViewerHeaderObserver.disconnect(); } catch (_) {}
+    }
+    try {
+      var observer = new MutationObserver(function () {
+        var selected = getSelectedGame();
+        if (selected !== 'impostor' && selected !== 'sonic') return;
+        try { simplifyViewer(); } catch (_) {}
+      });
+      observer.observe(header, { childList:true, subtree:true, characterData:true });
+      window.__neoViewerHeaderObserver = observer;
+      window.__neoObservedViewerHeader = header;
+    } catch (_) {}
+  }
   function simplifyViewer() {
     var title = findViewerTitle();
     if (!title) {
@@ -426,6 +451,7 @@
       keepButtons[0].parentElement.style.gap = '4px';
     }
     header.setAttribute('data-neo-game-viewer-header', selectedGame);
+    installViewerHeaderObserver(header);
     addViewerLogo(title);
     embedGame(findViewerContainer(title, header), header);
   }
