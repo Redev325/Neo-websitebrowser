@@ -12,6 +12,7 @@
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
+  var SELECTED_GAME_KEY = 'neo-selected-game';
 
   function leaf(el) { return el && !el.children.length ? String(el.textContent || '').trim() : ''; }
   function isExplorePage() { return /^\/Explore\/?$/i.test(location.pathname); }
@@ -31,7 +32,7 @@
     if (!card) return false;
     var r = card.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return false;
-    // Never treat the full-screen game/play viewer as an Explore card.
+    // Keep the full-screen game viewer out of the card scanner.
     if (r.width >= window.innerWidth * 0.80 || r.height >= window.innerHeight * 0.65) return false;
     return true;
   }
@@ -48,15 +49,20 @@
       if (Math.abs(ar.top - br.top) > 8) return ar.top - br.top;
       return ar.left - br.left;
     });
+    for (var j = 0; j < cards.length; j++) {
+      cards[j].setAttribute('data-neo-explore-card', String(j + 1));
+    }
     return cards;
   }
   function getCardTitle(card, index) {
+    var wanted = index === 0 ? FIRST_TITLE : index === 1 ? SECOND_TITLE : null;
     var nodes = card.querySelectorAll('p,h1,h2,h3,h4,span,div');
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
       if (index === 0 && (t === 'Placeholder 1' || t === FIRST_TITLE)) return nodes[i];
       if (index === 1 && (t === 'Placeholder 2' || t === SECOND_TITLE)) return nodes[i];
       if (index >= 2 && /^Placeholder \d+$/.test(t)) return nodes[i];
+      if (wanted && t === wanted) return nodes[i];
     }
     return null;
   }
@@ -131,6 +137,26 @@
       buttons[b].style.zIndex = '20';
     }
   }
+  function setSelectedGame(value) {
+    try {
+      if (value) sessionStorage.setItem(SELECTED_GAME_KEY, value);
+      else sessionStorage.removeItem(SELECTED_GAME_KEY);
+    } catch (_) {}
+    window.__neoSelectedGame = value || '';
+    window.__neoSonicViewer = value === 'sonic';
+  }
+  function getSelectedGame() {
+    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor') return window.__neoSelectedGame;
+    try {
+      var value = sessionStorage.getItem(SELECTED_GAME_KEY);
+      if (value === 'sonic' || value === 'impostor') {
+        window.__neoSelectedGame = value;
+        window.__neoSonicViewer = value === 'sonic';
+        return value;
+      }
+    } catch (_) {}
+    return '';
+  }
   function simplifyExplore() {
     if (!isExplorePage()) {
       window.__neoLastExplorePath = location.pathname;
@@ -139,17 +165,21 @@
     if (window.__neoLastExplorePath !== location.pathname || !window.__neoExploreStateInitialized) {
       window.__neoLastExplorePath = location.pathname;
       window.__neoExploreStateInitialized = true;
-      try { sessionStorage.removeItem('neo-sonic-viewer'); } catch (_) {}
-      window.__neoSonicViewer = false;
+      setSelectedGame('');
     }
     var cards = findCards();
     for (var i = 0; i < cards.length; i++) {
       simplifyCard(cards[i], i);
+      if (i === 0 && !cards[i].__neoImpostorClickBound) {
+        cards[i].__neoImpostorClickBound = true;
+        cards[i].addEventListener('click', function () {
+          setSelectedGame('impostor');
+        }, true);
+      }
       if (i === 1 && !cards[i].__neoSonicClickBound) {
         cards[i].__neoSonicClickBound = true;
         cards[i].addEventListener('click', function () {
-          window.__neoSonicViewer = true;
-          try { sessionStorage.setItem('neo-sonic-viewer', '1'); } catch (_) {}
+          setSelectedGame('sonic');
         }, true);
       }
     }
@@ -157,8 +187,7 @@
   function isInsideExploreCard(el) {
     var node = el;
     for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
-      if (node.getAttribute && node.getAttribute('data-neo-sonic-exe-card') === 'true') return true;
-      if (node.querySelector && node.querySelector('.aspect-video')) return true;
+      if (node.getAttribute && node.getAttribute('data-neo-explore-card')) return true;
     }
     return false;
   }
@@ -196,14 +225,9 @@
     return null;
   }
   function removeStrayGameIframe() {
-    if (!isExplorePage()) return;
+    if (!isExplorePage() || getSelectedGame()) return;
     var frames = document.querySelectorAll('#neo-impostor-legacy-game');
-    for (var i = 0; i < frames.length; i++) {
-      var frame = frames[i];
-      var title = findViewerTitle();
-      var container = title ? findViewerContainer(title, findViewerHeader(title)) : null;
-      if (!container || !container.contains(frame)) frame.remove();
-    }
+    for (var i = 0; i < frames.length; i++) frames[i].remove();
   }
   function clearVisualWrapper(el) {
     if (!el) return;
@@ -216,6 +240,8 @@
     el.style.padding = '0';
   }
   function addViewerLogo(title) {
+    var selectedGame = getSelectedGame();
+    if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
     var header = findViewerHeader(title);
     if (!header) return;
     clearVisualWrapper(header);
@@ -268,8 +294,7 @@
       header.appendChild(icon);
     }
 
-    var sonicViewer = !!window.__neoSonicViewer;
-    try { sonicViewer = sonicViewer || sessionStorage.getItem('neo-sonic-viewer') === '1'; } catch (_) {}
+    var sonicViewer = getSelectedGame() === 'sonic';
     icon.src = sonicViewer ? SONIC_ICON_URL : ICON_URL;
     icon.alt = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
     icon.style.visibility = 'visible';
@@ -298,9 +323,7 @@
   }
   function embedGame(container, header) {
     if (!container || !header) return;
-    var sonicViewer = !!window.__neoSonicViewer;
-    try { sonicViewer = sonicViewer || sessionStorage.getItem('neo-sonic-viewer') === '1'; } catch (_) {}
-    if (sonicViewer) return;
+    if (getSelectedGame() === 'sonic') return;
     var iframe = container.querySelector('#neo-impostor-legacy-game');
     if (!iframe) {
       iframe = document.createElement('iframe');
@@ -344,8 +367,20 @@
       removeStrayGameIframe();
       return;
     }
-    var sonicViewer = !!window.__neoSonicViewer;
-    try { sonicViewer = sonicViewer || sessionStorage.getItem('neo-sonic-viewer') === '1'; } catch (_) {}
+    var selectedGame = getSelectedGame();
+    var sonicViewer = selectedGame === 'sonic';
+    if (!selectedGame) {
+      var currentTitleText = leaf(title);
+      if (currentTitleText === 'Placeholder 1' || currentTitleText === FIRST_TITLE || currentTitleText === VIEWER_TITLE) {
+        selectedGame = 'impostor';
+      } else if (currentTitleText === SECOND_TITLE) {
+        selectedGame = 'sonic';
+        setSelectedGame('sonic');
+        sonicViewer = true;
+      }
+    }
+    if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
+    sonicViewer = selectedGame === 'sonic';
     title.textContent = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
     title.setAttribute('title', sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE);
     title.style.whiteSpace = 'nowrap';
@@ -364,17 +399,35 @@
     addViewerLogo(title);
     embedGame(findViewerContainer(title, header), header);
   }
-  function run() { try { simplifyExplore(); } catch (_) {} try { simplifyViewer(); } catch (_) {} }
+  function run() {
+    try { simplifyExplore(); } catch (_) {}
+    try { simplifyViewer(); } catch (_) {}
+  }
   function start() {
     run();
     var queued = false;
     function schedule() {
       if (queued) return;
       queued = true;
-      setTimeout(function () { queued = false; run(); }, 35);
+      requestAnimationFrame(function () {
+        queued = false;
+        run();
+      });
     }
-    try { new MutationObserver(schedule).observe(document.documentElement, { childList:true, subtree:true, characterData:true }); } catch (_) {}
-    setInterval(run, 300);
+    try {
+      new MutationObserver(function (mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          if (mutations[i].type === 'childList' && mutations[i].addedNodes && mutations[i].addedNodes.length) {
+            schedule();
+            break;
+          }
+        }
+      }).observe(document.documentElement, { childList:true, subtree:true });
+    } catch (_) {}
+    window.addEventListener('popstate', schedule);
+    window.addEventListener('hashchange', schedule);
+    document.addEventListener('click', schedule, true);
+    window.addEventListener('resize', schedule, { passive:true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once:true });
   else start();
