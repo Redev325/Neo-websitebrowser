@@ -378,7 +378,7 @@
       shell.style.position = 'absolute';
       shell.style.inset = '0';
       shell.style.pointerEvents = 'none';
-      shell.style.zIndex = '8';
+      shell.style.zIndex = '2147483000';
 
       var art = document.createElement('img');
       art.id = 'neo-sonic-buttons-art';
@@ -394,88 +394,215 @@
       art.style.userSelect = 'none';
       shell.appendChild(art);
 
-      // The image contains two actual button graphics. These are the only
-      // clickable areas; there are intentionally no four-column hitboxes.
-      var buttons = document.createElement('div');
-      buttons.id = 'neo-sonic-button-hits';
-      buttons.style.position = 'absolute';
-      buttons.style.inset = '0';
-      buttons.style.pointerEvents = 'none';
-      shell.appendChild(buttons);
+      var hits = document.createElement('div');
+      hits.id = 'neo-sonic-button-hits';
+      hits.style.position = 'absolute';
+      hits.style.inset = '0';
+      hits.style.pointerEvents = 'none';
+      shell.appendChild(hits);
 
-      function makeHit(id) {
+      function makeButton(index) {
         var button = document.createElement('button');
         button.type = 'button';
-        button.id = id;
         button.className = 'neo-sonic-button-hit';
+        button.dataset.sonicButton = String(index);
+        button.setAttribute('aria-label', 'Sonic.EXE button ' + index);
         button.style.position = 'absolute';
+        button.style.boxSizing = 'border-box';
         button.style.padding = '0';
         button.style.margin = '0';
         button.style.border = '0';
         button.style.outline = '0';
-        button.style.background = 'transparent';
+        button.style.background = 'rgba(255,255,255,0)';
         button.style.cursor = 'pointer';
         button.style.pointerEvents = 'auto';
-        button.style.borderRadius = '12px';
-        button.style.transition = 'transform .14s ease, background .14s ease, box-shadow .14s ease, filter .14s ease';
+        button.style.borderRadius = '10px';
+        button.style.zIndex = '2';
+        button.style.transition = 'transform .12s ease, background .12s ease, box-shadow .12s ease, filter .12s ease';
         button.addEventListener('mouseenter', function () {
+          this.style.background = 'rgba(255,255,255,.10)';
+          this.style.boxShadow = '0 0 24px rgba(255,255,255,.30), inset 0 0 18px rgba(255,255,255,.15)';
+          this.style.filter = 'brightness(1.10)';
           this.style.transform = 'scale(1.025)';
-          this.style.background = 'rgba(255,255,255,.055)';
-          this.style.boxShadow = '0 0 20px rgba(255,255,255,.18), inset 0 0 16px rgba(255,255,255,.10)';
-          this.style.filter = 'brightness(1.08)';
         });
         button.addEventListener('mouseleave', function () {
-          this.style.transform = 'scale(1)';
-          this.style.background = 'transparent';
+          this.style.background = 'rgba(255,255,255,0)';
           this.style.boxShadow = 'none';
           this.style.filter = 'none';
+          this.style.transform = 'scale(1)';
         });
         button.addEventListener('mousedown', function () {
-          this.style.transform = 'scale(.985)';
+          this.style.transform = 'scale(.98)';
         });
         button.addEventListener('mouseup', function () {
           this.style.transform = 'scale(1.025)';
         });
-        button.addEventListener('click', function () {
-          var event;
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.style.background = 'rgba(255,255,255,.16)';
+          setTimeout(function () {
+            if (button.isConnected) button.style.background = 'rgba(255,255,255,0)';
+          }, 120);
+          var eventData;
           try {
-            event = new CustomEvent('neo-sonic-button-click', {
+            eventData = new CustomEvent('neo-sonic-button-click', {
               bubbles: true,
-              detail: { id: this.id }
+              detail: { index: index }
             });
           } catch (_) {
-            event = document.createEvent('CustomEvent');
-            event.initCustomEvent('neo-sonic-button-click', true, false, { id: this.id });
+            eventData = document.createEvent('CustomEvent');
+            eventData.initCustomEvent('neo-sonic-button-click', true, false, { index: index });
           }
-          stage.dispatchEvent(event);
+          stage.dispatchEvent(eventData);
         });
-        buttons.appendChild(button);
+        hits.appendChild(button);
         return button;
       }
 
-      // Percentage positions are relative to the Sonic grey stage so the
-      // targets stay attached to the image when the viewer resizes.
-      var leftButton = makeHit('neo-sonic-button-1');
-      var rightButton = makeHit('neo-sonic-button-2');
-
-      leftButton.style.left = '32%';
-      leftButton.style.top = '48%';
-      leftButton.style.width = '16%';
-      leftButton.style.height = '18%';
-
-      rightButton.style.left = '52%';
-      rightButton.style.top = '48%';
-      rightButton.style.width = '16%';
-      rightButton.style.height = '18%';
-
+      var button1 = makeButton(1);
+      var button2 = makeButton(2);
+      shell.appendChild(hits);
       stage.appendChild(shell);
+
+      function applyDetectedBoxes(boxes) {
+        if (!boxes || boxes.length < 2) return;
+        var imageRect = art.getBoundingClientRect();
+        var stageRect = stage.getBoundingClientRect();
+        if (imageRect.width <= 0 || imageRect.height <= 0) return;
+
+        for (var i = 0; i < 2; i++) {
+          var box = boxes[i];
+          var target = i === 0 ? button1 : button2;
+          var left = imageRect.left - stageRect.left + box.x * imageRect.width;
+          var top = imageRect.top - stageRect.top + box.y * imageRect.height;
+          var width = box.w * imageRect.width;
+          var height = box.h * imageRect.height;
+          var padX = Math.max(3, width * 0.06);
+          var padY = Math.max(3, height * 0.08);
+          target.style.left = Math.max(0, left - padX) + 'px';
+          target.style.top = Math.max(0, top - padY) + 'px';
+          target.style.width = Math.min(stageRect.width - Math.max(0, left - padX), width + padX * 2) + 'px';
+          target.style.height = Math.min(stageRect.height - Math.max(0, top - padY), height + padY * 2) + 'px';
+          target.style.display = 'block';
+          target.style.visibility = 'visible';
+        }
+      }
+
+      function detectButtonBoxes() {
+        if (!art.naturalWidth || !art.naturalHeight) return;
+        var canvas = document.createElement('canvas');
+        var maxW = 320;
+        var scale = Math.min(1, maxW / art.naturalWidth);
+        canvas.width = Math.max(1, Math.round(art.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(art.naturalHeight * scale));
+        var ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+        try { ctx.drawImage(art, 0, 0, canvas.width, canvas.height); } catch (_) { return; }
+        var data;
+        try { data = ctx.getImageData(0, 0, canvas.width, canvas.height).data; } catch (_) { return; }
+
+        var bgIndex = 0;
+        var bgR = data[bgIndex] || 0, bgG = data[bgIndex + 1] || 0, bgB = data[bgIndex + 2] || 0;
+        function marked(x, y) {
+          var p = (y * canvas.width + x) * 4;
+          var alpha = data[p + 3];
+          if (alpha < 20) return false;
+          var dr = data[p] - bgR, dg = data[p + 1] - bgG, db = data[p + 2] - bgB;
+          return Math.sqrt(dr * dr + dg * dg + db * db) > 32;
+        }
+
+        var seen = new Uint8Array(canvas.width * canvas.height);
+        var components = [];
+        var queueX = new Int32Array(canvas.width * canvas.height);
+        var queueY = new Int32Array(canvas.width * canvas.height);
+
+        for (var y = 0; y < canvas.height; y++) {
+          for (var x = 0; x < canvas.width; x++) {
+            var startIndex = y * canvas.width + x;
+            if (seen[startIndex] || !marked(x, y)) continue;
+            var head = 0, tail = 0;
+            queueX[tail] = x; queueY[tail] = y; tail++;
+            seen[startIndex] = 1;
+            var minX = x, maxX = x, minY = y, maxY = y, area = 0;
+            while (head < tail) {
+              var cx = queueX[head], cy = queueY[head]; head++; area++;
+              if (cx < minX) minX = cx; if (cx > maxX) maxX = cx;
+              if (cy < minY) minY = cy; if (cy > maxY) maxY = cy;
+              for (var dy = -1; dy <= 1; dy++) {
+                for (var dx = -1; dx <= 1; dx++) {
+                  if (!dx && !dy) continue;
+                  var nx = cx + dx, ny = cy + dy;
+                  if (nx < 0 || ny < 0 || nx >= canvas.width || ny >= canvas.height) continue;
+                  var ni = ny * canvas.width + nx;
+                  if (seen[ni] || !marked(nx, ny)) continue;
+                  seen[ni] = 1;
+                  queueX[tail] = nx; queueY[tail] = ny; tail++;
+                }
+              }
+            }
+            if (area < canvas.width * canvas.height * 0.003) continue;
+            var w = maxX - minX + 1, h = maxY - minY + 1;
+            if (w < canvas.width * 0.08 || h < canvas.height * 0.05) continue;
+            if (w > canvas.width * 0.75 && h > canvas.height * 0.75) continue;
+            components.push({
+              area: area,
+              x: minX / canvas.width,
+              y: minY / canvas.height,
+              w: w / canvas.width,
+              h: h / canvas.height,
+              centerX: (minX + maxX) / (2 * canvas.width),
+              centerY: (minY + maxY) / (2 * canvas.height)
+            });
+          }
+        }
+
+        components.sort(function (a, b) { return b.area - a.area; });
+        var chosen = [];
+        for (var ci = 0; ci < components.length && chosen.length < 2; ci++) {
+          var candidate = components[ci];
+          // Keep the two most button-sized components and avoid choosing
+          // one component that is almost entirely inside the other.
+          var overlaps = false;
+          for (var cj = 0; cj < chosen.length; cj++) {
+            var other = chosen[cj];
+            var x1 = Math.max(candidate.x, other.x);
+            var y1 = Math.max(candidate.y, other.y);
+            var x2 = Math.min(candidate.x + candidate.w, other.x + other.w);
+            var y2 = Math.min(candidate.y + candidate.h, other.y + other.h);
+            if (x2 > x1 && y2 > y1) {
+              var intersection = (x2 - x1) * (y2 - y1);
+              var smaller = Math.min(candidate.w * candidate.h, other.w * other.h);
+              if (intersection / smaller > 0.45) { overlaps = true; break; }
+            }
+          }
+          if (!overlaps) chosen.push(candidate);
+        }
+
+        if (chosen.length >= 2) {
+          chosen.sort(function (a, b) {
+            if (Math.abs(a.centerY - b.centerY) > 0.08) return a.centerY - b.centerY;
+            return a.centerX - b.centerX;
+          });
+          applyDetectedBoxes(chosen);
+        }
+      }
+
+      if (art.complete) detectButtonBoxes();
+      else art.addEventListener('load', detectButtonBoxes, {once:true});
+
+      window.addEventListener('resize', detectButtonBoxes, {passive:true});
     }
 
     shell.style.display = 'block';
     shell.style.visibility = 'visible';
     shell.style.pointerEvents = 'none';
-    var hits = shell.querySelector('#neo-sonic-button-hits');
-    if (hits) hits.style.pointerEvents = 'none';
+    var hit = shell.querySelector('#neo-sonic-button-hits');
+    if (hit) hit.style.pointerEvents = 'none';
+    var buttons = shell.querySelectorAll('.neo-sonic-button-hit');
+    for (var b = 0; b < buttons.length; b++) {
+      buttons[b].style.pointerEvents = 'auto';
+    }
   }
 
   function embedImpostor(root, stage) {
