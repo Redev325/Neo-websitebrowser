@@ -585,11 +585,15 @@
     root.classList.toggle('neo-native-cursor', !!active);
 
     // Remove any already-rendered Neo cursor effects while native mode is active.
+    var cursor = document.getElementById('custom-cursor');
     if (active) {
-      var cursor = document.getElementById('custom-cursor');
       if (cursor) cursor.style.display = 'none';
       var effects = document.querySelectorAll('.cursor-trail-dot, .cursor-particle');
       for (var i = 0; i < effects.length; i++) effects[i].remove();
+    } else if (cursor && window.__neoCursorHasMoved) {
+      cursor.style.display = 'block';
+      if (typeof window.__neoCursorMouseX === 'number') cursor.style.left = window.__neoCursorMouseX + 'px';
+      if (typeof window.__neoCursorMouseY === 'number') cursor.style.top = window.__neoCursorMouseY + 'px';
     }
 
     var frames = document.querySelectorAll('iframe');
@@ -709,6 +713,7 @@
     document.addEventListener('mousemove', function (event) {
       window.__neoCursorMouseX = event.clientX;
       window.__neoCursorMouseY = event.clientY;
+      window.__neoCursorHasMoved = true;
       var root = findViewerRoot();
       if (!root || !getSelectedGame()) {
         syncNativeCursorForViewer(false);
