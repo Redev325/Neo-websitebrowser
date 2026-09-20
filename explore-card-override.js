@@ -232,22 +232,35 @@
   function findViewerHeader(title) {
     if (!title) return null;
     var node = title;
-    for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
+    for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
-      // Match the actual game play bar: wide, short, near the top,
-      // and containing the viewer's native controls.
-      var buttons = node.querySelectorAll ? node.querySelectorAll('button') : [];
-      if (r.top <= 8 && r.height >= 32 && r.height <= 100 &&
-          r.width >= window.innerWidth * 0.70 && buttons.length >= 2) return node;
+      if (r.top >= -2 && r.top <= 2 && r.width >= window.innerWidth * 0.90 &&
+          r.height >= 40 && r.height <= 64) {
+        var buttons = node.querySelectorAll ? node.querySelectorAll('button') : [];
+        if (buttons.length >= 1) return node;
+      }
+      // The actual viewer shell is fixed full-screen; its first child is
+      // the 48px header. This is the reliable fallback.
+      var s = getComputedStyle(node);
+      if (s.position === 'fixed' && r.width >= window.innerWidth * 0.90 &&
+          r.height >= window.innerHeight * 0.80) {
+        var first = node.firstElementChild;
+        if (first) {
+          var fr = first.getBoundingClientRect();
+          var fb = first.querySelectorAll ? first.querySelectorAll('button') : [];
+          if (fr.height >= 40 && fr.height <= 64 && fb.length >= 1) return first;
+        }
+      }
     }
     return null;
   }
   function findViewerContainer(title, header) {
     if (!title || !header) return null;
-    var node = header;
-    for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
+    var node = header.parentElement;
+    for (var i = 0; i < 10 && node; i++, node = node.parentElement) {
       var r = node.getBoundingClientRect();
-      if (r.width >= window.innerWidth * 0.70 && r.height >= window.innerHeight * 0.60 && r.top <= 20) return node;
+      if (r.width >= window.innerWidth * 0.90 && r.height >= window.innerHeight * 0.80 &&
+          r.top <= 10) return node;
     }
     return header.parentElement || null;
   }
@@ -271,65 +284,54 @@
     if (selectedGame !== 'impostor' && selectedGame !== 'sonic') return;
     var header = findViewerHeader(title);
     if (!header) return;
-    header.style.position = 'relative';
-    header.style.overflow = 'hidden';
 
-    var hr = header.getBoundingClientRect();
-    var tr = title.getBoundingClientRect();
-    if (hr.width < window.innerWidth * 0.7) return;
+    // The built app already has a left-side title row. Replace its generic
+    // icon with the selected game's real logo instead of absolutely
+    // positioning a second logo over the bar.
+    var titleRow = title.parentElement;
+    if (!titleRow) return;
+    titleRow.style.display = 'flex';
+    titleRow.style.alignItems = 'center';
+    titleRow.style.gap = '10px';
+    titleRow.style.minWidth = '0';
 
-    var oldIcon = null;
-    var icon = header.querySelector('#neo-game-header-logo');
+    var icon = titleRow.querySelector('#neo-game-header-logo');
     if (!icon) {
       icon = document.createElement('img');
       icon.id = 'neo-game-header-logo';
       icon.alt = '';
       icon.draggable = false;
-      icon.style.position = 'absolute';
-      icon.style.pointerEvents = 'none';
-      icon.style.zIndex = '2147483646';
-      icon.style.display = 'block';
-      icon.style.boxSizing = 'border-box';
-      icon.style.objectFit = 'contain';
-      icon.style.objectPosition = 'center';
-      icon.style.background = 'transparent';
-      icon.style.border = '0';
-      icon.style.borderRadius = '0';
-      icon.style.boxShadow = 'none';
-      icon.style.outline = '0';
-      icon.style.mixBlendMode = 'normal';
-      icon.style.filter = 'none';
-      icon.style.transform = 'none';
-      icon.style.transformOrigin = 'center center';
-      header.appendChild(icon);
+      titleRow.insertBefore(icon, titleRow.firstChild);
     }
-
-    var sonicViewer = getSelectedGame() === 'sonic';
-    icon.src = sonicViewer ? SONIC_ICON_URL : ICON_URL;
-    icon.alt = sonicViewer ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    icon.src = selectedGame === 'sonic' ? SONIC_ICON_URL : ICON_URL;
+    icon.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    icon.style.display = 'block';
+    icon.style.width = '30px';
+    icon.style.height = '30px';
+    icon.style.flex = '0 0 30px';
+    icon.style.objectFit = 'contain';
+    icon.style.position = 'relative';
     icon.style.visibility = 'visible';
+    icon.style.pointerEvents = 'none';
+    icon.style.background = 'transparent';
+    icon.style.border = '0';
 
-    var headerHeight = Math.max(40, Math.min(70, hr.height));
-    var size = Math.min(44, Math.max(38, headerHeight - 4));
-    var left = 10;
-    var top = Math.max(2, (hr.height - size) / 2);
-    var textLeft = left + size + 10;
-
-    icon.style.left = left + 'px';
-    icon.style.top = top + 'px';
-    icon.style.width = size + 'px';
-    icon.style.height = size + 'px';
-
-    title.style.position = 'absolute';
-    title.style.left = textLeft + 'px';
-    title.style.top = '50%';
-    title.style.transform = 'translateY(-50%)';
+    title.style.position = 'relative';
+    title.style.left = 'auto';
+    title.style.top = 'auto';
+    title.style.transform = 'none';
     title.style.margin = '0';
     title.style.padding = '0';
     title.style.width = 'auto';
-    title.style.maxWidth = 'calc(100% - ' + textLeft + 'px - 140px)';
-    title.style.zIndex = '20';
+    title.style.minWidth = '0';
+    title.style.maxWidth = 'calc(100vw - 220px)';
+    title.style.zIndex = '2';
+    title.style.whiteSpace = 'nowrap';
+    title.style.overflow = 'hidden';
+    title.style.textOverflow = 'ellipsis';
+    title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
   }
+
   function embedGame(container, header) {
     if (!container || !header) return;
     if (getSelectedGame() === 'sonic') return;
@@ -433,43 +435,82 @@
     title.style.textOverflow = 'clip';
     title.style.maxWidth = 'none';
     var viewerContainer = findViewerContainer(title, header);
-    var headerButtons = Array.prototype.slice.call(header.querySelectorAll('button'));
-    headerButtons.sort(function (a, b) {
-      return a.getBoundingClientRect().left - b.getBoundingClientRect().left;
-    });
 
-    // Keep the viewer's own Fullscreen and X controls in their original layout.
-    // Prefer accessible labels; otherwise the existing rightmost two controls
-    // are the viewer's Fullscreen and close buttons.
-    var wanted = [];
-    var others = [];
-    for (var h = 0; h < headerButtons.length; h++) {
-      var label = ((headerButtons[h].getAttribute('aria-label') || '') + ' ' +
-                   (headerButtons[h].getAttribute('title') || '') + ' ' +
-                   (headerButtons[h].textContent || '')).toLowerCase();
-      var isFullscreen = /full\\s*screen|fullscreen|maximize|expand/.test(label);
-      var isClose = /(^|[\\s_-])(?:close|exit)(?:$|[\\s_-])|[×✕✖]/.test(label);
-      if (isFullscreen || isClose) wanted.push(headerButtons[h]);
-      else others.push(headerButtons[h]);
-    }
-    if (wanted.length < 2 && headerButtons.length >= 2) {
-      wanted = headerButtons.slice(Math.max(0, headerButtons.length - 2));
-    }
-    for (var oh = 0; oh < others.length; oh++) {
-      others[oh].style.display = 'none';
-      others[oh].style.visibility = 'hidden';
-      others[oh].style.pointerEvents = 'none';
-    }
-    for (var wh = 0; wh < wanted.length; wh++) {
-      wanted[wh].style.display = '';
-      wanted[wh].style.visibility = 'visible';
-      wanted[wh].style.opacity = '1';
-      wanted[wh].style.pointerEvents = 'auto';
+    // The original viewer creates four controls in this row. The last one
+    // is the wired Close/X action. Keep it and add exactly one real
+    // Fullscreen control immediately before it.
+    var headerButtons = Array.prototype.slice.call(header.querySelectorAll('button'));
+    if (headerButtons.length) {
+      var closeButton = headerButtons[headerButtons.length - 1];
+      for (var hb = 0; hb < headerButtons.length - 1; hb++) {
+        headerButtons[hb].style.display = 'none';
+        headerButtons[hb].style.visibility = 'hidden';
+        headerButtons[hb].style.pointerEvents = 'none';
+      }
+      closeButton.style.display = 'flex';
+      closeButton.style.visibility = 'visible';
+      closeButton.style.pointerEvents = 'auto';
+      closeButton.style.opacity = '1';
+      closeButton.style.width = '28px';
+      closeButton.style.height = '28px';
+      closeButton.style.margin = '0';
+      closeButton.setAttribute('aria-label', 'Exit');
+      closeButton.title = 'Exit';
+
+      var row = closeButton.parentElement;
+      if (row) {
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '4px';
+
+        var fs = row.querySelector('#neo-game-fullscreen');
+        if (!fs) {
+          fs = document.createElement('button');
+          fs.id = 'neo-game-fullscreen';
+          fs.type = 'button';
+          fs.setAttribute('aria-label', 'Fullscreen');
+          fs.title = 'Fullscreen';
+          fs.innerHTML = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          fs.style.width = '28px';
+          fs.style.height = '28px';
+          fs.style.padding = '0';
+          fs.style.margin = '0';
+          fs.style.display = 'flex';
+          fs.style.alignItems = 'center';
+          fs.style.justifyContent = 'center';
+          fs.style.border = '0';
+          fs.style.background = 'transparent';
+          fs.style.color = 'inherit';
+          fs.style.borderRadius = '4px';
+          fs.style.cursor = 'pointer';
+          row.insertBefore(fs, closeButton);
+        }
+        fs.style.display = 'flex';
+        fs.style.visibility = 'visible';
+        fs.style.pointerEvents = 'auto';
+        if (!fs.__neoBound) {
+          fs.__neoBound = true;
+          fs.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            var shell = header.parentElement;
+            var target = shell || viewerContainer || header;
+            if (document.fullscreenElement) {
+              try { document.exitFullscreen(); } catch (_) {}
+              return;
+            }
+            var req = target.requestFullscreen || target.webkitRequestFullscreen;
+            if (req) {
+              try { req.call(target); } catch (_) {}
+            }
+          });
+        }
+      }
     }
 
     header.setAttribute('data-neo-game-viewer-header', selectedGame);
-    installViewerHeaderObserver(header);
     addViewerLogo(title);
+    installViewerHeaderObserver(header);
     embedGame(viewerContainer, header);
   }
   function run() {
