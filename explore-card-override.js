@@ -14,6 +14,7 @@
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
+  var HANK_GAME_URL = 'https://accelerant.nxtdev.xyz/';
   var SONIC_OLD_BUILD_URL = 'https://sonicrestored30.devs.surf/';
   var SONIC_RESTORED_BUILD_URL = 'https://sonicexerealrestored.devs.surf/';
   var SELECTED_GAME_KEY = 'neo-selected-game';
@@ -667,9 +668,38 @@
     }
   }
 
+  function embedHank(root, stage) {
+    if (!root || !stage || getSelectedGame() !== 'hank') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+
+    var iframe = stage.querySelector('#neo-accelerant-hank-game');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'neo-accelerant-hank-game';
+      iframe.src = HANK_GAME_URL;
+      iframe.title = 'Vs Accelerant Hank';
+      iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map; pointer-lock';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('playsinline', '');
+      iframe.setAttribute('scrolling', 'no');
+      iframe.style.position = 'absolute';
+      iframe.style.inset = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+      iframe.style.display = 'block';
+      iframe.style.background = '#808080';
+      iframe.style.zIndex = '1';
+      stage.appendChild(iframe);
+    }
+  }
+
   function removeStrayGameIframe() {
     if (!isExplorePage() || getSelectedGame()) return;
-    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build, #neo-sonic-restored-build');
+    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build, #neo-sonic-restored-build, #neo-accelerant-hank-game');
     for (var i = 0; i < frames.length; i++) frames[i].remove();
   }
 
@@ -754,6 +784,7 @@
       if (parts.stage) parts.stage.removeAttribute('data-neo-sonic-active-build');
     }
     if (selectedGame === 'impostor') embedImpostor(root, parts.stage);
+    if (selectedGame === 'hank') embedHank(root, parts.stage);
   }
 
   function scheduleViewerActivation() {
