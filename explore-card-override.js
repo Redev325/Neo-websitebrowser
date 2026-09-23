@@ -44,7 +44,7 @@
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
-      if (t !== FIRST_TITLE && t !== SECOND_TITLE && !/^Placeholder \d+$/.test(t)) continue;
+      if (t !== FIRST_TITLE && t !== SECOND_TITLE && t !== THIRD_TITLE && !/^Placeholder \d+$/.test(t)) continue;
       var card = cardFromTitle(nodes[i]);
       if (card && isLikelyExploreCard(card) && cards.indexOf(card) === -1) cards.push(card);
     }
@@ -232,13 +232,16 @@
     var right = header.children[1] || null;
     var title = null;
     if (left) {
-      var spans = left.querySelectorAll('span');
-      for (var i = 0; i < spans.length; i++) {
-        var t = exactText(spans[i]);
-        if (t === 'Placeholder 1' || t === 'Placeholder 2' ||
+      // Preserve the existing header structure. Find the title wherever the
+      // current app rendered it (span/div/heading) instead of assuming span.
+      var titleNodes = left.querySelectorAll('span,p,h1,h2,h3,h4,div');
+      for (var i = 0; i < titleNodes.length; i++) {
+        var candidate = titleNodes[i];
+        var t = exactText(candidate);
+        if (t === 'Placeholder 1' || t === 'Placeholder 2' || t === 'Placeholder 3' ||
             t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE ||
-            t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE || t === THIRD_TITLE) {
-          title = spans[i];
+            t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE) {
+          title = candidate;
           break;
         }
       }
