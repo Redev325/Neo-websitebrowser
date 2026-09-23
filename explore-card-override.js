@@ -5,6 +5,7 @@
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
   var SECOND_TITLE = 'Vs Sonic.exe(2.0-4.0)';
+  var THIRD_TITLE = 'Vs Accelerant Hank';
   var SECOND_IMAGE = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/vs-sonic-exe-2-0-4-0.jpg';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
@@ -64,6 +65,7 @@
       var t = leaf(nodes[i]);
       if (index === 0 && (t === 'Placeholder 1' || t === FIRST_TITLE)) return nodes[i];
       if (index === 1 && (t === 'Placeholder 2' || t === SECOND_TITLE)) return nodes[i];
+      if (index === 2 && (t === 'Placeholder 3' || t === THIRD_TITLE)) return nodes[i];
       if (index >= 2 && /^Placeholder \d+$/.test(t)) return nodes[i];
       if (wanted && t === wanted) return nodes[i];
     }
@@ -154,10 +156,10 @@
     }
   }
   function getSelectedGame() {
-    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor') return window.__neoSelectedGame;
+    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank') return window.__neoSelectedGame;
     try {
       var value = sessionStorage.getItem(SELECTED_GAME_KEY);
-      if (value === 'sonic' || value === 'impostor') {
+      if (value === 'sonic' || value === 'impostor' || value === 'hank') {
         window.__neoSelectedGame = value;
         window.__neoSonicViewer = value === 'sonic';
         return value;
@@ -195,6 +197,13 @@
           scheduleViewerActivation();
         }, true);
       }
+      if (i === 2 && !cards[i].__neoHankClickBound) {
+        cards[i].__neoHankClickBound = true;
+        cards[i].addEventListener('click', function () {
+          setSelectedGame('hank');
+          scheduleViewerActivation();
+        }, true);
+      }
     }
   }
   function findViewerRoot() {
@@ -226,8 +235,8 @@
       for (var i = 0; i < spans.length; i++) {
         var t = exactText(spans[i]);
         if (t === 'Placeholder 1' || t === 'Placeholder 2' ||
-            t === FIRST_TITLE || t === SECOND_TITLE ||
-            t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE) {
+            t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE ||
+            t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE || t === THIRD_TITLE) {
           title = spans[i];
           break;
         }
@@ -253,7 +262,7 @@
       left.insertBefore(logo, parts.title);
     }
     logo.src = selectedGame === 'sonic' ? SONIC_ICON_URL : ICON_URL;
-    logo.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    logo.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : VIEWER_TITLE;
     logo.style.display = 'block';
     logo.style.visibility = 'visible';
     logo.style.width = '30px';
@@ -274,7 +283,7 @@
       }
     }
 
-    parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : VIEWER_TITLE;
     parts.title.title = parts.title.textContent;
     parts.title.style.display = 'block';
     parts.title.style.minWidth = '0';
@@ -709,7 +718,7 @@
       return;
     }
     var selectedGame = getSelectedGame();
-    if (selectedGame !== 'impostor' && selectedGame !== 'sonic') {
+    if (selectedGame !== 'impostor' && selectedGame !== 'sonic' && selectedGame !== 'hank') {
       syncNativeCursorForViewer(false);
       return;
     }
@@ -724,7 +733,7 @@
     if (!parts || !parts.title) return;
 
     parts.title.setAttribute('data-neo-game-viewer-title', selectedGame);
-    parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : VIEWER_TITLE;
+    parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : VIEWER_TITLE;
     root.setAttribute('data-neo-game-viewer', selectedGame);
     updateViewerLogo(parts, selectedGame);
     updateViewerControls(parts, root);
@@ -739,7 +748,7 @@
       if (restoredSonicFrame) restoredSonicFrame.remove();
       if (parts.stage) parts.stage.removeAttribute('data-neo-sonic-active-build');
     }
-    embedImpostor(root, parts.stage);
+    if (selectedGame === 'impostor') embedImpostor(root, parts.stage);
   }
 
   function scheduleViewerActivation() {
