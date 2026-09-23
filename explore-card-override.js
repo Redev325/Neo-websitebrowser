@@ -108,6 +108,7 @@
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
     }
     if (index >= 2) {
+      title.textContent = THIRD_TITLE;
       preview.style.background = '#000';
       preview.style.backgroundColor = '#000';
       var genericImages = preview.querySelectorAll('img');
