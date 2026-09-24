@@ -11,7 +11,7 @@
   var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
   var SONIC_ICON_URL = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/Vs.sonic.exe.png';
   var HANK_ICON_URL = '/VsAccHank.png';
-  var HANK_THUMBNAIL_URL = '/assets/vs-accelerant-hank.jpg';
+  var HANK_THUMBNAIL_URL = '/assets/vs-accelerant-hank.jpg?v=2';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
