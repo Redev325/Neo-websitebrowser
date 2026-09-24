@@ -11,6 +11,7 @@
   var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
   var SONIC_ICON_URL = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/Vs.sonic.exe.png';
   var HANK_ICON_URL = '/VsAccHank.png';
+  var HANK_THUMBNAIL_URL = '/assets/vs-accelerant-hank.jpg';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
@@ -111,10 +112,21 @@
     }
     if (index === 2) {
       title.textContent = THIRD_TITLE;
+      var hankImage = preview.querySelector('.neo-hank-card-image');
+      if (!hankImage) {
+        hankImage = document.createElement('img');
+        hankImage.className = 'neo-hank-card-image';
+        preview.appendChild(hankImage);
+      }
+      hankImage.src = HANK_THUMBNAIL_URL;
+      hankImage.alt = THIRD_TITLE;
+      hankImage.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;';
       preview.style.background = '#000';
       preview.style.backgroundColor = '#000';
       var genericImages = preview.querySelectorAll('img');
-      for (var gi = 0; gi < genericImages.length; gi++) genericImages[gi].style.display = 'none';
+      for (var gi = 0; gi < genericImages.length; gi++) {
+        if (genericImages[gi] !== hankImage) genericImages[gi].style.display = 'none';
+      }
       var genericSvgs = preview.querySelectorAll('svg');
       for (var gs = 0; gs < genericSvgs.length; gs++) genericSvgs[gs].style.display = 'none';
     }
