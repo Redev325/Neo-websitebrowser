@@ -546,7 +546,7 @@ function rewriteLinks(html, base, proxyOrigin) {
   }
 
   function rewriteAttr(tag, attr, kind) {
-    const re = new RegExp("(" + attr + "\s*=\s*)(?:\"([^\"]+)\"|'([^']+)'|([^\s>]+))", "i");
+    const re = new RegExp("(" + attr + "\\s*=\\s*)(?:\"([^\"]+)\"|'([^']+)'|([^\\s>]+))", "i");
     return tag.replace(re, (all, prefix, doubleQuoted, singleQuoted, bare) => {
       const raw = doubleQuoted !== undefined ? doubleQuoted : singleQuoted !== undefined ? singleQuoted : bare;
       if (!raw) return all;
