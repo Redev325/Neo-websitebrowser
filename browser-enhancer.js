@@ -161,6 +161,27 @@
     if (!value) return;
     if (!tabs.length) tabs.push(makeTab(HOME_TOKEN, 'Home'));
 
+    // A pasted Neo proxy URL must stay inside the Browser iframe instead of
+    // navigating the outer Neo page to /api/proxy.
+    try {
+      var proxyInput = new URL(value, location.href);
+      if (proxyInput.origin === location.origin && proxyInput.pathname === '/api/proxy') {
+        var embeddedTarget = proxyInput.searchParams.get('url') || '';
+        var restoredTarget = embeddedTarget ? decodeURIComponent(embeddedTarget) : '';
+        tabs[active].url = proxyInput.href;
+        tabs[active].title = titleFor(proxyInput.href);
+        frame = findFrame();
+        address = findAddress();
+        if (frame) {
+          frame.removeAttribute('srcdoc');
+          frame.src = proxyInput.href;
+        }
+        if (address) address.value = restoredTarget || proxyInput.href;
+        renderTabs();
+        return;
+      }
+    } catch (_) {}
+
     var looksLikeUrl = /^https?:\/\//i.test(value) || /^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(value);
     if (!looksLikeUrl) {
       var searchUrl = location.origin + '/api/search?q=' + encodeURIComponent(value);
@@ -175,11 +196,15 @@
     }
 
     var target = /^https?:\/\//i.test(value) ? value : 'https://' + value;
-    tabs[active].url = proxyFor(target);
-    tabs[active].title = titleFor(tabs[active].url);
+    var embeddedUrl = proxyFor(target);
+    tabs[active].url = embeddedUrl;
+    tabs[active].title = titleFor(embeddedUrl);
     frame = findFrame();
     address = findAddress();
-    if (frame) { frame.removeAttribute('srcdoc'); frame.src = tabs[active].url; }
+    if (frame) {
+      frame.removeAttribute('srcdoc');
+      frame.src = embeddedUrl;
+    }
     if (address) address.value = target;
     renderTabs();
   }
