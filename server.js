@@ -7,7 +7,7 @@ const searchHandler = require("./api/search.js");
 
 const app = express();
 app.disable("x-powered-by");
-app.use(express.json({ limit: "32mb" }));
+app.use(express.json({ limit: "1mb" }));
 
 app.all("/api/proxy", (req, res) => {
   try {
