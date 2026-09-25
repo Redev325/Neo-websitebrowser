@@ -499,8 +499,10 @@ function buildBridge(proxyOrigin, pageBase) {
     'syncCursorMode();' +
     'function toProxy(url){try{if(!url)return null;var s=String(url);if(/^(data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(s))return null;var u=new URL(s,PAGE_BASE||location.href);if(u.protocol!=="http:"&&u.protocol!=="https:")return null;if(u.origin===PROXY_ORIGIN&&u.pathname==="/api/proxy")return null;var h=u.hostname;if(SNOKIDO_PAGE&&/^(?:www\\.)?snokido\\.(?:com|fr)$/i.test(h))return null;if(!SNOKIDO_PAGE&&/kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i.test(h))return null;return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
     'function shouldProxyIframe(url){try{var u=new URL(String(url),PAGE_BASE||location.href);if(u.origin===PROXY_ORIGIN&&u.pathname==="/api/proxy")return false;if(SNOKIDO_PAGE)return false;if(DIRECT.test(u.hostname))return false;if(/snokido\\.com$/i.test(u.hostname)&&u.pathname.indexOf("/game/")===0)return false;if(u.pathname.indexOf("/embed/")!==-1)return false;return true}catch(e){return true}}' +
-    'var _f=window.fetch;window.fetch=function(input,init){try{var url=typeof input==="string"?input:(input&&input.url)||"";var p=toProxy(url);if(p){if(typeof input==="string")input=p;else if(typeof input==="object")input=Object.assign({},input,{url:p})}}catch(e){}return _f.apply(this,arguments)};' +
+    'var _f=window.fetch;window.fetch=function(input,init){try{var raw=typeof input==="string"?input:(input&&input.url)||String(input||"");var p=toProxy(raw);if(p){if(typeof Request!=="undefined"&&input instanceof Request){input=new Request(p,input)}else{input=p}}}catch(e){}return _f.call(this,input,init)};' +
     'var XO=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,url){try{var p=toProxy(url);if(p)arguments[1]=p;}catch(e){}return XO.apply(this,arguments);};' +
+    'try{if(window.EventSource){var NativeEventSource=window.EventSource;window.EventSource=function(url,opts){var p=toProxy(url)||url;return new NativeEventSource(p,opts)};window.EventSource.prototype=NativeEventSource.prototype;}}catch(e){}' +
+    'try{if(navigator.sendBeacon){var nativeBeacon=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(url,data){var p=toProxy(url);return nativeBeacon(p||url,data)}}catch(e){}' +
     'try{var desc=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,"src");if(desc&&desc.set){var os=desc.set,og=desc.get;Object.defineProperty(HTMLIFrameElement.prototype,"src",{configurable:true,get:function(){return og.call(this)},set:function(v){try{if(shouldProxyIframe(v))v=toProxy(v)||v}catch(e){}return os.call(this,v)}})}}catch(e){}' +
     'function nav(href){var p=toProxy(href);if(p){location.href=p;return true}return false}' +
     'document.addEventListener("click",function(e){var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(!a)return;var href=a.getAttribute("href");if(!href||href.charAt(0)==="#"||/^(javascript|mailto|tel|data|blob):/i.test(href))return;e.preventDefault();nav(href)},{capture:true});' +
@@ -513,46 +515,100 @@ function buildBridge(proxyOrigin, pageBase) {
 }
 
 function rewriteLinks(html, base, proxyOrigin) {
-  let snokidoPage = false;
-  try {
-    const bu = new URL(base);
-    snokidoPage =
-      /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) &&
-      /^\/game(?:\/|$)/i.test(bu.pathname);
-  } catch {}
+  let bu;
+  try { bu = new URL(base); } catch { bu = null; }
+  const snokidoPage = !!(bu &&
+    /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) &&
+    /^\/game(?:\/|$)/i.test(bu.pathname));
 
   const prox = (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
-  function rewriteAttr(tag, attr, force) {
-    const re = new RegExp("(" + attr + "\\s*=\\s*[\"'])([^\"']+)([\"'])", "i");
-    return tag.replace(re, (all, a, raw, b) => {
-      if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(raw)) return all;
+
+  function isDirectGameHost(hostname) {
+    return /(?:snokido\.com|kbhgames\.com|wgplayer\.com|crazygames\.com|poki\.com|y8\.com|itch\.io)$/i.test(hostname);
+  }
+
+  function shouldKeepIframeDirect(u) {
+    if (!u) return false;
+    if (snokidoPage) return true;
+    if (isDirectGameHost(u.hostname)) return true;
+    return /\/embed\//i.test(u.pathname);
+  }
+
+  function rewriteRawUrl(raw) {
+    if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(raw.trim())) return raw;
+    try {
+      const u = new URL(raw.trim(), base);
+      if (u.protocol !== "http:" && u.protocol !== "https:") return raw;
+      return prox(u);
+    } catch {
+      return raw;
+    }
+  }
+
+  function rewriteAttr(tag, attr, kind) {
+    const re = new RegExp("(" + attr + "\\s*=\\s*)(?:\"([^\"]+)\"|'([^']+)'|([^\\s>]+))", "i");
+    return tag.replace(re, (all, prefix, doubleQuoted, singleQuoted, bare) => {
+      const raw = doubleQuoted !== undefined ? doubleQuoted : singleQuoted !== undefined ? singleQuoted : bare;
+      if (!raw) return all;
       try {
         const u = new URL(raw, base);
         if (u.protocol !== "http:" && u.protocol !== "https:") return all;
-        const h = u.hostname;
-        if (!force && /kbhgames\.com$|wgplayer\.com$|crazygames\.com$|poki\.com$|y8\.com$|itch\.io$/i.test(h)) return all;
-        if (!force && u.pathname.indexOf("/embed/") !== -1) return all;
-        return a + prox(u) + b;
+        if (kind === "iframe" && shouldKeepIframeDirect(u)) return all;
+        const replacement = prox(u);
+        if (doubleQuoted !== undefined) return prefix + "\"" + replacement + "\"";
+        if (singleQuoted !== undefined) return prefix + "'" + replacement + "'";
+        return prefix + replacement;
       } catch {
         return all;
       }
     });
   }
-  html = html.replace(new RegExp("<(img|script|source|video|audio|track|embed|object)\\b[^>]*>", "gi"), (tag) => {
+
+  function rewriteSrcset(tag) {
+    const re = /(<img\\b[^>]*\\bsrcset\\s*=\\s*)(?:\"([^\"]+)\"|'([^']+)')/i;
+    return tag.replace(re, (all, prefix, dq, sq) => {
+      const raw = dq !== undefined ? dq : sq;
+      const rewritten = raw.split(",").map((part) => {
+        const bits = part.trim().split(/\\s+/);
+        if (!bits[0] || /^data:/i.test(bits[0])) return part;
+        const url = rewriteRawUrl(bits[0]);
+        return bits.length > 1 ? url + " " + bits.slice(1).join(" ") : url;
+      }).join(", ");
+      return prefix + (dq !== undefined ? "\"" + rewritten + "\"" : "'" + rewritten + "'");
+    });
+  }
+
+  html = html.replace(/<(img|script|source|video|audio|track|embed|object)\\b[^>]*>/gi, (tag) => {
     let out = tag;
-    for (const a of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, a);
+    for (const attr of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, attr, "asset");
     return out;
   });
-  html = html.replace(new RegExp("<iframe\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "src", snokidoPage));
-  html = html.replace(new RegExp("<link\\b[^>]*>", "gi"), (tag) => {
-    const relM = tag.match(new RegExp("\\brel\\s*=\\s*[\"']([^\"']+)[\"']", "i"));
-    const rel = ((relM && relM[1]) || "").toLowerCase();
-    if (!/(stylesheet|icon|preload|modulepreload)/.test(rel)) return tag;
-    return rewriteAttr(tag, "href");
+
+  html = html.replace(/<iframe\\b[^>]*>/gi, (tag) => rewriteAttr(tag, "src", "iframe"));
+  html = html.replace(/<link\\b[^>]*>/gi, (tag) => {
+    let out = tag;
+    for (const attr of ["href", "imagesrcset"]) out = rewriteAttr(out, attr, "link");
+    return out;
   });
-  html = html.replace(new RegExp("<a\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "href"));
-  html = html.replace(new RegExp("<form\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "action"));
-  html = html.replace(new RegExp("<meta\\b[^>]*http-equiv\\s*=\\s*[\"']content-security-policy[\"'][^>]*>", "gi"), "");
-  html = html.replace(new RegExp("<meta\\b[^>]*http-equiv\\s*=\\s*[\"']x-frame-options[\"'][^>]*>", "gi"), "");
+  html = html.replace(/<a\\b[^>]*>/gi, (tag) => rewriteAttr(tag, "href", "link"));
+  html = html.replace(/<form\\b[^>]*>/gi, (tag) => rewriteAttr(tag, "action", "form"));
+  html = html.replace(/<img\\b[^>]*>/gi, rewriteSrcset);
+
+  // Rewrite common absolute/relative refresh redirects and inline style URLs.
+  html = html.replace(/(<meta\\b[^>]*http-equiv\\s*=\\s*["']refresh["'][^>]*content\\s*=\\s*["'][^"']*\\burl=)([^"' >]+)/gi,
+    (all, prefix, raw) => prefix + rewriteRawUrl(raw));
+
+  html = html.replace(/(\\bstyle\\s*=\\s*)(["'])([^"']*)\\2/gi, (all, prefix, quote, css) => {
+    const rewritten = css.replace(/url\\(\\s*(['"]?)([^'")]+)\\1\\s*\\)/gi, (full, q, raw) => {
+      const next = rewriteRawUrl(raw);
+      return next !== raw ? 'url("' + next + '")' : full;
+    });
+    return prefix + quote + rewritten + quote;
+  });
+
+  html = html.replace(/<base\\b[^>]*>/gi, "");
+  html = html.replace(/<meta\\b[^>]*http-equiv\\s*=\\s*["']content-security-policy(?:-report-only)?["'][^>]*>/gi, "");
+  html = html.replace(/<meta\\b[^>]*http-equiv\\s*=\\s*["']x-frame-options["'][^>]*>/gi, "");
+
   return html;
 }
