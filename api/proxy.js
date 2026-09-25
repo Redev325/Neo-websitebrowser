@@ -293,8 +293,6 @@ module.exports = async function handler(req, res) {
   try {
     let current = target;
     let r;
-    let usedFallback = false;
-
     let currentMethod = (req.method || "GET").toUpperCase();
     const hasInitialBody = !["GET", "HEAD"].includes(currentMethod);
     const outgoingBody = hasInitialBody ? await readIncomingBody(req, req.body) : undefined;
@@ -356,8 +354,8 @@ module.exports = async function handler(req, res) {
     res.setHeader("Referrer-Policy", "unsafe-url");
     res.setHeader("Permissions-Policy", "fullscreen=*, autoplay=*, gamepad=*, pointer-lock=*");
 
-    const cacheableGet = method === "GET" && !req.headers.cookie;
-    if (lowerType.includes("text/html")) {
+    const cacheableGet = currentMethod === "GET" && !req.headers.cookie;
+    if (isHtmlType(type)) {
       res.setHeader("Cache-Control", cacheableGet ? "public, max-age=60, stale-while-revalidate=300" : "private, no-cache");
     } else if (cacheableGet) {
       res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
