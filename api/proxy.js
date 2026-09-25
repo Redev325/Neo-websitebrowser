@@ -1,420 +1,460 @@
 const { Readable } = require("stream");
 
 const BLOCKED_HOSTS = new Set([
-  "localhost", "127.0.0.1", "0.0.0.0", "::1",
-  "169.254.169.254", "metadata.google.internal"
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0",
+  "::1",
+  "169.254.169.254",
+  "metadata.google.internal"
 ]);
 
 function isPrivateIPv4(host) {
-  const p = host.split(".").map(Number);
-  if (p.length !== 4 || p.some(Number.isNaN)) return false;
-  const [a, b] = p;
-  return a === 10 || a === 127 || (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  const parts = String(host).split(".").map(Number);
+  if (parts.length !== 4 || parts.some(Number.isNaN)) return false;
+  const [a, b] = parts;
+  return a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168);
 }
 
-function blocked(hostname) {
-  const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  return BLOCKED_HOSTS.has(h) || h.endsWith(".local") ||
-    h.endsWith(".internal") || isPrivateIPv4(h);
+function isBlockedHost(hostname) {
+  const host = String(hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
+  return BLOCKED_HOSTS.has(host) ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    isPrivateIPv4(host);
 }
 
-function targetUrl(raw, base) {
+function parseTarget(raw, base) {
   try {
-    const u = new URL(raw, base);
-    if (!["http:", "https:"].includes(u.protocol) || blocked(u.hostname)) return null;
-    return u;
+    const url = new URL(raw, base);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (isBlockedHost(url.hostname)) return null;
+    return url;
   } catch {
     return null;
   }
 }
 
-function makeProx(proxyOrigin) {
-  return (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
+function proxyUrl(proxyOrigin, target) {
+  return proxyOrigin + "/api/proxy?url=" + encodeURIComponent(target.toString());
 }
 
-function searchQueryOf(u) {
-  const host = u.hostname.toLowerCase();
-  const isBing = host === "www.bing.com" || host === "bing.com";
-  if (!isBing) return null;
-  if (!/^\/search\/?$/.test(u.pathname)) return null;
-  const q = u.searchParams.get("q");
-  return q ? q.trim() : null;
+function cookieKey(hostname) {
+  return "neo_" + Buffer.from(String(hostname).toLowerCase()).toString("base64url").replace(/[^A-Za-z0-9_-]/g, "_") + "_";
 }
 
-function stripTags(s) {
-  return s.replace(/<[^>]*>/g, "");
+function cookiesForTarget(header, hostname) {
+  const prefix = cookieKey(hostname);
+  return String(header || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const eq = part.indexOf("=");
+      if (eq < 1) return null;
+      const name = part.slice(0, eq);
+      if (!name.startsWith(prefix)) return null;
+      return name.slice(prefix.length) + part.slice(eq);
+    })
+    .filter(Boolean)
+    .join("; ");
 }
 
-function decodeEntities(s) {
-  return s
-    .replace(new RegExp("&" + "amp;", "g"), "&")
-    .replace(new RegExp("&" + "lt;", "g"), "<")
-    .replace(new RegExp("&" + "gt;", "g"), ">")
-    .replace(new RegExp("&" + "quot;", "g"), '"')
-    .replace(/&#0?39;/g, "'")
-    .replace(/&#x27;/gi, "'")
-    .replace(new RegExp("&" + "nbsp;", "g"), " ")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)));
-}
+function rewriteSetCookies(setCookies, hostname) {
+  const prefix = cookieKey(hostname);
 
-function clean(s) {
-  return decodeEntities(stripTags(s)).replace(/\s+/g, " ").trim();
-}
+  return setCookies.map((cookie) => {
+    const parts = String(cookie).split(";");
+    const first = parts.shift() || "";
+    const eq = first.indexOf("=");
+    if (eq < 1) return cookie;
 
-function escapeHtml(s) {
-  return s
-    .replace(/&/g, "&" + "amp;")
-    .replace(/</g, "&" + "lt;")
-    .replace(/>/g, "&" + "gt;")
-    .replace(/"/g, "&" + "quot;");
-}
+    const name = first.slice(0, eq).trim();
+    const value = first.slice(eq + 1);
+    const attrs = [];
+    let hasPath = false;
 
-function resolveBingLink(href) {
-  const url = decodeEntities(href);
-  let host = "";
-  try {
-    host = new URL(url).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
-  if (host.endsWith("bing.com")) {
-    try {
-      const enc = new URL(url).searchParams.get("u");
-      if (enc && enc.startsWith("a1")) {
-        const real = Buffer.from(enc.slice(2), "base64url").toString("utf-8");
-        if (/^https?:\/\//i.test(real)) return real;
+    for (const rawAttr of parts) {
+      const attr = rawAttr.trim();
+      if (!attr) continue;
+      if (/^domain=/i.test(attr)) continue;
+      if (/^path=/i.test(attr)) {
+        attrs.push("Path=/api/proxy");
+        hasPath = true;
+        continue;
       }
-    } catch {}
-    return null;
-  }
-  if (host.endsWith("microsoft.com") || host.endsWith("msn.com")) return null;
-  return url;
-}
-
-function parseBingResults(html) {
-  const results = [];
-  const seen = new Set();
-  const marker = 'class="b_algo';
-  let idx = html.indexOf(marker);
-  while (idx !== -1 && results.length < 15) {
-    const next = html.indexOf(marker, idx + marker.length);
-    const block = html.slice(idx, next === -1 ? html.length : next);
-    const linkMatch = block.match(/<h2[^>]*>[\s\S]*?<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
-    if (linkMatch) {
-      const url = resolveBingLink(linkMatch[1]);
-      const title = clean(linkMatch[2]);
-      const snipMatch = block.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i);
-      const snippet = snipMatch ? clean(snipMatch[1]) : "";
-      if (url && title && !seen.has(url)) {
-        seen.add(url);
-        let display = url;
-        try {
-          const uu = new URL(url);
-          display = uu.hostname.replace(/^www\./, "") + (uu.pathname === "/" ? "" : uu.pathname);
-        } catch {}
-        results.push({ url, title, snippet, display });
+      if (/^samesite=/i.test(attr)) {
+        attrs.push("SameSite=Lax");
+        continue;
       }
+      attrs.push(attr);
     }
-    idx = next;
+
+    if (!hasPath) attrs.push("Path=/api/proxy");
+    return prefix + name + "=" + value + (attrs.length ? "; " + attrs.join("; ") : "");
+  });
+}
+
+function mapReferer(value, proxyOrigin) {
+  const raw = String(value || "");
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.origin !== proxyOrigin || url.pathname !== "/api/proxy") return raw;
+    const target = url.searchParams.get("url");
+    return target ? new URL(target).toString() : "";
+  } catch {
+    return "";
   }
-  return results;
 }
 
-function renderSearchPage(query, results, proxyOrigin) {
-  const prox = makeProx(proxyOrigin);
-  const bridge = buildBridge(proxyOrigin, "https://www.bing.com/");
-  const q = escapeHtml(query);
-  const items = results.map((r) =>
-    '<article class="res">' +
-    '<a class="res-url" href="' + escapeHtml(prox(new URL(r.url))) + '">' + escapeHtml(r.display) + '</a>' +
-    '<a class="res-title" href="' + escapeHtml(prox(new URL(r.url))) + '">' + escapeHtml(r.title) + '</a>' +
-    (r.snippet ? '<p class="res-snip">' + escapeHtml(r.snippet) + '</p>' : '') +
-    '</article>'
-  ).join("");
-  const empty = '<div class="empty"><div class="empty-orb"></div><p>No results found for <strong>' + q + '</strong>.</p><p class="empty-sub">Try a different search or enter a full URL.</p></div>';
-  return '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">' +
-    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<title>' + q + ' - Neo Search</title><style>' +
-    ':root{--bg:#0a0a0b;--panel:#111114;--border:#1f1f24;--text:#e7e7ea;--muted:#8a8a93;--accent:#ff2d2d;--link:#8ab4ff;}' +
-    '*{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;min-height:100%;cursor:none!important}' +
-    '.wrap{max-width:720px;margin:0 auto;padding:28px 24px 80px}' +
-    'header{display:flex;align-items:center;gap:10px;padding-bottom:18px;border-bottom:1px solid var(--border);margin-bottom:24px}' +
-    '.mark{width:38px;height:38px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 0 10px rgba(255,45,45,.5))}' +
-    '.wordmark{height:40px;width:auto;object-fit:contain;display:block}' +
-    '.meta{color:var(--muted);font-size:13px;margin:0 0 20px}.meta strong{color:var(--text)}' +
-    '.res{padding:14px 0;border-bottom:1px solid rgba(255,255,255,.04)}' +
-    '.res-url{display:block;color:var(--muted);font-size:12.5px;text-decoration:none;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
-    '.res-title{display:block;color:var(--link);font-size:18px;line-height:1.35;text-decoration:none}.res-title:hover{text-decoration:underline}' +
-    '.res-snip{color:#c4c4cc;font-size:14px;line-height:1.5;margin:6px 0 0}' +
-    '.empty{text-align:center;padding:60px 0;color:var(--muted)}' +
-    '.empty-orb{width:56px;height:56px;border-radius:50%;margin:0 auto 18px;background:radial-gradient(circle at 50% 45%,#fff 0%,#ff5a5a 30%,var(--accent) 60%,#7a0000 100%);box-shadow:0 0 26px rgba(255,45,45,.6)}' +
-    '.empty-sub{font-size:13px;margin-top:6px}' +
-    'footer{margin-top:34px;text-align:center;color:var(--muted);font-size:12px}' +
-    '</style></head><body><div class="wrap">' +
-    '<header>' +
-    '<img class="mark" src="/assets/neo-logo-diamond.png" alt="Neo" />' +
-    '<img class="wordmark" src="/assets/neo-search-wordmark.png" alt="Neo Search" />' +
-    '</header>' +
-    '<p class="meta">Results for <strong>' + q + '</strong></p>' +
-    (results.length ? items : empty) +
-    '<footer>Neo Browser · Use responsibly</footer>' +
-    '</div>' + bridge + '</body></html>';
+function mapOrigin(value, referer, proxyOrigin) {
+  const raw = String(value || "");
+  if (!raw) return "";
+  try {
+    const origin = new URL(raw);
+    if (origin.origin !== proxyOrigin) return raw;
+    const mapped = mapReferer(referer, proxyOrigin);
+    return mapped ? new URL(mapped).origin : "";
+  } catch {
+    return "";
+  }
 }
 
-module.exports = async function handler(req, res) {
+function rewriteUrl(raw, base, proxyOrigin) {
+  if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(String(raw).trim())) {
+    return raw;
+  }
+
+  try {
+    const target = new URL(String(raw).trim(), base);
+    if (target.protocol !== "http:" && target.protocol !== "https:") return raw;
+    return proxyUrl(proxyOrigin, target);
+  } catch {
+    return raw;
+  }
+}
+
+function isSnokidoGamePage(base) {
+  try {
+    const url = new URL(base);
+    return /^(?:www\.)?snokido\.(?:com|fr)$/i.test(url.hostname) &&
+      /^\/game(?:\/|$)/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function shouldKeepIframeDirect(raw, base) {
+  try {
+    const target = new URL(String(raw), base);
+    if (/^(?:www\.)?snokido\.(?:com|fr)$/i.test(target.hostname)) return true;
+    if (/(?:kbhgames|wgplayer|crazygames|poki|y8|itch)\.io?$|(?:kbhgames|wgplayer|crazygames|poki|y8|itch)\.com$/i.test(target.hostname)) return true;
+    if (/\/embed\//i.test(target.pathname)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function rewriteTagAttr(tag, attr, base, proxyOrigin, options) {
+  const re = new RegExp(
+    "(" + attr + "\\s*=\\s*)(?:\"([^\"]+)\"|'([^']+)'|([^\\s>]+))",
+    "i"
+  );
+
+  return tag.replace(re, (all, prefix, doubleValue, singleValue, bareValue) => {
+    const raw = doubleValue !== undefined
+      ? doubleValue
+      : singleValue !== undefined
+        ? singleValue
+        : bareValue;
+
+    if (!raw) return all;
+
+    if (options && options.iframe && options.keepDirect) {
+      return all;
+    }
+
+    const rewritten = rewriteUrl(raw, base, proxyOrigin);
+    if (rewritten === raw) return all;
+
+    if (doubleValue !== undefined) return prefix + "\"" + rewritten + "\"";
+    if (singleValue !== undefined) return prefix + "'" + rewritten + "'";
+    return prefix + rewritten;
+  });
+}
+
+function rewriteSrcset(tag, base, proxyOrigin) {
+  const re = /(<(?:img|source)\b[^>]*\bsrcset\s*=\s*)(?:"([^"]+)"|'([^']+)')/i;
+  return tag.replace(re, (all, prefix, doubleValue, singleValue) => {
+    const raw = doubleValue !== undefined ? doubleValue : singleValue;
+    const value = raw.split(",").map((part) => {
+      const bits = part.trim().split(/\s+/);
+      if (!bits[0]) return part;
+      const rewritten = rewriteUrl(bits[0], base, proxyOrigin);
+      return bits.length > 1 ? rewritten + " " + bits.slice(1).join(" ") : rewritten;
+    }).join(", ");
+
+    return prefix + (doubleValue !== undefined ? "\"" + value + "\"" : "'" + value + "'");
+  });
+}
+
+function buildBridge(proxyOrigin, pageBase) {
+  const O = JSON.stringify(proxyOrigin);
+  const B = JSON.stringify(pageBase);
+  const snokidoGame = isSnokidoGamePage(pageBase);
+
+  return (
+    '<style id="neo-proxy-style">html,body,*{cursor:none!important}html,body{margin:0;}</style>' +
+    '<script id="neo-proxy-bridge">(function(){' +
+    'if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;' +
+    'var P=' + O + ';' +
+    'var B=' + B + ';' +
+    'var S=' + JSON.stringify(snokidoGame) + ';' +
+    'function px(v){try{if(!v)return null;var s=String(v);if(/^(data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(s))return null;var u=new URL(s,B||location.href);if(u.protocol!=="http:"&&u.protocol!=="https:")return null;if(u.origin===P&&u.pathname==="/api/proxy")return null;return P+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
+    'function nativeCursor(){return!!(document.pointerLockElement||document.fullscreenElement||document.webkitFullscreenElement)}' +
+    'function sendCursor(e,click){if(nativeCursor())return;try{var r=e.clientX,t=e.clientY,f=window.frameElement;if(f){var b=f.getBoundingClientRect();r+=b.left;t+=b.top}parent.postMessage({source:"neo-browser-cursor",x:r,y:t,click:!!click},"*")}catch(_){}}' +
+    'document.addEventListener("mousemove",function(e){sendCursor(e,false)},{passive:true});' +
+    'document.addEventListener("mousedown",function(e){sendCursor(e,true)},{passive:true});' +
+    'document.addEventListener("pointerlockchange",function(){},false);' +
+    'var oldFetch=window.fetch;window.fetch=function(input,init){try{var raw=typeof input==="string"?input:(input&&input.url)||"";var p=px(raw);if(p){if(typeof Request!=="undefined"&&input instanceof Request)input=new Request(p,input);else input=p;}}catch(_){}return oldFetch.call(this,input,init)};' +
+    'var oldOpen=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(method,url){try{var p=px(url);if(p)arguments[1]=p}catch(_){}return oldOpen.apply(this,arguments)};' +
+    'try{var NativeEventSource=window.EventSource;if(NativeEventSource){window.EventSource=function(url,opts){return new NativeEventSource(px(url)||url,opts)};window.EventSource.prototype=NativeEventSource.prototype}}catch(_){}' +
+    'try{var beacon=navigator.sendBeacon&&navigator.sendBeacon.bind(navigator);if(beacon){navigator.sendBeacon=function(url,data){return beacon(px(url)||url,data)}}}catch(_){}' +
+    'try{var desc=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,"src");if(desc&&desc.set){var os=desc.set,og=desc.get;Object.defineProperty(HTMLIFrameElement.prototype,"src",{configurable:true,get:og,set:function(v){try{var u=new URL(String(v),B||location.href);if(!S&&/^(?:www\\.)?snokido\\.(?:com|fr)$/i.test(u.hostname))v=v;else if(/\/embed\//i.test(u.pathname))v=v;else v=px(v)||v}catch(_){}return os.call(this,v)}})}}catch(_){}' +
+    'document.addEventListener("click",function(e){var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(!a)return;var href=a.getAttribute("href");if(!href||/^(#|javascript:|mailto:|tel:|data:|blob:)/i.test(href))return;var p=px(href);if(!p)return;e.preventDefault();e.stopImmediatePropagation();location.href=p},{capture:true});' +
+    'document.addEventListener("submit",function(e){var form=e.target;if(!form)return;var method=(form.getAttribute("method")||"GET").toUpperCase();if(method!=="GET")return;try{e.preventDefault();e.stopImmediatePropagation();var action=new URL(form.getAttribute("action")||B,B);var data=new URLSearchParams(new FormData(form));for(var pair of data.entries())action.searchParams.set(pair[0],pair[1]);var p=px(action.toString());if(p)location.href=p}catch(_){}},{capture:true});' +
+    'try{var hp=history.pushState;var hr=history.replaceState;history.pushState=function(state,title,url){var p=px(url);return hp.call(this,state,title,p||url)};history.replaceState=function(state,title,url){var p=px(url);return hr.call(this,state,title,p||url)}}catch(_){}' +
+    'try{var d=Object.getOwnPropertyDescriptor(Location.prototype,"href");if(d&&d.set){var os=d.set;Object.defineProperty(Location.prototype,"href",{configurable:true,enumerable:true,get:d.get,set:function(v){return os.call(this,px(v)||v)}})}}catch(_){}' +
+    'try{parent.postMessage({source:"neo-browser-cursor",hello:true},"*")}catch(_){}' +
+    '})();</script>'
+  );
+}
+
+function rewriteHtml(html, base, proxyOrigin) {
+  const snokidoGamePage = isSnokidoGamePage(base);
+
+  html = html.replace(/<base\b[^>]*>/gi, "");
+
+  html = html.replace(/<(img|script|source|video|audio|track|embed|object)\b[^>]*>/gi, (tag) => {
+    let out = tag;
+    for (const attr of ["src", "data-src", "poster", "data"]) {
+      out = rewriteTagAttr(out, attr, base, proxyOrigin);
+    }
+    out = rewriteSrcset(out, base, proxyOrigin);
+    return out;
+  });
+
+  html = html.replace(/<iframe\b[^>]*>/gi, (tag) => {
+    return rewriteTagAttr(tag, "src", base, proxyOrigin, {
+      iframe: true,
+      keepDirect: shouldKeepIframeDirect(
+        (tag.match(/\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i) || [])[1] ||
+        (tag.match(/\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i) || [])[2] ||
+        (tag.match(/\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/i) || [])[3] ||
+        "",
+        base
+      )
+    });
+  });
+
+  html = html.replace(/<link\b[^>]*>/gi, (tag) => {
+    let out = tag;
+    out = rewriteTagAttr(out, "href", base, proxyOrigin);
+    out = rewriteTagAttr(out, "imagesrcset", base, proxyOrigin);
+    return out;
+  });
+
+  html = html.replace(/<a\b[^>]*>/gi, (tag) => rewriteTagAttr(tag, "href", base, proxyOrigin));
+  html = html.replace(/<form\b[^>]*>/gi, (tag) => rewriteTagAttr(tag, "action", base, proxyOrigin));
+
+  html = html.replace(/(<meta\b[^>]*http-equiv\s*=\s*["']refresh["'][^>]*content\s*=\s*["'][^"']*\burl=)([^"' >]+)/gi,
+    (all, prefix, raw) => prefix + rewriteUrl(raw, base, proxyOrigin)
+  );
+
+  html = html.replace(/(\bstyle\s*=\s*)(["'])([^"']*)\2/gi, (all, prefix, quote, css) => {
+    const rewritten = css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (full, q, raw) => {
+      const next = rewriteUrl(raw, base, proxyOrigin);
+      return next === raw ? full : 'url("' + next + '")';
+    });
+    return prefix + quote + rewritten + quote;
+  });
+
+  html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']content-security-policy(?:-report-only)?["'][^>]*>/gi, "");
+  html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']x-frame-options["'][^>]*>/gi, "");
+  html = html.replace(/<meta\b[^>]*name\s*=\s*["']referrer["'][^>]*>/gi, "");
+
+  const bridge = buildBridge(proxyOrigin, base);
+  if (/<head\b[^>]*>/i.test(html)) {
+    html = html.replace(/<head([^>]*)>/i, (match) => match + bridge);
+  } else {
+    html = bridge + html;
+  }
+
+  return html;
+}
+
+async function fetchBody(req) {
+  if (req.method === "GET" || req.method === "HEAD") return undefined;
+  if (req.body !== undefined) {
+    if (Buffer.isBuffer(req.body)) return req.body;
+    if (typeof req.body === "string") return Buffer.from(req.body);
+    if (req.body && typeof req.body === "object") return Buffer.from(JSON.stringify(req.body));
+  }
+
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on("end", () => resolve(chunks.length ? Buffer.concat(chunks) : undefined));
+    req.on("error", reject);
+  });
+}
+
+module.exports = async function proxyHandler(req, res) {
   const raw = req.query && req.query.url;
-  if (!raw || typeof raw !== "string") return res.status(400).send("Missing ?url=");
-  const target = targetUrl(raw);
-  if (!target) return res.status(400).send("Invalid or blocked URL");
+  if (!raw || typeof raw !== "string") {
+    return res.status(400).send("Missing ?url=");
+  }
 
-  const xfProto = (req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
-  const xfHost = (req.headers["x-forwarded-host"] || "").split(",")[0].trim();
+  const target = parseTarget(raw);
+  if (!target) {
+    return res.status(400).send("Invalid or blocked URL");
+  }
+
+  const xfProto = String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  const xfHost = String(req.headers["x-forwarded-host"] || "").split(",")[0].trim();
   const host = xfHost || req.headers.host || "localhost";
   const proto = xfProto || (host.includes("localhost") ? "http" : "https");
   const proxyOrigin = proto + "://" + host;
 
+  const method = String(req.method || "GET").toUpperCase();
+  const body = await fetchBody(req);
+  const incomingReferer = mapReferer(req.headers.referer, proxyOrigin);
+  const incomingOrigin = mapOrigin(req.headers.origin, req.headers.referer, proxyOrigin);
+
+  let current = target;
+  let response = null;
+
   try {
-    let current = target;
-    let r;
-    let usedFallback = false;
-
-    const method = (req.method || "GET").toUpperCase();
-    const hasBody = !["GET", "HEAD"].includes(method);
-    let outgoingBody;
-    let outgoingContentType;
-    if (hasBody) {
-      const ct = req.headers["content-type"] || "";
-      if (req.body && Buffer.isBuffer(req.body)) {
-        outgoingBody = req.body;
-        outgoingContentType = ct || "application/octet-stream";
-      } else if (typeof req.body === "string" && req.body.length) {
-        outgoingBody = req.body;
-        outgoingContentType = ct || "text/plain;charset=UTF-8";
-      } else if (req.body && typeof req.body === "object" && Object.keys(req.body).length) {
-        outgoingBody = JSON.stringify(req.body);
-        outgoingContentType = "application/json";
-      }
-    }
-
-    async function tryFetch(url, useBody) {
+    for (let hop = 0; hop < 8; hop++) {
       const headers = {
         accept: req.headers.accept || "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "accept-language": req.headers["accept-language"] || "en-US,en;q=0.9",
-        "user-agent": req.headers["user-agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        referer: url.origin + "/",
-        "upgrade-insecure-requests": "1",
-        "accept-encoding": "gzip, deflate, br",
+        "user-agent": req.headers["user-agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
       };
-      if (req.headers.cookie) headers.cookie = req.headers.cookie;
+
+      if (incomingReferer) headers.referer = incomingReferer;
+      if (incomingOrigin) headers.origin = incomingOrigin;
       if (req.headers.range) headers.range = req.headers.range;
-      if (useBody && outgoingBody !== undefined) headers["content-type"] = outgoingContentType;
-      return fetch(url.toString(), {
+      if (req.headers["if-range"]) headers["if-range"] = req.headers["if-range"];
+      if (req.headers["if-none-match"]) headers["if-none-match"] = req.headers["if-none-match"];
+      if (req.headers["if-modified-since"]) headers["if-modified-since"] = req.headers["if-modified-since"];
+      if (req.headers.authorization) headers.authorization = req.headers.authorization;
+      if (req.headers["content-type"] && body !== undefined) headers["content-type"] = req.headers["content-type"];
+
+      const targetCookies = cookiesForTarget(req.headers.cookie, current.hostname);
+      if (targetCookies) headers.cookie = targetCookies;
+
+      response = await fetch(current.toString(), {
         method,
         redirect: "manual",
         headers,
-        body: useBody ? outgoingBody : undefined,
-        signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined,
+        body: ["GET", "HEAD"].includes(method) ? undefined : body,
+        signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined
       });
+
+      if (!(response.status >= 300 && response.status < 400)) break;
+
+      const location = response.headers.get("location");
+      if (!location) break;
+
+      const next = parseTarget(location, current);
+      if (!next) return res.status(403).send("Redirect destination is blocked");
+
+      current = next;
     }
 
-    try {
-      for (let i = 0; i < 6; i++) {
-        r = await tryFetch(current, i === 0);
-        if (!(r.status >= 300 && r.status < 400)) break;
-        const loc = r.headers.get("location");
-        if (!loc) break;
-        const next = targetUrl(loc, current);
-        if (!next) return res.status(403).send("Redirect destination is blocked");
-        current = next;
-      }
-    } catch (fetchErr) {
-      if (method !== "GET") throw fetchErr;
-      try {
-        const fb = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()), { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined });
-        if (fb.ok) { r = fb; usedFallback = true; } else throw fetchErr;
-      } catch (_) { throw fetchErr; }
-    }
+    if (!response) return res.status(502).send("Proxy did not receive a response");
 
-    if (method === "GET" && !usedFallback && r && (r.status === 403 || r.status === 503 || r.status === 520 || r.status === 521 || r.status === 522)) {
-      try {
-        const fb = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()), { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined });
-        if (fb.ok) { r = fb; usedFallback = true; }
-      } catch (_) {}
-    }
-
-    const type = usedFallback ? (r.headers.get("content-type") || "text/html; charset=utf-8") : (r.headers.get("content-type") || "");
-    const lowerType = type.toLowerCase();
+    const contentType = response.headers.get("content-type") || "";
+    const lowerType = contentType.toLowerCase();
 
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Referrer-Policy", "unsafe-url");
+    res.setHeader("Permissions-Policy", "fullscreen=*, autoplay=*, gamepad=*, pointer-lock=*");
 
-    const cacheableGet = method === "GET" && !req.headers.cookie;
-    if (lowerType.includes("text/html")) {
-      res.setHeader("Cache-Control", cacheableGet ? "public, max-age=60, stale-while-revalidate=300" : "private, no-cache");
-    } else if (cacheableGet) {
-      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
-    } else {
-      res.setHeader("Cache-Control", "private, no-cache");
+    const noCache = !!req.headers.cookie || method !== "GET";
+    res.setHeader("Cache-Control", noCache ? "private, no-cache" : "public, max-age=60, stale-while-revalidate=300");
+
+    const setCookies = typeof response.headers.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : [];
+    if (setCookies.length) {
+      res.setHeader("Set-Cookie", rewriteSetCookies(setCookies, current.hostname));
     }
 
-    const rawSetCookies = typeof r.headers.getSetCookie === "function" ? r.headers.getSetCookie() : [];
-    if (rawSetCookies.length) {
-      const rewritten = rawSetCookies.map((c) => c.replace(/;\s*domain=[^;]*/i, "").replace(/;\s*samesite=[^;]*/i, "; SameSite=Lax"));
-      res.setHeader("Set-Cookie", rewritten);
-    }
-
-    if (lowerType.includes("text/html") || usedFallback) {
-      const body = await r.arrayBuffer();
-      let html = new TextDecoder("utf-8").decode(body);
-      const query = searchQueryOf(current);
-      if (query) {
-        const results = parseBingResults(html);
-        if (results.length) {
-          res.setHeader("Content-Type", "text/html; charset=utf-8");
-          return res.status(200).send(renderSearchPage(query, results, proxyOrigin));
-        }
-      }
-      const bridge = buildBridge(proxyOrigin, current.toString());
-      html = rewriteLinks(html, current.toString(), proxyOrigin);
-      html = html.replace(/<meta\b[^>]*name\s*=\s*["']referrer["'][^>]*>/gi, "");
-      if (/<head[^>]*>/i.test(html)) html = html.replace(/<head([^>]*)>/i, (m) => m + bridge);
-      else html = bridge + html;
+    if (lowerType.includes("text/html") || lowerType.includes("application/xhtml+xml")) {
+      const bytes = await response.arrayBuffer();
+      let html = new TextDecoder("utf-8").decode(bytes);
+      html = rewriteHtml(html, current.toString(), proxyOrigin);
+      res.status(response.status);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      return res.status(r.status).send(html);
+      return res.send(html);
     }
 
     if (lowerType.includes("text/css")) {
-      const body = await r.arrayBuffer();
-      let css = new TextDecoder("utf-8").decode(body);
-      css = css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (all, q, raw) => {
-        try {
-          const u = new URL(raw.trim(), current.toString());
-          if (u.protocol !== "http:" && u.protocol !== "https:") return all;
-          return "url(\"" + proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString()) + "\")";
-        } catch { return all; }
+      const bytes = await response.arrayBuffer();
+      let css = new TextDecoder("utf-8").decode(bytes);
+      css = css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (all, q, rawUrl) => {
+        const next = rewriteUrl(rawUrl, current.toString(), proxyOrigin);
+        return next === rawUrl ? all : 'url("' + next + '")';
       });
+      res.status(response.status);
       res.setHeader("Content-Type", "text/css; charset=utf-8");
-      return res.status(r.status).send(css);
+      return res.send(css);
     }
 
-    res.setHeader("Content-Type", type || "application/octet-stream");
-    const cr = r.headers.get("content-range");
-    if (cr) res.setHeader("Content-Range", cr);
-    const ar = r.headers.get("accept-ranges");
-    if (ar) res.setHeader("Accept-Ranges", ar);
+    res.setHeader("Content-Type", contentType || "application/octet-stream");
+    for (const [name, source] of [
+      ["Content-Range", "content-range"],
+      ["Accept-Ranges", "accept-ranges"],
+      ["Content-Disposition", "content-disposition"],
+      ["Last-Modified", "last-modified"],
+      ["ETag", "etag"]
+    ]) {
+      const value = response.headers.get(source);
+      if (value) res.setHeader(name, value);
+    }
 
-    if (r.body && typeof Readable.fromWeb === "function") {
-      const stream = Readable.fromWeb(r.body);
-      stream.on("error", (err) => {
-        console.error("Neo proxy stream error:", err);
+    res.status(response.status);
+
+    if (method === "HEAD") return res.end();
+
+    if (response.body && typeof Readable.fromWeb === "function") {
+      const stream = Readable.fromWeb(response.body);
+      stream.on("error", (error) => {
+        console.error("Neo proxy stream error:", error);
         if (!res.headersSent) res.status(502);
         else res.destroy();
       });
       return stream.pipe(res);
     }
 
-    const body = await r.arrayBuffer();
-    return res.status(r.status).send(Buffer.from(body));
-  } catch (e) {
-    console.error(e);
-    const msg = (e && (e.name === "TimeoutError" || e.name === "AbortError")) ? "The site took too long to respond." : "This site could not be loaded through Neo Browser.";
-    const detail = (e && e.message) ? String(e.message).slice(0, 200) : "";
-    const bridge = buildBridge(proxyOrigin, "https://www.bing.com/");
-    const html = "<!DOCTYPE html><html><head><meta charset=utf-8><title>Neo Browser</title>" +
-      "<style>html,body{margin:0;background:#0a0a0b;color:#e7e7ea;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}" +
-      ".box{text-align:center;padding:40px;max-width:420px}.t{font-size:18px;margin:0 0 10px}.s{color:#8a8a93;font-size:14px;margin:0}</style>" +
-      bridge + "</head><body><div class=box><p class=t>" + msg + "</p><p class=s>" + detail.replace(/</g,"") + "</p></div></body></html>";
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    if (e && (e.name === "TimeoutError" || e.name === "AbortError")) return res.status(504).send(html);
-    return res.status(502).send(html);
+    const bytes = await response.arrayBuffer();
+    return res.send(Buffer.from(bytes));
+  } catch (error) {
+    console.error("Neo proxy error:", error);
+    const timeout = error && (error.name === "TimeoutError" || error.name === "AbortError");
+    return res.status(timeout ? 504 : 502).send(
+      timeout
+        ? "The site took too long to respond."
+        : "This site could not be loaded through Neo Browser."
+    );
   }
 };
-
-function buildBridge(proxyOrigin, pageBase) {
-  const O = JSON.stringify(proxyOrigin);
-  const B = JSON.stringify(pageBase);
-  return (
-    '<style id="neo-proxy-cursor-style">html,body,*{cursor:none!important}</style>' +
-    '<script id="neo-proxy-bridge">(function(){' +
-    'if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;' +
-    'var PROXY_ORIGIN=' + O + ';' +
-    'var PAGE_BASE=' + B + ';' +
-    'var SNOKIDO_PAGE=/^(?:https?:\\/\\/)?(?:www\\.)?snokido\\.(?:com|fr)\\/game(?:\\/|$)/i.test(PAGE_BASE);' +
-    'var DIRECT=/snokido\\.com$|kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i;' +
-    'var styleEl=document.getElementById("neo-proxy-cursor-style");' +
-    'function setNative(on){if(styleEl)styleEl.textContent=on?"html,body,*{cursor:auto!important}":"html,body,*{cursor:none!important}"}' +
-    'function gameCursorMode(){return !!(document.pointerLockElement||document.fullscreenElement||document.webkitFullscreenElement)}' +
-    'function syncCursorMode(){setNative(gameCursorMode())}' +
-    'document.addEventListener("pointerlockchange",syncCursorMode);' +
-    'document.addEventListener("fullscreenchange",syncCursorMode);' +
-    'document.addEventListener("webkitfullscreenchange",syncCursorMode);' +
-    'function screenPoint(e){var x=e.clientX,y=e.clientY;try{var f=window.frameElement;if(f){var r=f.getBoundingClientRect();x+=r.left;y+=r.top}}catch(_){}return{x:x,y:y}}' +
-    'function send(e,click){if(gameCursorMode())return;var p=screenPoint(e);try{parent.postMessage({source:"neo-browser-cursor",x:p.x,y:p.y,click:!!click},"*")}catch(_){}}' +
-    'document.addEventListener("mousemove",function(e){send(e,false)},{passive:true});' +
-    'document.addEventListener("mousedown",function(e){send(e,true)},{passive:true});' +
-    'document.addEventListener("mouseleave",function(){try{parent.postMessage({source:"neo-browser-cursor",leave:true},"*")}catch(_){}},{passive:true});' +
-    'window.addEventListener("message",function(e){var d=e&&e.data;if(!d||d.source!=="neo-browser-shell")return;if("nativeCursor" in d)setNative(!!d.nativeCursor||gameCursorMode())},{passive:true});' +
-    'try{parent.postMessage({source:"neo-browser-cursor",hello:true},"*")}catch(_){}' +
-    'syncCursorMode();' +
-    'function toProxy(url){try{if(!url)return null;var s=String(url);if(/^(data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(s))return null;var u=new URL(s,PAGE_BASE||location.href);if(u.protocol!=="http:"&&u.protocol!=="https:")return null;if(u.origin===PROXY_ORIGIN&&u.pathname==="/api/proxy")return null;var h=u.hostname;if(SNOKIDO_PAGE&&/^(?:www\\.)?snokido\\.(?:com|fr)$/i.test(h))return null;if(!SNOKIDO_PAGE&&/kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i.test(h))return null;return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
-    'function shouldProxyIframe(url){try{var u=new URL(String(url),PAGE_BASE||location.href);if(u.origin===PROXY_ORIGIN&&u.pathname==="/api/proxy")return false;if(SNOKIDO_PAGE)return false;if(DIRECT.test(u.hostname))return false;if(/snokido\\.com$/i.test(u.hostname)&&u.pathname.indexOf("/game/")===0)return false;if(u.pathname.indexOf("/embed/")!==-1)return false;return true}catch(e){return true}}' +
-    'var _f=window.fetch;window.fetch=function(input,init){try{var url=typeof input==="string"?input:(input&&input.url)||"";var p=toProxy(url);if(p){if(typeof input==="string")input=p;else if(typeof input==="object")input=Object.assign({},input,{url:p})}}catch(e){}return _f.apply(this,arguments)};' +
-    'var XO=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,url){try{var p=toProxy(url);if(p)arguments[1]=p;}catch(e){}return XO.apply(this,arguments);};' +
-    'try{var desc=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,"src");if(desc&&desc.set){var os=desc.set,og=desc.get;Object.defineProperty(HTMLIFrameElement.prototype,"src",{configurable:true,get:function(){return og.call(this)},set:function(v){try{if(shouldProxyIframe(v))v=toProxy(v)||v}catch(e){}return os.call(this,v)}})}}catch(e){}' +
-    'function nav(href){var p=toProxy(href);if(p){location.href=p;return true}return false}' +
-    'document.addEventListener("click",function(e){var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(!a)return;var href=a.getAttribute("href");if(!href||href.charAt(0)==="#"||/^(javascript|mailto|tel|data|blob):/i.test(href))return;e.preventDefault();nav(href)},{capture:true});' +
-    'document.addEventListener("submit",function(e){var form=e.target;if(!form)return;e.preventDefault();try{var action=form.getAttribute("action")||PAGE_BASE;var method=(form.getAttribute("method")||"GET").toUpperCase();if(method==="GET"){var u=new URL(action,PAGE_BASE||location.href);if(form.elements.length)u.search=new URLSearchParams(new FormData(form)).toString();var p=toProxy(u.toString());if(p){location.href=p;return}}else{var fd=new FormData(form);var req=new XMLHttpRequest();req.open(method,action);req.send(fd)}}catch(e){}},{capture:true});' +
-    'function rewriteHistoryUrl(url){if(url==null||url==="")return null;try{var s=String(url);if(s.indexOf("/api/proxy?url=")!==-1)return null;if(s.charAt(0)==="#")return null;var u=new URL(s,PAGE_BASE||location.href);return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
-    'try{var _push=history.pushState.bind(history);var _repl=history.replaceState.bind(history);history.pushState=function(state,title,url){if(url!=null){var p=rewriteHistoryUrl(url);if(p){arguments[2]=p}}return _push.apply(this,arguments)};history.replaceState=function(state,title,url){if(url!=null){var p=rewriteHistoryUrl(url);if(p){arguments[2]=p}}return _repl.apply(this,arguments)}}catch(e){}' +
-    'try{var srcDesc=Object.getOwnPropertyDescriptor(Location.prototype,"href");if(srcDesc&&srcDesc.set){var origSet=srcDesc.set;Object.defineProperty(Location.prototype,"href",{configurable:true,enumerable:true,set:function(v){if(typeof v==="string"&&v){var proxyUrl=toProxy(v);if(proxyUrl){return origSet.call(this,proxyUrl)}}return origSet.call(this,v)}})}}catch(e){}' +
-    '})();</script>'
-  );
-}
-
-function rewriteLinks(html, base, proxyOrigin) {
-  let snokidoPage = /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) && /^\/game(?:\/|$)/i.test(bu.pathname);
-  try {
-    const bu = new URL(base);
-    snokidoPage = /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) && /^\/game(?:\/|$)/i.test(bu.pathname);
-  } catch {}
-
-  const prox = (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
-  function rewriteAttr(tag, attr, force) {
-    const re = new RegExp("(" + attr + "\\s*=\\s*[\"'])([^\"']+)([\"'])", "i");
-    return tag.replace(re, (all, a, raw, b) => {
-      if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(raw)) return all;
-      try {
-        const u = new URL(raw, base);
-        if (u.protocol !== "http:" && u.protocol !== "https:") return all;
-        const h = u.hostname;
-        if (!force && /kbhgames\.com$|wgplayer\.com$|crazygames\.com$|poki\.com$|y8\.com$|itch\.io$/i.test(h)) return all;
-        if (!force && u.pathname.indexOf("/embed/") !== -1) return all;
-        return a + prox(u) + b;
-      } catch {
-        return all;
-      }
-    });
-  }
-  html = html.replace(new RegExp("<(img|script|source|video|audio|track|embed|object)\\b[^>]*>", "gi"), (tag) => {
-    let out = tag;
-    for (const a of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, a);
-    return out;
-  });
-  html = html.replace(new RegExp("<iframe\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "src", snokidoPage));
-  html = html.replace(new RegExp("<link\\b[^>]*>", "gi"), (tag) => {
-    const relM = tag.match(new RegExp("\\brel\\s*=\\s*[\"']([^\"']+)[\"']", "i"));
-    const rel = ((relM && relM[1]) || "").toLowerCase();
-    if (!/(stylesheet|icon|preload|modulepreload)/.test(rel)) return tag;
-    return rewriteAttr(tag, "href");
-  });
-  html = html.replace(new RegExp("<a\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "href"));
-  html = html.replace(new RegExp("<form\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "action"));
-  html = html.replace(new RegExp("<meta\\b[^>]*http-equiv\\s*=\\s*[\"']content-security-policy[\"'][^>]*>", "gi"), "");
-  html = html.replace(new RegExp("<meta\\b[^>]*http-equiv\\s*=\\s*[\"']x-frame-options[\"'][^>]*>", "gi"), "");
-  return html;
-}
