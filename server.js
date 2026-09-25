@@ -50,10 +50,16 @@ function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
     if (err) return next(err);
-    const scripts = '<script src="/browser-freeze-fix.js?v=3"></script><script src="/browser-enhancer.js?v=7"></script><script src="/explore-card-override.js?v=52"></script>';
-    const injected = html.includes('/explore-card-override.js')
-      ? html.replace(/<script[^>]+explore-card-override\.js[^>]*><\/script>/gi, '<script src="/explore-card-override.js?v=52"></script>')
-      : html.replace(/<\/body>/i, scripts + '</body>');
+    let injected = html;
+    if (!injected.includes('browser-freeze-fix.js')) {
+      injected = injected.replace(/<\/body>/i, '<script src="/browser-freeze-fix.js?v=3"></script></body>');
+    }
+    if (!injected.includes('browser-enhancer.js')) {
+      injected = injected.replace(/<\/body>/i, '<script src="/browser-enhancer.js?v=7"></script></body>');
+    }
+    if (injected.includes('/explore-card-override.js')) {
+      injected = injected.replace(/<script[^>]+explore-card-override\.js[^>]*><\/script>/gi, '<script src="/explore-card-override.js?v=52"></script>');
+    }
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     return res.type("html").send(injected);
   });
