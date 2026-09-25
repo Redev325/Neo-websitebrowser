@@ -342,6 +342,23 @@
       tabStrip = null;
       return;
     }
+
+    // A direct /api/proxy URL is redirected to /Browser?url=... by the
+    // server. Consume that target and render it inside the Browser iframe.
+    if (!window.__neoBrowserInitialUrlHandled) {
+      window.__neoBrowserInitialUrlHandled = true;
+      try {
+        var initialParam = new URL(location.href).searchParams.get('url');
+        if (initialParam) {
+          var initialUrl = decodeURIComponent(initialParam);
+          setTimeout(function () { navigate(initialUrl); }, 0);
+          try {
+            history.replaceState({}, '', '/Browser');
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
     injectStyles();
     frame = findFrame();
     address = findAddress();
