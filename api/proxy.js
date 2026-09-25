@@ -33,121 +33,6 @@ function makeProx(proxyOrigin) {
   return (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
 }
 
-function cookiePrefix(hostname) {
-  const key = Buffer.from(hostname.toLowerCase()).toString("base64url").replace(/[^A-Za-z0-9_-]/g, "_");
-  return "neo_" + key + "_";
-}
-
-function filterProxyCookies(cookieHeader, targetHostname) {
-  if (!cookieHeader) return "";
-  const prefix = cookiePrefix(targetHostname);
-  return String(cookieHeader)
-    .split(";")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const eq = part.indexOf("=");
-      if (eq === -1) return null;
-      const name = part.slice(0, eq).trim();
-      const value = part.slice(eq + 1);
-      return name.startsWith(prefix) ? name.slice(prefix.length) + "=" + value : null;
-    })
-    .filter(Boolean)
-    .join("; ");
-}
-
-function rewriteProxySetCookies(setCookies, targetHostname) {
-  const prefix = cookiePrefix(targetHostname);
-  return setCookies.map((cookie) => {
-    const parts = String(cookie).split(";");
-    if (!parts.length) return cookie;
-    const firstEq = parts[0].indexOf("=");
-    if (firstEq === -1) return cookie;
-    const name = parts[0].slice(0, firstEq).trim();
-    const value = parts[0].slice(firstEq + 1);
-    parts[0] = prefix + name + "=" + value;
-    let hadPath = false;
-    const attrs = [];
-    for (let i = 1; i < parts.length; i++) {
-      const attr = parts[i].trim();
-      if (/^domain=/i.test(attr)) continue;
-      if (/^path=/i.test(attr)) {
-        attrs.push("Path=/api/proxy");
-        hadPath = true;
-        continue;
-      }
-      if (/^samesite=/i.test(attr)) {
-        attrs.push("SameSite=Lax");
-        continue;
-      }
-      attrs.push(attr);
-    }
-    if (!hadPath) attrs.push("Path=/api/proxy");
-    return parts[0] + (attrs.length ? "; " + attrs.join("; ") : "");
-  });
-}
-
-function mappedProxyReferer(referer, proxyOrigin) {
-  const raw = String(referer || "");
-  if (!raw) return "";
-  try {
-    const u = new URL(raw);
-    if (u.origin !== proxyOrigin || u.pathname !== "/api/proxy") return raw;
-    const target = u.searchParams.get("url");
-    return target ? new URL(target).toString() : "";
-  } catch {
-    return "";
-  }
-}
-
-function mappedProxyOrigin(origin, referer, proxyOrigin) {
-  const raw = String(origin || "");
-  if (!raw) return "";
-  try {
-    const o = new URL(raw);
-    if (o.origin !== proxyOrigin) return raw;
-    const mappedRef = mappedProxyReferer(referer, proxyOrigin);
-    return mappedRef ? new URL(mappedRef).origin : "";
-  } catch {
-    return "";
-  }
-}
-
-function readIncomingBody(req, parsedBody) {
-  if (parsedBody !== undefined) {
-    if (Buffer.isBuffer(parsedBody)) return Promise.resolve(parsedBody);
-    if (typeof parsedBody === "string") return Promise.resolve(Buffer.from(parsedBody));
-    if (parsedBody && typeof parsedBody === "object") return Promise.resolve(Buffer.from(JSON.stringify(parsedBody)));
-    return Promise.resolve(undefined);
-  }
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let total = 0;
-    const limit = 32 * 1024 * 1024;
-    req.on("data", (chunk) => {
-      total += chunk.length;
-      if (total > limit) {
-        reject(new Error("Request body is too large."));
-        req.destroy();
-        return;
-      }
-      chunks.push(Buffer.from(chunk));
-    });
-    req.on("end", () => resolve(chunks.length ? Buffer.concat(chunks) : undefined));
-    req.on("error", reject);
-  });
-}
-
-function isHtmlType(type) {
-  const t = String(type || "").toLowerCase();
-  return t.includes("text/html") || t.includes("application/xhtml+xml");
-}
-
-function isJsType(type) {
-  const t = String(type || "").toLowerCase();
-  return t.includes("javascript") || t.includes("ecmascript");
-}
-
 function searchQueryOf(u) {
   const host = u.hostname.toLowerCase();
   const isBing = host === "www.bing.com" || host === "bing.com";
@@ -293,69 +178,83 @@ module.exports = async function handler(req, res) {
   try {
     let current = target;
     let r;
-    let currentMethod = (req.method || "GET").toUpperCase();
-    const hasInitialBody = !["GET", "HEAD"].includes(currentMethod);
-    const outgoingBody = hasInitialBody ? await readIncomingBody(req, req.body) : undefined;
-    const proxyRequestOrigin = (xfProto || (host.includes("localhost") ? "http" : "https")) + "://" + host;
-    const incomingReferer = mappedProxyReferer(req.headers.referer, proxyRequestOrigin);
-    const incomingOrigin = mappedProxyOrigin(req.headers.origin, req.headers.referer, proxyRequestOrigin);
+    let usedFallback = false;
 
-    async function tryFetch(url, body) {
+    const method = (req.method || "GET").toUpperCase();
+    const hasBody = !["GET", "HEAD"].includes(method);
+    let outgoingBody;
+    let outgoingContentType;
+    if (hasBody) {
+      const ct = req.headers["content-type"] || "";
+      if (req.body && Buffer.isBuffer(req.body)) {
+        outgoingBody = req.body;
+        outgoingContentType = ct || "application/octet-stream";
+      } else if (typeof req.body === "string" && req.body.length) {
+        outgoingBody = req.body;
+        outgoingContentType = ct || "text/plain;charset=UTF-8";
+      } else if (req.body && typeof req.body === "object" && Object.keys(req.body).length) {
+        outgoingBody = JSON.stringify(req.body);
+        outgoingContentType = "application/json";
+      }
+    }
+
+    async function tryFetch(url, useBody) {
       const headers = {
-        accept: req.headers.accept || "*/*",
+        accept: req.headers.accept || "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "accept-language": req.headers["accept-language"] || "en-US,en;q=0.9",
         "user-agent": req.headers["user-agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        referer: url.origin + "/",
+        "upgrade-insecure-requests": "1",
+        "accept-encoding": "gzip, deflate, br",
       };
-      if (incomingReferer) headers.referer = incomingReferer;
-      if (incomingOrigin) headers.origin = incomingOrigin;
-      if (req.headers["upgrade-insecure-requests"]) headers["upgrade-insecure-requests"] = req.headers["upgrade-insecure-requests"];
+      if (req.headers.cookie) headers.cookie = req.headers.cookie;
       if (req.headers.range) headers.range = req.headers.range;
-      if (req.headers["if-range"]) headers["if-range"] = req.headers["if-range"];
-      if (req.headers["if-none-match"]) headers["if-none-match"] = req.headers["if-none-match"];
-      if (req.headers["if-modified-since"]) headers["if-modified-since"] = req.headers["if-modified-since"];
-      if (req.headers.authorization) headers.authorization = req.headers.authorization;
-      if (req.headers["x-requested-with"]) headers["x-requested-with"] = req.headers["x-requested-with"];
-      if (req.headers["sec-ch-ua"]) headers["sec-ch-ua"] = req.headers["sec-ch-ua"];
-      if (req.headers["sec-ch-ua-mobile"]) headers["sec-ch-ua-mobile"] = req.headers["sec-ch-ua-mobile"];
-      if (req.headers["sec-ch-ua-platform"]) headers["sec-ch-ua-platform"] = req.headers["sec-ch-ua-platform"];
-      if (req.headers["content-type"] && body !== undefined) headers["content-type"] = req.headers["content-type"];
-      const targetCookies = filterProxyCookies(req.headers.cookie, url.hostname);
-      if (targetCookies) headers.cookie = targetCookies;
+      if (useBody && outgoingBody !== undefined) headers["content-type"] = outgoingContentType;
       return fetch(url.toString(), {
-        method: currentMethod,
+        method,
         redirect: "manual",
         headers,
-        body,
+        body: useBody ? outgoingBody : undefined,
         signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined,
       });
     }
 
     try {
-      for (let i = 0; i < 8; i++) {
-        const bodyForThisHop = ["GET", "HEAD"].includes(currentMethod) ? undefined : outgoingBody;
-        r = await tryFetch(current, bodyForThisHop);
+      for (let i = 0; i < 6; i++) {
+        r = await tryFetch(current, i === 0);
         if (!(r.status >= 300 && r.status < 400)) break;
         const loc = r.headers.get("location");
         if (!loc) break;
         const next = targetUrl(loc, current);
         if (!next) return res.status(403).send("Redirect destination is blocked");
-        if (r.status === 303 || ((r.status === 301 || r.status === 302) && currentMethod === "POST")) {
-          currentMethod = "GET";
-        }
         current = next;
       }
+    } catch (fetchErr) {
+      if (method !== "GET") throw fetchErr;
+      try {
+        const fb = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()), { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined });
+        if (fb.ok) { r = fb; usedFallback = true; } else throw fetchErr;
+      } catch (_) { throw fetchErr; }
     }
 
-    const type = r.headers.get("content-type") || "";
+    if (method === "GET" && !usedFallback && r && (r.status === 403 || r.status === 503 || r.status === 520 || r.status === 521 || r.status === 522)) {
+      try {
+        const fb = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(current.toString()), { signal: AbortSignal.timeout ? AbortSignal.timeout(45000) : undefined });
+        if (fb.ok) { r = fb; usedFallback = true; }
+      } catch (_) {}
+    }
+
+    const type = usedFallback ? (r.headers.get("content-type") || "text/html; charset=utf-8") : (r.headers.get("content-type") || "");
     const lowerType = type.toLowerCase();
 
     res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Referrer-Policy", "unsafe-url");
-    res.setHeader("Permissions-Policy", "fullscreen=*, autoplay=*, gamepad=*, pointer-lock=*");
 
-    const cacheableGet = currentMethod === "GET" && !req.headers.cookie;
-    if (isHtmlType(type)) {
+    const cacheableGet = method === "GET" && !req.headers.cookie;
+    if (lowerType.includes("text/html")) {
       res.setHeader("Cache-Control", cacheableGet ? "public, max-age=60, stale-while-revalidate=300" : "private, no-cache");
     } else if (cacheableGet) {
       res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
@@ -365,10 +264,11 @@ module.exports = async function handler(req, res) {
 
     const rawSetCookies = typeof r.headers.getSetCookie === "function" ? r.headers.getSetCookie() : [];
     if (rawSetCookies.length) {
-      res.setHeader("Set-Cookie", rewriteProxySetCookies(rawSetCookies, current.hostname));
+      const rewritten = rawSetCookies.map((c) => c.replace(/;\s*domain=[^;]*/i, "").replace(/;\s*samesite=[^;]*/i, "; SameSite=Lax"));
+      res.setHeader("Set-Cookie", rewritten);
     }
 
-    if (isHtmlType(type)) {
+    if (lowerType.includes("text/html") || usedFallback) {
       const body = await r.arrayBuffer();
       let html = new TextDecoder("utf-8").decode(body);
       const query = searchQueryOf(current);
@@ -382,37 +282,10 @@ module.exports = async function handler(req, res) {
       const bridge = buildBridge(proxyOrigin, current.toString());
       html = rewriteLinks(html, current.toString(), proxyOrigin);
       html = html.replace(/<meta\b[^>]*name\s*=\s*["']referrer["'][^>]*>/gi, "");
-      html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']content-security-policy(?:-report-only)?["'][^>]*>/gi, "");
-      html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']x-frame-options["'][^>]*>/gi, "");
-      const baseTag = '<base href="' + escapeHtml(current.toString()) + '">';
-      if (/<base\b/i.test(html)) html = html.replace(/<base\b[^>]*>/i, baseTag);
-      else if (/<head[^>]*>/i.test(html)) html = html.replace(/<head([^>]*)>/i, (m) => m + baseTag + bridge);
-      else html = baseTag + bridge + html;
+      if (/<head[^>]*>/i.test(html)) html = html.replace(/<head([^>]*)>/i, (m) => m + bridge);
+      else html = bridge + html;
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(r.status).send(html);
-    }
-
-    if (isJsType(type)) {
-      const body = await r.arrayBuffer();
-      let js = new TextDecoder("utf-8").decode(body);
-      const prox = makeProx(proxyOrigin);
-      const rewriteJsUrl = (raw) => {
-        if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(raw)) return raw;
-        try {
-          const u = new URL(raw, current.toString());
-          if (u.protocol !== "http:" && u.protocol !== "https:") return raw;
-          return prox(u);
-        } catch {
-          return raw;
-        }
-      };
-      js = js
-        .replace(/(\bfrom\s*["'])([^"']+)(["'])/g, (all, a, raw, b) => a + rewriteJsUrl(raw) + b)
-        .replace(/(\bimport\s*\(\s*["'])([^"']+)(["']\s*\))/g, (all, a, raw, b) => a + rewriteJsUrl(raw) + b)
-        .replace(/(\b(?:new\s+Worker|new\s+SharedWorker)\s*\(\s*["'])([^"']+)(["'])/g, (all, a, raw, b) => a + rewriteJsUrl(raw) + b)
-        .replace(/(new\s+URL\s*\(\s*["'])([^"']+)(["']\s*,\s*import\.meta\.url\s*\))/g, (all, a, raw, b) => a + rewriteJsUrl(raw) + b);
-      res.setHeader("Content-Type", type || "application/javascript; charset=utf-8");
-      return res.status(r.status).send(js);
     }
 
     if (lowerType.includes("text/css")) {
@@ -430,20 +303,12 @@ module.exports = async function handler(req, res) {
     }
 
     res.setHeader("Content-Type", type || "application/octet-stream");
-    for (const [name, header] of [
-      ["Content-Range", "content-range"],
-      ["Accept-Ranges", "accept-ranges"],
-      ["Content-Disposition", "content-disposition"],
-      ["Content-Language", "content-language"],
-      ["Last-Modified", "last-modified"],
-      ["ETag", "etag"]
-    ]) {
-      const value = r.headers.get(header);
-      if (value) res.setHeader(name, value);
-    }
-    res.status(r.status);
+    const cr = r.headers.get("content-range");
+    if (cr) res.setHeader("Content-Range", cr);
+    const ar = r.headers.get("accept-ranges");
+    if (ar) res.setHeader("Accept-Ranges", ar);
 
-    if (r.body && typeof Readable.fromWeb === "function" && currentMethod !== "HEAD") {
+    if (r.body && typeof Readable.fromWeb === "function") {
       const stream = Readable.fromWeb(r.body);
       stream.on("error", (err) => {
         console.error("Neo proxy stream error:", err);
@@ -453,9 +318,8 @@ module.exports = async function handler(req, res) {
       return stream.pipe(res);
     }
 
-    if (currentMethod === "HEAD") return res.end();
     const body = await r.arrayBuffer();
-    return res.send(Buffer.from(body));
+    return res.status(r.status).send(Buffer.from(body));
   } catch (e) {
     console.error(e);
     const msg = (e && (e.name === "TimeoutError" || e.name === "AbortError")) ? "The site took too long to respond." : "This site could not be loaded through Neo Browser.";
@@ -499,10 +363,8 @@ function buildBridge(proxyOrigin, pageBase) {
     'syncCursorMode();' +
     'function toProxy(url){try{if(!url)return null;var s=String(url);if(/^(data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(s))return null;var u=new URL(s,PAGE_BASE||location.href);if(u.protocol!=="http:"&&u.protocol!=="https:")return null;if(u.origin===PROXY_ORIGIN&&u.pathname==="/api/proxy")return null;var h=u.hostname;if(SNOKIDO_PAGE&&/^(?:www\\.)?snokido\\.(?:com|fr)$/i.test(h))return null;if(!SNOKIDO_PAGE&&/kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i.test(h))return null;return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
     'function shouldProxyIframe(url){try{var u=new URL(String(url),PAGE_BASE||location.href);if(u.origin===PROXY_ORIGIN&&u.pathname==="/api/proxy")return false;if(SNOKIDO_PAGE)return false;if(DIRECT.test(u.hostname))return false;if(/snokido\\.com$/i.test(u.hostname)&&u.pathname.indexOf("/game/")===0)return false;if(u.pathname.indexOf("/embed/")!==-1)return false;return true}catch(e){return true}}' +
-    'var _f=window.fetch;window.fetch=function(input,init){try{var raw=typeof input==="string"?input:(input&&input.url)||String(input||"");var p=toProxy(raw);if(p){if(typeof Request!=="undefined"&&input instanceof Request){input=new Request(p,input)}else{input=p}}}catch(e){}return _f.call(this,input,init)};' +
+    'var _f=window.fetch;window.fetch=function(input,init){try{var url=typeof input==="string"?input:(input&&input.url)||"";var p=toProxy(url);if(p){if(typeof input==="string")input=p;else if(typeof input==="object")input=Object.assign({},input,{url:p})}}catch(e){}return _f.apply(this,arguments)};' +
     'var XO=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,url){try{var p=toProxy(url);if(p)arguments[1]=p;}catch(e){}return XO.apply(this,arguments);};' +
-    'try{if(window.EventSource){var NativeEventSource=window.EventSource;window.EventSource=function(url,opts){var p=toProxy(url)||url;return new NativeEventSource(p,opts)};window.EventSource.prototype=NativeEventSource.prototype;}}catch(e){}' +
-    'try{if(navigator.sendBeacon){var nativeBeacon=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(url,data){var p=toProxy(url);return nativeBeacon(p||url,data)}}catch(e){}' +
     'try{var desc=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,"src");if(desc&&desc.set){var os=desc.set,og=desc.get;Object.defineProperty(HTMLIFrameElement.prototype,"src",{configurable:true,get:function(){return og.call(this)},set:function(v){try{if(shouldProxyIframe(v))v=toProxy(v)||v}catch(e){}return os.call(this,v)}})}}catch(e){}' +
     'function nav(href){var p=toProxy(href);if(p){location.href=p;return true}return false}' +
     'document.addEventListener("click",function(e){var a=e.target&&e.target.closest?e.target.closest("a[href]"):null;if(!a)return;var href=a.getAttribute("href");if(!href||href.charAt(0)==="#"||/^(javascript|mailto|tel|data|blob):/i.test(href))return;e.preventDefault();nav(href)},{capture:true});' +
@@ -515,100 +377,46 @@ function buildBridge(proxyOrigin, pageBase) {
 }
 
 function rewriteLinks(html, base, proxyOrigin) {
-  let bu;
-  try { bu = new URL(base); } catch { bu = null; }
-  const snokidoPage = !!(bu &&
-    /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) &&
-    /^\/game(?:\/|$)/i.test(bu.pathname));
+  let snokidoPage = false;
+  try {
+    const bu = new URL(base);
+    snokidoPage =
+      /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) &&
+      /^\/game(?:\/|$)/i.test(bu.pathname);
+  } catch {}
 
   const prox = (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
-
-  function isDirectGameHost(hostname) {
-    return /(?:snokido\.com|kbhgames\.com|wgplayer\.com|crazygames\.com|poki\.com|y8\.com|itch\.io)$/i.test(hostname);
-  }
-
-  function shouldKeepIframeDirect(u) {
-    if (!u) return false;
-    if (snokidoPage) return true;
-    if (isDirectGameHost(u.hostname)) return true;
-    return /\/embed\//i.test(u.pathname);
-  }
-
-  function rewriteRawUrl(raw) {
-    if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(raw.trim())) return raw;
-    try {
-      const u = new URL(raw.trim(), base);
-      if (u.protocol !== "http:" && u.protocol !== "https:") return raw;
-      return prox(u);
-    } catch {
-      return raw;
-    }
-  }
-
-  function rewriteAttr(tag, attr, kind) {
-    const re = new RegExp("(" + attr + "\\s*=\\s*)(?:\"([^\"]+)\"|'([^']+)'|([^\\s>]+))", "i");
-    return tag.replace(re, (all, prefix, doubleQuoted, singleQuoted, bare) => {
-      const raw = doubleQuoted !== undefined ? doubleQuoted : singleQuoted !== undefined ? singleQuoted : bare;
-      if (!raw) return all;
+  function rewriteAttr(tag, attr, force) {
+    const re = new RegExp("(" + attr + "\\s*=\\s*[\"'])([^\"']+)([\"'])", "i");
+    return tag.replace(re, (all, a, raw, b) => {
+      if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(raw)) return all;
       try {
         const u = new URL(raw, base);
         if (u.protocol !== "http:" && u.protocol !== "https:") return all;
-        if (kind === "iframe" && shouldKeepIframeDirect(u)) return all;
-        const replacement = prox(u);
-        if (doubleQuoted !== undefined) return prefix + "\"" + replacement + "\"";
-        if (singleQuoted !== undefined) return prefix + "'" + replacement + "'";
-        return prefix + replacement;
+        const h = u.hostname;
+        if (!force && /kbhgames\.com$|wgplayer\.com$|crazygames\.com$|poki\.com$|y8\.com$|itch\.io$/i.test(h)) return all;
+        if (!force && u.pathname.indexOf("/embed/") !== -1) return all;
+        return a + prox(u) + b;
       } catch {
         return all;
       }
     });
   }
-
-  function rewriteSrcset(tag) {
-    const re = /(<img\b[^>]*\bsrcset\s*=\s*)(?:\"([^\"]+)\"|'([^']+)')/i;
-    return tag.replace(re, (all, prefix, dq, sq) => {
-      const raw = dq !== undefined ? dq : sq;
-      const rewritten = raw.split(",").map((part) => {
-        const bits = part.trim().split(/\s+/);
-        if (!bits[0] || /^data:/i.test(bits[0])) return part;
-        const url = rewriteRawUrl(bits[0]);
-        return bits.length > 1 ? url + " " + bits.slice(1).join(" ") : url;
-      }).join(", ");
-      return prefix + (dq !== undefined ? "\"" + rewritten + "\"" : "'" + rewritten + "'");
-    });
-  }
-
-  html = html.replace(/<(img|script|source|video|audio|track|embed|object)\b[^>]*>/gi, (tag) => {
+  html = html.replace(new RegExp("<(img|script|source|video|audio|track|embed|object)\\b[^>]*>", "gi"), (tag) => {
     let out = tag;
-    for (const attr of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, attr, "asset");
+    for (const a of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, a);
     return out;
   });
-
-  html = html.replace(/<iframe\b[^>]*>/gi, (tag) => rewriteAttr(tag, "src", "iframe"));
-  html = html.replace(/<link\b[^>]*>/gi, (tag) => {
-    let out = tag;
-    for (const attr of ["href", "imagesrcset"]) out = rewriteAttr(out, attr, "link");
-    return out;
+  html = html.replace(new RegExp("<iframe\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "src", snokidoPage));
+  html = html.replace(new RegExp("<link\\b[^>]*>", "gi"), (tag) => {
+    const relM = tag.match(new RegExp("\\brel\\s*=\\s*[\"']([^\"']+)[\"']", "i"));
+    const rel = ((relM && relM[1]) || "").toLowerCase();
+    if (!/(stylesheet|icon|preload|modulepreload)/.test(rel)) return tag;
+    return rewriteAttr(tag, "href");
   });
-  html = html.replace(/<a\b[^>]*>/gi, (tag) => rewriteAttr(tag, "href", "link"));
-  html = html.replace(/<form\b[^>]*>/gi, (tag) => rewriteAttr(tag, "action", "form"));
-  html = html.replace(/<img\b[^>]*>/gi, rewriteSrcset);
-
-  // Rewrite common absolute/relative refresh redirects and inline style URLs.
-  html = html.replace(/(<meta\b[^>]*http-equiv\s*=\s*["']refresh["'][^>]*content\s*=\s*["'][^"']*\burl=)([^"' >]+)/gi,
-    (all, prefix, raw) => prefix + rewriteRawUrl(raw));
-
-  html = html.replace(/(\bstyle\s*=\s*)(["'])([^"']*)\2/gi, (all, prefix, quote, css) => {
-    const rewritten = css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (full, q, raw) => {
-      const next = rewriteRawUrl(raw);
-      return next !== raw ? 'url("' + next + '")' : full;
-    });
-    return prefix + quote + rewritten + quote;
-  });
-
-  html = html.replace(/<base\b[^>]*>/gi, "");
-  html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']content-security-policy(?:-report-only)?["'][^>]*>/gi, "");
-  html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']x-frame-options["'][^>]*>/gi, "");
-
+  html = html.replace(new RegExp("<a\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "href"));
+  html = html.replace(new RegExp("<form\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "action"));
+  html = html.replace(new RegExp("<meta\\b[^>]*http-equiv\\s*=\\s*[\"']content-security-policy[\"'][^>]*>", "gi"), "");
+  html = html.replace(new RegExp("<meta\\b[^>]*http-equiv\\s*=\\s*[\"']x-frame-options[\"'][^>]*>", "gi"), "");
   return html;
 }
