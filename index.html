@@ -181,6 +181,4 @@
   <script>
     (function(){function fsActive(){return!!(document.fullscreenElement||document.webkitFullscreenElement);}function broadcast(state){var frames=document.querySelectorAll('iframe');for(var i=0;i<frames.length;i++){try{frames[i].contentWindow.postMessage({source:'neo-browser-shell',nativeCursor:state},'*');}catch(e){}}}function sync(){var fs=fsActive();document.documentElement.classList.toggle('neo-native-cursor',fs);broadcast(fs);}document.addEventListener('fullscreenchange',sync);document.addEventListener('webkitfullscreenchange',sync);window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-cursor'||!d.hello)return;try{e.source.postMessage({source:'neo-browser-shell',nativeCursor:fsActive()},'*');}catch(err){}});})();
   </script>
-  <script src="browser-freeze-fix.js?v=3"></script>
-  <script src="browser-enhancer.js?v=9"></script>
 </body></html>
