@@ -1,3 +1,5 @@
+const { Readable } = require("stream");
+
 const BLOCKED_HOSTS = new Set([
   "localhost", "127.0.0.1", "0.0.0.0", "::1",
   "169.254.169.254", "metadata.google.internal"
@@ -203,7 +205,7 @@ module.exports = async function handler(req, res) {
         "user-agent": req.headers["user-agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         referer: url.origin + "/",
         "upgrade-insecure-requests": "1",
-        "accept-encoding": "identity",
+        "accept-encoding": "gzip, deflate, br",
       };
       if (req.headers.cookie) headers.cookie = req.headers.cookie;
       if (req.headers.range) headers.range = req.headers.range;
@@ -243,14 +245,22 @@ module.exports = async function handler(req, res) {
     }
 
     const type = usedFallback ? (r.headers.get("content-type") || "text/html; charset=utf-8") : (r.headers.get("content-type") || "");
-    const body = await r.arrayBuffer();
+    const lowerType = type.toLowerCase();
 
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    res.setHeader("Cache-Control", "no-store");
     res.setHeader("Referrer-Policy", "unsafe-url");
+
+    const cacheableGet = method === "GET" && !req.headers.cookie;
+    if (lowerType.includes("text/html")) {
+      res.setHeader("Cache-Control", cacheableGet ? "public, max-age=60, stale-while-revalidate=300" : "private, no-cache");
+    } else if (cacheableGet) {
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+    } else {
+      res.setHeader("Cache-Control", "private, no-cache");
+    }
 
     const rawSetCookies = typeof r.headers.getSetCookie === "function" ? r.headers.getSetCookie() : [];
     if (rawSetCookies.length) {
@@ -258,7 +268,8 @@ module.exports = async function handler(req, res) {
       res.setHeader("Set-Cookie", rewritten);
     }
 
-    if (type.toLowerCase().includes("text/html") || usedFallback) {
+    if (lowerType.includes("text/html") || usedFallback) {
+      const body = await r.arrayBuffer();
       let html = new TextDecoder("utf-8").decode(body);
       const query = searchQueryOf(current);
       if (query) {
@@ -277,7 +288,8 @@ module.exports = async function handler(req, res) {
       return res.status(r.status).send(html);
     }
 
-    if (type.toLowerCase().includes("text/css")) {
+    if (lowerType.includes("text/css")) {
+      const body = await r.arrayBuffer();
       let css = new TextDecoder("utf-8").decode(body);
       css = css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (all, q, raw) => {
         try {
@@ -293,6 +305,20 @@ module.exports = async function handler(req, res) {
     res.setHeader("Content-Type", type || "application/octet-stream");
     const cr = r.headers.get("content-range");
     if (cr) res.setHeader("Content-Range", cr);
+    const ar = r.headers.get("accept-ranges");
+    if (ar) res.setHeader("Accept-Ranges", ar);
+
+    if (r.body && typeof Readable.fromWeb === "function") {
+      const stream = Readable.fromWeb(r.body);
+      stream.on("error", (err) => {
+        console.error("Neo proxy stream error:", err);
+        if (!res.headersSent) res.status(502);
+        else res.destroy();
+      });
+      return stream.pipe(res);
+    }
+
+    const body = await r.arrayBuffer();
     return res.status(r.status).send(Buffer.from(body));
   } catch (e) {
     console.error(e);
@@ -318,6 +344,7 @@ function buildBridge(proxyOrigin, pageBase) {
     'if(window.__neoProxyBridge)return;window.__neoProxyBridge=1;' +
     'var PROXY_ORIGIN=' + O + ';' +
     'var PAGE_BASE=' + B + ';' +
+    'var SNOKIDO_PAGE=/^(?:https?:\\/\\/)?(?:www\\.)?snokido\\.(?:com|fr)\\/game(?:\\/|$)/i.test(PAGE_BASE);' +
     'var DIRECT=/kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i;' +
     'var styleEl=document.getElementById("neo-proxy-cursor-style");' +
     'function setNative(on){if(styleEl)styleEl.textContent=on?"html,body,*{cursor:auto!important}":"html,body,*{cursor:none!important}"}' +
@@ -334,8 +361,8 @@ function buildBridge(proxyOrigin, pageBase) {
     'window.addEventListener("message",function(e){var d=e&&e.data;if(!d||d.source!=="neo-browser-shell")return;if("nativeCursor" in d)setNative(!!d.nativeCursor||gameCursorMode())},{passive:true});' +
     'try{parent.postMessage({source:"neo-browser-cursor",hello:true},"*")}catch(_){}' +
     'syncCursorMode();' +
-    'function toProxy(url){try{if(!url)return null;var s=String(url);if(/^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(s))return null;var u=new URL(s,PAGE_BASE||location.href);if(u.protocol!=="http:"&&u.protocol!=="https:")return null;var h=u.hostname;if(/kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i.test(h))return null;return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
-    'function shouldProxyIframe(url){try{var u=new URL(String(url),PAGE_BASE||location.href);if(DIRECT.test(u.hostname))return false;if(/snokido\\.com$/i.test(u.hostname)&&u.pathname.indexOf("/game/")===0)return false;if(u.pathname.indexOf("/embed/")!==-1)return false;return true}catch(e){return true}}' +
+    'function toProxy(url){try{if(!url)return null;var s=String(url);if(/^(data:|blob:|javascript:|mailto:|tel:|about:|#)/i.test(s))return null;var u=new URL(s,PAGE_BASE||location.href);if(u.protocol!=="http:"&&u.protocol!=="https:")return null;if(u.origin===PROXY_ORIGIN&&u.pathname==="/api/proxy")return null;var h=u.hostname;if(!SNOKIDO_PAGE&&/kbhgames\\.com$|wgplayer\\.com$|crazygames\\.com$|poki\\.com$|y8\\.com$|itch\\.io$/i.test(h))return null;return PROXY_ORIGIN+"/api/proxy?url="+encodeURIComponent(u.toString())}catch(e){return null}}' +
+    'function shouldProxyIframe(url){try{var u=new URL(String(url),PAGE_BASE||location.href);if(u.origin===PROXY_ORIGIN&&u.pathname==="/api/proxy")return false;if(SNOKIDO_PAGE)return true;if(DIRECT.test(u.hostname))return false;if(/snokido\\.com$/i.test(u.hostname)&&u.pathname.indexOf("/game/")===0)return false;if(u.pathname.indexOf("/embed/")!==-1)return false;return true}catch(e){return true}}' +
     'var _f=window.fetch;window.fetch=function(input,init){try{var url=typeof input==="string"?input:(input&&input.url)||"";var p=toProxy(url);if(p){if(typeof input==="string")input=p;else if(typeof input==="object")input=Object.assign({},input,{url:p})}}catch(e){}return _f.apply(this,arguments)};' +
     'var XO=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,url){try{var p=toProxy(url);if(p)arguments[1]=p;}catch(e){}return XO.apply(this,arguments);};' +
     'try{var desc=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,"src");if(desc&&desc.set){var os=desc.set,og=desc.get;Object.defineProperty(HTMLIFrameElement.prototype,"src",{configurable:true,get:function(){return og.call(this)},set:function(v){try{if(shouldProxyIframe(v))v=toProxy(v)||v}catch(e){}return os.call(this,v)}})}}catch(e){}' +
@@ -350,6 +377,12 @@ function buildBridge(proxyOrigin, pageBase) {
 }
 
 function rewriteLinks(html, base, proxyOrigin) {
+  let snokidoPage = false;
+  try {
+    const bu = new URL(base);
+    snokidoPage = /^(?:www\\.)?snokido\\.(?:com|fr)$/i.test(bu.hostname) && /^\\/game(?:\\/|$)/i.test(bu.pathname);
+  } catch {}
+
   const prox = (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
   function rewriteAttr(tag, attr) {
     const re = new RegExp("(" + attr + "\\s*=\\s*[\"'])([^\"']+)([\"'])", "i");
@@ -372,7 +405,7 @@ function rewriteLinks(html, base, proxyOrigin) {
     for (const a of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, a);
     return out;
   });
-  html = html.replace(new RegExp("<iframe\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "src"));
+  html = html.replace(new RegExp("<iframe\\b[^>]*>", "gi"), (tag) => rewriteAttr(tag, "src", snokidoPage));
   html = html.replace(new RegExp("<link\\b[^>]*>", "gi"), (tag) => {
     const relM = tag.match(new RegExp("\\brel\\s*=\\s*[\"']([^\"']+)[\"']", "i"));
     const rel = ((relM && relM[1]) || "").toLowerCase();
