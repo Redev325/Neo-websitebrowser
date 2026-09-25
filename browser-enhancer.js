@@ -350,7 +350,7 @@
       try {
         var initialParam = new URL(location.href).searchParams.get('url');
         if (initialParam) {
-          var initialUrl = decodeURIComponent(initialParam);
+          var initialUrl = initialParam;
           setTimeout(function () { navigate(initialUrl); }, 0);
           try {
             history.replaceState({}, '', '/Browser');
