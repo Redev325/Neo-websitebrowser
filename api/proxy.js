@@ -377,14 +377,14 @@ function buildBridge(proxyOrigin, pageBase) {
 }
 
 function rewriteLinks(html, base, proxyOrigin) {
-  let snokidoPage = false;
+  let snokidoPage = /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) && /^\/game(?:\/|$)/i.test(bu.pathname);
   try {
     const bu = new URL(base);
     snokidoPage = /^(?:www\\.)?snokido\\.(?:com|fr)$/i.test(bu.hostname) && /^\\/game(?:\\/|$)/i.test(bu.pathname);
   } catch {}
 
   const prox = (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
-  function rewriteAttr(tag, attr) {
+  function rewriteAttr(tag, attr, force) {
     const re = new RegExp("(" + attr + "\\s*=\\s*[\"'])([^\"']+)([\"'])", "i");
     return tag.replace(re, (all, a, raw, b) => {
       if (!raw || /^(data:|blob:|javascript:|mailto:|tel:|#)/i.test(raw)) return all;
@@ -392,8 +392,8 @@ function rewriteLinks(html, base, proxyOrigin) {
         const u = new URL(raw, base);
         if (u.protocol !== "http:" && u.protocol !== "https:") return all;
         const h = u.hostname;
-        if (/kbhgames\.com$|wgplayer\.com$|crazygames\.com$|poki\.com$|y8\.com$|itch\.io$/i.test(h)) return all;
-        if (u.pathname.indexOf("/embed/") !== -1) return all;
+        if (!force && /kbhgames\.com$|wgplayer\.com$|crazygames\.com$|poki\.com$|y8\.com$|itch\.io$/i.test(h)) return all;
+        if (!force && u.pathname.indexOf("/embed/") !== -1) return all;
         return a + prox(u) + b;
       } catch {
         return all;
