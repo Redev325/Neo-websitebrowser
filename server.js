@@ -13,6 +13,19 @@ app.all("/api/proxy", (req, res) => {
   try {
     let raw = req.query && typeof req.query.url === "string" ? req.query.url : "";
     const requestHost = String(req.headers.host || "").split(":")[0].toLowerCase();
+    const fetchDest = String(req.headers["sec-fetch-dest"] || "").toLowerCase();
+    const referer = String(req.headers.referer || "");
+    
+    // When somebody opens a Neo proxy URL directly in the outer browser tab,
+    // put the target into the Neo Browser page instead of showing the proxy
+    // response as a standalone document. Requests coming from the iframe use
+    // Sec-Fetch-Dest: iframe and continue directly to the proxy handler.
+    if (raw && fetchDest === "document" && !/\/Browser\/?(?:\?|$)/i.test(referer)) {
+      const target = new URL(raw);
+      const browserUrl = "/Browser?url=" + encodeURIComponent(target.toString());
+      return res.redirect(302, browserUrl);
+    }
+
     for (let i = 0; i < 8 && raw; i++) {
       const u = new URL(raw);
       const host = u.hostname.toLowerCase();
