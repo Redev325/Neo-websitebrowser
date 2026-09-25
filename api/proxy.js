@@ -377,10 +377,12 @@ function buildBridge(proxyOrigin, pageBase) {
 }
 
 function rewriteLinks(html, base, proxyOrigin) {
-  let snokidoPage = /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) && /^\/game(?:\/|$)/i.test(bu.pathname);
+  let snokidoPage = false;
   try {
     const bu = new URL(base);
-    snokidoPage = /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) && /^\/game(?:\/|$)/i.test(bu.pathname);
+    snokidoPage =
+      /^(?:www\.)?snokido\.(?:com|fr)$/i.test(bu.hostname) &&
+      /^\/game(?:\/|$)/i.test(bu.pathname);
   } catch {}
 
   const prox = (u) => proxyOrigin + "/api/proxy?url=" + encodeURIComponent(u.toString());
