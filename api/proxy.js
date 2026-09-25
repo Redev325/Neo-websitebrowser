@@ -546,7 +546,7 @@ function rewriteLinks(html, base, proxyOrigin) {
   }
 
   function rewriteAttr(tag, attr, kind) {
-    const re = new RegExp("(" + attr + "\\s*=\\s*)(?:\"([^\"]+)\"|'([^']+)'|([^\\s>]+))", "i");
+    const re = new RegExp("(" + attr + "\s*=\s*)(?:\"([^\"]+)\"|'([^']+)'|([^\s>]+))", "i");
     return tag.replace(re, (all, prefix, doubleQuoted, singleQuoted, bare) => {
       const raw = doubleQuoted !== undefined ? doubleQuoted : singleQuoted !== undefined ? singleQuoted : bare;
       if (!raw) return all;
@@ -565,11 +565,11 @@ function rewriteLinks(html, base, proxyOrigin) {
   }
 
   function rewriteSrcset(tag) {
-    const re = /(<img\\b[^>]*\\bsrcset\\s*=\\s*)(?:\"([^\"]+)\"|'([^']+)')/i;
+    const re = /(<img\b[^>]*\bsrcset\s*=\s*)(?:\"([^\"]+)\"|'([^']+)')/i;
     return tag.replace(re, (all, prefix, dq, sq) => {
       const raw = dq !== undefined ? dq : sq;
       const rewritten = raw.split(",").map((part) => {
-        const bits = part.trim().split(/\\s+/);
+        const bits = part.trim().split(/\s+/);
         if (!bits[0] || /^data:/i.test(bits[0])) return part;
         const url = rewriteRawUrl(bits[0]);
         return bits.length > 1 ? url + " " + bits.slice(1).join(" ") : url;
@@ -578,37 +578,37 @@ function rewriteLinks(html, base, proxyOrigin) {
     });
   }
 
-  html = html.replace(/<(img|script|source|video|audio|track|embed|object)\\b[^>]*>/gi, (tag) => {
+  html = html.replace(/<(img|script|source|video|audio|track|embed|object)\b[^>]*>/gi, (tag) => {
     let out = tag;
     for (const attr of ["src", "data-src", "poster", "data"]) out = rewriteAttr(out, attr, "asset");
     return out;
   });
 
-  html = html.replace(/<iframe\\b[^>]*>/gi, (tag) => rewriteAttr(tag, "src", "iframe"));
-  html = html.replace(/<link\\b[^>]*>/gi, (tag) => {
+  html = html.replace(/<iframe\b[^>]*>/gi, (tag) => rewriteAttr(tag, "src", "iframe"));
+  html = html.replace(/<link\b[^>]*>/gi, (tag) => {
     let out = tag;
     for (const attr of ["href", "imagesrcset"]) out = rewriteAttr(out, attr, "link");
     return out;
   });
-  html = html.replace(/<a\\b[^>]*>/gi, (tag) => rewriteAttr(tag, "href", "link"));
-  html = html.replace(/<form\\b[^>]*>/gi, (tag) => rewriteAttr(tag, "action", "form"));
-  html = html.replace(/<img\\b[^>]*>/gi, rewriteSrcset);
+  html = html.replace(/<a\b[^>]*>/gi, (tag) => rewriteAttr(tag, "href", "link"));
+  html = html.replace(/<form\b[^>]*>/gi, (tag) => rewriteAttr(tag, "action", "form"));
+  html = html.replace(/<img\b[^>]*>/gi, rewriteSrcset);
 
   // Rewrite common absolute/relative refresh redirects and inline style URLs.
-  html = html.replace(/(<meta\\b[^>]*http-equiv\\s*=\\s*["']refresh["'][^>]*content\\s*=\\s*["'][^"']*\\burl=)([^"' >]+)/gi,
+  html = html.replace(/(<meta\b[^>]*http-equiv\s*=\s*["']refresh["'][^>]*content\s*=\s*["'][^"']*\burl=)([^"' >]+)/gi,
     (all, prefix, raw) => prefix + rewriteRawUrl(raw));
 
-  html = html.replace(/(\\bstyle\\s*=\\s*)(["'])([^"']*)\\2/gi, (all, prefix, quote, css) => {
-    const rewritten = css.replace(/url\\(\\s*(['"]?)([^'")]+)\\1\\s*\\)/gi, (full, q, raw) => {
+  html = html.replace(/(\bstyle\s*=\s*)(["'])([^"']*)\2/gi, (all, prefix, quote, css) => {
+    const rewritten = css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/gi, (full, q, raw) => {
       const next = rewriteRawUrl(raw);
       return next !== raw ? 'url("' + next + '")' : full;
     });
     return prefix + quote + rewritten + quote;
   });
 
-  html = html.replace(/<base\\b[^>]*>/gi, "");
-  html = html.replace(/<meta\\b[^>]*http-equiv\\s*=\\s*["']content-security-policy(?:-report-only)?["'][^>]*>/gi, "");
-  html = html.replace(/<meta\\b[^>]*http-equiv\\s*=\\s*["']x-frame-options["'][^>]*>/gi, "");
+  html = html.replace(/<base\b[^>]*>/gi, "");
+  html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']content-security-policy(?:-report-only)?["'][^>]*>/gi, "");
+  html = html.replace(/<meta\b[^>]*http-equiv\s*=\s*["']x-frame-options["'][^>]*>/gi, "");
 
   return html;
 }
