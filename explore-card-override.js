@@ -844,16 +844,25 @@
   function syncNativeCursorForViewer(active) {
     var root = document.documentElement;
     if (!root) return;
-    root.classList.toggle('neo-native-cursor', !!active);
+
+    var next = !!active;
+    if (root.__neoNativeCursorState === next) return;
+    root.__neoNativeCursorState = next;
+
+    root.classList.toggle('neo-native-cursor', next);
 
     // Remove any already-rendered Neo cursor effects while native mode is active.
     var cursor = document.getElementById('custom-cursor');
-    if (active) {
-      if (cursor) cursor.style.display = 'none';
+    if (next) {
+      if (cursor) {
+        cursor.style.display = 'none';
+        cursor.style.visibility = 'hidden';
+      }
       var effects = document.querySelectorAll('.cursor-trail-dot, .cursor-particle');
       for (var i = 0; i < effects.length; i++) effects[i].remove();
     } else if (cursor && window.__neoCursorHasMoved) {
       cursor.style.display = 'block';
+      cursor.style.visibility = 'visible';
       if (typeof window.__neoCursorMouseX === 'number') cursor.style.left = window.__neoCursorMouseX + 'px';
       if (typeof window.__neoCursorMouseY === 'number') cursor.style.top = window.__neoCursorMouseY + 'px';
     }
@@ -861,7 +870,7 @@
     var frames = document.querySelectorAll('iframe');
     for (var f = 0; f < frames.length; f++) {
       try {
-        frames[f].contentWindow.postMessage({source:'neo-browser-shell', nativeCursor:!!active}, '*');
+        frames[f].contentWindow.postMessage({source:'neo-browser-shell', nativeCursor:next}, '*');
       } catch (_) {}
     }
   }
@@ -954,7 +963,18 @@
   }
 
   function keepNativeCursorInViewer() {
-    try { syncNativeCursorForViewer(!!findViewerRoot() && !!getSelectedGame()); } catch (_) {}
+    try {
+      var root = findViewerRoot();
+      if (!root) {
+        syncNativeCursorForViewer(false);
+        return;
+      }
+      var x = typeof window.__neoCursorMouseX === 'number' ? window.__neoCursorMouseX : -1;
+      var y = typeof window.__neoCursorMouseY === 'number' ? window.__neoCursorMouseY : -1;
+      var r = root.getBoundingClientRect();
+      var inside = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+      syncNativeCursorForViewer(inside || document.fullscreenElement === root || document.webkitFullscreenElement === root);
+    } catch (_) {}
   }
 
   function start() {
@@ -986,7 +1006,7 @@
       window.__neoCursorMouseY = event.clientY;
       window.__neoCursorHasMoved = true;
       var root = findViewerRoot();
-      if (!root || !getSelectedGame()) {
+      if (!root) {
         syncNativeCursorForViewer(false);
         return;
       }
