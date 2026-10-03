@@ -357,7 +357,10 @@
     root.style.pointerEvents = 'auto';
     controls.style.position = 'absolute';
     controls.style.right = '0';
-    controls.style.top = '50%';
+    // The controls are attached to the viewer root, so anchor their vertical
+    // position to the actual header height instead of the whole viewer.
+    var headerHeight = header.getBoundingClientRect().height || 56;
+    controls.style.top = (headerHeight / 2) + 'px';
     controls.style.transform = 'translateY(-50%)';
     controls.style.display = 'flex';
     controls.style.alignItems = 'stretch';
