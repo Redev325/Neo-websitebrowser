@@ -13,7 +13,7 @@
   var SONIC_ICON_URL = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/Vs.sonic.exe.png';
   var HANK_ICON_URL = '/VsAccHank.png';
   var HANK_THUMBNAIL_URL = '/assets/vs-accelerant-hank-original.png?v=1';
-  var IMPOSTOR_ICON_URL = '/assets/v4icon.png';
+  var IMPOSTOR_ICON_URL = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/V4icon.png';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
@@ -301,8 +301,8 @@
     left.style.transition = 'none';
 
     // Keep one real image in the header instead of replacing it every
-    // mutation. This preserves the original Legacy icon rendering and stops
-    // the icon from blinking during React re-renders.
+    // mutation. Legacy keeps its existing icon source; the non-Legacy
+    // Impostor viewer uses the repository's V4icon.png asset.
     var logo = left.querySelector('#neo-game-header-logo');
     if (!logo) {
       logo = document.createElement('img');
@@ -326,7 +326,14 @@
       left.insertBefore(logo, parts.title);
     }
 
-    if (logo.src !== desiredIcon && desiredIcon) logo.src = desiredIcon;
+    if (desiredIcon) {
+      // Resolve once before comparing. HTMLImageElement.src is always an
+      // absolute URL, so comparing it directly to a relative path causes
+      // the browser to reload the same image on every React mutation.
+      var desiredIconResolved = desiredIcon;
+      try { desiredIconResolved = new URL(desiredIcon, document.baseURI).href; } catch (_) {}
+      if (logo.src !== desiredIconResolved) logo.src = desiredIconResolved;
+    }
     if (!desiredIcon) {
       logo.style.display = 'none';
     } else {
