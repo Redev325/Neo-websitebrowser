@@ -357,18 +357,18 @@
     root.style.pointerEvents = 'auto';
     controls.style.position = 'absolute';
     controls.style.right = '0';
-    controls.style.top = '0';
-    controls.style.transform = 'none';
+    controls.style.top = '50%';
+    controls.style.transform = 'translateY(-50%)';
     controls.style.display = 'flex';
     controls.style.alignItems = 'stretch';
     controls.style.justifyContent = 'flex-end';
     controls.style.gap = '0';
     controls.style.zIndex = '2147483647';
-    controls.style.height = '60px';
-    controls.style.width = '120px';
+    controls.style.height = '44px';
+    controls.style.width = '88px';
     controls.style.padding = '0';
     controls.style.margin = '0';
-    controls.style.minWidth = '120px';
+    controls.style.minWidth = '88px';
     controls.style.pointerEvents = 'auto';
     controls.style.overflow = 'visible';
 
@@ -390,12 +390,12 @@
 
       button.setAttribute('aria-label', titleText);
       button.title = titleText;
-      // Each button is one full 60px slot. There is no gap between them,
-      // so the entire visible control area is directly clickable.
-      button.style.width = '60px';
-      button.style.height = '60px';
-      button.style.minWidth = '60px';
-      button.style.minHeight = '60px';
+      // Compact controls with no gap, while keeping the entire button
+      // itself clickable rather than only the SVG icon.
+      button.style.width = '44px';
+      button.style.height = '44px';
+      button.style.minWidth = '44px';
+      button.style.minHeight = '44px';
       button.style.padding = '0';
       button.style.margin = '0';
       button.style.display = 'flex';
@@ -410,7 +410,7 @@
       button.style.color = 'inherit';
       button.style.background = 'transparent';
       button.style.border = '0';
-      button.style.borderRadius = '6px';
+      button.style.borderRadius = '4px';
       button.style.position = 'relative';
       button.style.zIndex = '2147483647';
       return button;
