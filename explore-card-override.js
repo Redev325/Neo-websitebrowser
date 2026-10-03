@@ -417,35 +417,52 @@
 
         if (activeFullscreen) {
           try {
-            if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-            else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
-            else if (document.msExitFullscreen) document.msExitFullscreen();
+            var exit = document.exitFullscreen ||
+              document.webkitExitFullscreen ||
+              document.mozCancelFullScreen ||
+              document.msExitFullscreen;
+            if (exit) {
+              var exitResult = exit.call(document);
+              if (exitResult && typeof exitResult.catch === 'function') {
+                exitResult.catch(function () {});
+              }
+            }
           } catch (_) {}
           return;
         }
 
-        var target = null;
+        // Prefer the actual game iframe, then the viewer stage, then the
+        // complete viewer root. The first successful request wins.
+        var targets = [];
         if (parts.stage) {
-          target =
+          var gameFrame =
             parts.stage.querySelector('#neo-sonic-old-build') ||
             parts.stage.querySelector('#neo-sonic-restored-build') ||
             parts.stage.querySelector('#neo-impostor-legacy-game') ||
-            parts.stage.querySelector('#neo-accelerant-hank-game') ||
-            parts.stage;
+            parts.stage.querySelector('#neo-accelerant-hank-game');
+          if (gameFrame) targets.push(gameFrame);
+          targets.push(parts.stage);
         }
-        target = target || root || header.parentElement;
+        if (root) targets.push(root);
+        if (header.parentElement) targets.push(header.parentElement);
+        if (document.documentElement) targets.push(document.documentElement);
 
-        var request =
-          target.requestFullscreen ||
-          target.webkitRequestFullscreen ||
-          target.mozRequestFullScreen ||
-          target.msRequestFullscreen;
-
-        if (request) {
+        for (var ti = 0; ti < targets.length; ti++) {
+          var target = targets[ti];
+          if (!target) continue;
+          var request =
+            target.requestFullscreen ||
+            target.webkitRequestFullscreen ||
+            target.mozRequestFullScreen ||
+            target.msRequestFullscreen;
+          if (!request) continue;
           try {
             var result = request.call(target);
-            if (result && typeof result.catch === 'function') result.catch(function () {});
+            if (result && typeof result.catch === 'function') {
+              result.catch(function () {});
+            }
+            // A request was made; don't keep calling other fullscreen targets.
+            break;
           } catch (_) {}
         }
       });
@@ -465,22 +482,50 @@
 
         if (activeFullscreen) {
           try {
-            if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-            else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
-            else if (document.msExitFullscreen) document.msExitFullscreen();
-          } catch (_) {}
-        }
-
-        if (getSelectedGame()) {
-          setSelectedGame('');
-        } else {
-          try {
-            if (header.__neoNativeClose && header.__neoNativeClose !== closeButton) {
-              header.__neoNativeClose.click();
+            var exit = document.exitFullscreen ||
+              document.webkitExitFullscreen ||
+              document.mozCancelFullScreen ||
+              document.msExitFullscreen;
+            if (exit) {
+              var exitResult = exit.call(document);
+              if (exitResult && typeof exitResult.catch === 'function') {
+                exitResult.catch(function () {});
+              }
             }
           } catch (_) {}
         }
+
+        // Resolve the CURRENT native close button on every click because the
+        // React viewer can replace its header/button tree between renders.
+        var liveClose = null;
+        try {
+          var candidates = Array.prototype.slice.call(
+            header.querySelectorAll('button:not(.neo-viewer-custom-control)')
+          );
+          for (var li = candidates.length - 1; li >= 0; li--) {
+            var candidate = candidates[li];
+            var label = ((candidate.getAttribute('aria-label') || '') + ' ' + (candidate.title || '')).toLowerCase();
+            if (label.indexOf('close') !== -1 || label.indexOf('exit') !== -1) {
+              liveClose = candidate;
+              break;
+            }
+          }
+          if (!liveClose && candidates.length) liveClose = candidates[candidates.length - 1];
+        } catch (_) {}
+
+        if (getSelectedGame()) setSelectedGame('');
+
+        // Always invoke the real viewer close handler too. This closes the
+        // React modal state for both special and generic game viewers.
+        try {
+          if (liveClose && liveClose !== closeButton) {
+            liveClose.click();
+          } else if (header.__neoNativeClose &&
+                     header.__neoNativeClose.isConnected &&
+                     header.__neoNativeClose !== closeButton) {
+            header.__neoNativeClose.click();
+          }
+        } catch (_) {}
       });
     }
 
