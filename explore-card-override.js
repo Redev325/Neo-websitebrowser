@@ -78,6 +78,31 @@
     }
     return null;
   }
+  function repairFavoriteButtons(card) {
+    if (!card) return;
+    var buttons = card.querySelectorAll('button[aria-label]');
+    for (var i = 0; i < buttons.length; i++) {
+      var button = buttons[i];
+      var label = String(button.getAttribute('aria-label') || '').toLowerCase();
+      if (label !== 'add to favorites' && label !== 'remove from favorites') continue;
+      button.style.setProperty('display', 'flex', 'important');
+      button.style.setProperty('visibility', 'visible', 'important');
+      button.style.setProperty('opacity', '1', 'important');
+      button.style.setProperty('position', 'absolute', 'important');
+      button.style.setProperty('top', '0.5rem', 'important');
+      button.style.setProperty('right', '0.5rem', 'important');
+      button.style.setProperty('width', '1.75rem', 'important');
+      button.style.setProperty('height', '1.75rem', 'important');
+      button.style.setProperty('min-width', '1.75rem', 'important');
+      button.style.setProperty('min-height', '1.75rem', 'important');
+      button.style.setProperty('align-items', 'center', 'important');
+      button.style.setProperty('justify-content', 'center', 'important');
+      button.style.setProperty('z-index', '50', 'important');
+      button.style.setProperty('pointer-events', 'auto', 'important');
+      button.style.setProperty('border-radius', '9999px', 'important');
+    }
+  }
+
   function simplifyCard(card, index) {
     var title = getCardTitle(card, index), preview = card.querySelector('.aspect-video');
     if (!title || !preview) return;
@@ -174,6 +199,7 @@
       buttons[b].style.pointerEvents = 'auto';
       buttons[b].style.zIndex = '20';
     }
+    repairFavoriteButtons(card);
   }
   function setSelectedGame(value) {
     var previousValue = window.__neoSelectedGame || '';
