@@ -317,14 +317,7 @@ g.jsx("div",{className:"grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-c
 g.jsx(_E,{delay:Math.min(h*6,300),children:
 g.jsxs("div",{className:"neo-explore-card group relative w-full text-left rounded-lg overflow-hidden border border-border/60 bg-[#1a1a1a] hover:border-accent/50 hover:-translate-y-1 hover:shadow-xl hover:shadow-accent/10 transition-all duration-300",children:[
 g.jsxs("button",{type:"button",onClick:()=>t(f),className:"block w-full text-left",children:[
-g.jsxs("div",{className:"aspect-video w-full relative overflow-hidden bg-[#161616]",children:[
-g.jsx("div",{className:"absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,hsl(var(--accent)/.18),transparent_45%),radial-gradient(circle_at_75%_75%,hsl(var(--accent)/.08),transparent_50%)]"}),
-g.jsx("div",{className:"absolute inset-0 opacity-15",style:{backgroundImage:"linear-gradient(135deg,transparent 0 49%,hsl(var(--accent)/.14) 50%,transparent 51%),linear-gradient(45deg,transparent 0 49%,hsl(var(--accent)/.10) 50%,transparent 51%)"}}),
-g.jsxs("div",{className:"relative z-10 h-full flex flex-col items-center justify-center",children:[
-g.jsx("div",{className:"w-16 h-16 rounded-2xl border border-white/10 bg-black/25 flex items-center justify-center shadow-[0_0_28px_hsl(var(--accent)/.08)]",children:g.jsx("span",{className:"text-white/75 text-[11px] font-bold tracking-[.18em]",children:"PLACEHOLDER"})}),
-g.jsx("span",{className:"mt-2 text-[10px] uppercase tracking-[.28em] text-white/40",children:"NEO GAME"})
-]})
-]}),
+g.jsx("div",{className:"aspect-video w-full relative overflow-hidden bg-[#161616]"}),
 g.jsxs("div",{className:"p-3 flex flex-col gap-2",children:[
 g.jsx("p",{className:"text-sm font-bold text-white truncate",children:f.title}),
 g.jsx("p",{className:"text-xs text-[#a0a0a0] leading-snug line-clamp-2",children:f.description}),
