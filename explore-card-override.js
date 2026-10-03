@@ -846,10 +846,8 @@
       return;
     }
     var selectedGame = getSelectedGame();
-    if (selectedGame !== 'impostor' && selectedGame !== 'sonic' && selectedGame !== 'hank') {
-      syncNativeCursorForViewer(false);
-      return;
-    }
+    // The current viewer bar must also be applied to regular Explore cards,
+    // not only the three special embedded games.
     bindViewerCursor(root);
     // Start with the normal Neo cursor unless the mouse is already over the viewer.
     var currentX = typeof window.__neoCursorMouseX === 'number' ? window.__neoCursorMouseX : -1;
@@ -858,12 +856,20 @@
     var overViewer = currentX >= rr.left && currentX <= rr.right && currentY >= rr.top && currentY <= rr.bottom;
     syncNativeCursorForViewer(overViewer || document.fullscreenElement === root || document.webkitFullscreenElement === root);
     var parts = getViewerParts(root);
-    if (!parts || !parts.title) return;
+    if (!parts) return;
 
-    parts.title.setAttribute('data-neo-game-viewer-title', selectedGame);
-    parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : VIEWER_TITLE;
-    root.setAttribute('data-neo-game-viewer', selectedGame);
-    updateViewerLogo(parts, selectedGame);
+    if (parts.title) {
+      parts.title.setAttribute('data-neo-game-viewer-title', selectedGame || 'generic');
+      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor') {
+        parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : VIEWER_TITLE;
+        root.setAttribute('data-neo-game-viewer', selectedGame);
+        updateViewerLogo(parts, selectedGame);
+      } else {
+        root.setAttribute('data-neo-game-viewer', 'generic');
+      }
+    }
+
+    // Always apply the current X + Fullscreen viewer bar.
     updateViewerControls(parts, root);
     if (selectedGame === 'sonic') {
       setupSonicButtons(parts.stage);
