@@ -843,8 +843,6 @@
     stage.style.backgroundImage = 'url("https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/impselection.png")';
     stage.style.backgroundRepeat = 'no-repeat';
     stage.style.backgroundPosition = 'center center';
-    // Fill the viewer with the complete selection artwork while keeping the
-    // artwork behind the buttons at all times.
     stage.style.backgroundSize = 'cover';
 
     var shell = stage.querySelector('#neo-impostor-selection-buttons');
@@ -855,7 +853,6 @@
       shell.style.inset = '0';
       shell.style.pointerEvents = 'none';
       shell.style.zIndex = '12';
-      shell.style.overflow = 'hidden';
       stage.appendChild(shell);
 
       function createSelectionButton(id, side, label) {
@@ -865,92 +862,91 @@
         button.className = 'neo-impostor-selection-button';
         button.setAttribute('aria-label', label);
         button.title = label;
+
+        // The artwork has circular choices. Use small circular hit areas so
+        // hover never creates a large square over the selection image.
         button.style.position = 'absolute';
-        button.style.top = '55%';
-        button.style.width = '42%';
-        button.style.height = '25%';
-        button.style[side] = '6%';
+        button.style.top = '42%';
+        button.style.width = '21%';
+        button.style.height = '21%';
+        button.style[side] = '18%';
         button.style.padding = '0';
         button.style.margin = '0';
         button.style.border = '0';
-        button.style.outline = 'none';
+        button.style.outline = '0';
         button.style.background = 'transparent';
         button.style.cursor = 'pointer';
         button.style.pointerEvents = 'auto';
         button.style.boxSizing = 'border-box';
-        button.style.borderRadius = '18px';
-        button.style.transformOrigin = 'center';
-        button.style.transition = 'transform .14s ease';
+        button.style.borderRadius = '50%';
+        button.style.overflow = 'hidden';
+        button.style.transformOrigin = 'center center';
+        button.style.transition = 'transform .14s ease, filter .14s ease';
 
         var glow = document.createElement('span');
         glow.className = 'neo-impostor-selection-glow';
         glow.setAttribute('aria-hidden', 'true');
         glow.style.position = 'absolute';
         glow.style.inset = '0';
-        glow.style.borderRadius = '18px';
-        glow.style.border = '2px solid rgba(255,70,70,0.0)';
-        glow.style.boxShadow = 'inset 0 0 22px rgba(255,60,60,0), 0 0 18px rgba(255,60,60,0)';
-        glow.style.background = 'rgba(255,70,70,0)';
+        glow.style.borderRadius = '50%';
+        glow.style.border = '2px solid rgba(255,90,90,0)';
+        glow.style.boxShadow = 'inset 0 0 18px rgba(255,60,60,0), 0 0 14px rgba(255,60,60,0)';
+        glow.style.background = 'radial-gradient(circle, rgba(255,80,80,0.16) 0%, rgba(255,60,60,0.07) 55%, rgba(255,60,60,0) 78%)';
         glow.style.opacity = '0';
         glow.style.pointerEvents = 'none';
-        glow.style.transition = 'opacity .14s ease, background .14s ease, border-color .14s ease, box-shadow .14s ease';
+        glow.style.transition = 'opacity .14s ease, border-color .14s ease, box-shadow .14s ease';
         button.appendChild(glow);
 
         button.addEventListener('mouseenter', function () {
-          this.style.transform = 'scale(1.018)';
+          this.style.transform = 'scale(1.035)';
+          this.style.filter = 'brightness(1.12)';
           glow.style.opacity = '1';
-          glow.style.background = 'rgba(255,70,70,0.08)';
-          glow.style.borderColor = 'rgba(255,90,90,0.58)';
-          glow.style.boxShadow = 'inset 0 0 22px rgba(255,60,60,0.18), 0 0 18px rgba(255,60,60,0.42)';
-        });
-        button.addEventListener('mouseleave', function () {
-          this.style.transform = 'scale(1)';
-          glow.style.opacity = '0';
-          glow.style.background = 'rgba(255,70,70,0)';
-          glow.style.borderColor = 'rgba(255,70,70,0)';
-          glow.style.boxShadow = 'inset 0 0 22px rgba(255,60,60,0), 0 0 18px rgba(255,60,60,0)';
-        });
-        button.addEventListener('mousedown', function (event) {
-          if (event.button !== 0) return;
-          this.style.transform = 'scale(.988)';
-        });
-        button.addEventListener('mouseup', function () {
-          this.style.transform = 'scale(1.018)';
+          glow.style.borderColor = 'rgba(255,100,100,0.62)';
+          glow.style.boxShadow = 'inset 0 0 18px rgba(255,60,60,0.20), 0 0 14px rgba(255,60,60,0.42)';
         });
 
-        // Preserve any real control that exists underneath the overlay.
+        button.addEventListener('mouseleave', function () {
+          this.style.transform = 'scale(1)';
+          this.style.filter = 'none';
+          glow.style.opacity = '0';
+          glow.style.borderColor = 'rgba(255,90,90,0)';
+          glow.style.boxShadow = 'inset 0 0 18px rgba(255,60,60,0), 0 0 14px rgba(255,60,60,0)';
+        });
+
+        button.addEventListener('mousedown', function (event) {
+          if (event.button !== 0) return;
+          this.style.transform = 'scale(.97)';
+        });
+
+        button.addEventListener('mouseup', function () {
+          this.style.transform = 'scale(1.035)';
+        });
+
+        // Let an actual control underneath receive the click when one exists.
         button.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
-
           var x = event.clientX;
           var y = event.clientY;
           this.style.visibility = 'hidden';
           var underlying = document.elementFromPoint(x, y);
           this.style.visibility = 'visible';
 
-          if (underlying && underlying !== this &&
-              !(underlying.closest && underlying.closest('.neo-impostor-selection-button'))) {
-            try {
-              var targetButton = underlying.closest
-                ? underlying.closest('button,a,[role="button"]')
-                : null;
-              if (targetButton && targetButton !== this) {
-                targetButton.click();
-              }
-            } catch (_) {}
-          }
+          try {
+            var targetButton = underlying && underlying.closest
+              ? underlying.closest('button,a,[role="button"]')
+              : null;
+            if (targetButton && targetButton !== this) targetButton.click();
+          } catch (_) {}
         });
 
         shell.appendChild(button);
       }
 
-      createSelectionButton('neo-impostor-selection-left', 'left', 'Vs Impostor selection');
-      createSelectionButton('neo-impostor-selection-right', 'right', 'Vs Impostor alternate selection');
+      createSelectionButton('neo-impostor-selection-left', 'left', 'Vs Impostor left selection');
+      createSelectionButton('neo-impostor-selection-right', 'right', 'Vs Impostor right selection');
     }
 
-    // Keep the image background intact and simply keep the two transparent
-    // interactive areas positioned over the two artwork choices.
     shell.style.display = 'block';
     shell.style.visibility = 'visible';
   }
