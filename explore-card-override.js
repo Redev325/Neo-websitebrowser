@@ -16,7 +16,7 @@
   var IMPOSTOR_ICON_URL = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/V4icon.png';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
-  var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
+  var GAME_URL = 'https://impostor.devs.surf/';
   var HANK_GAME_URL = 'https://accelerant.nxtdev.xyz/';
   var SONIC_OLD_BUILD_URL = 'https://sonicrestored30.devs.surf/';
   var SONIC_RESTORED_BUILD_URL = 'https://sonicexerealrestored.devs.surf/';
