@@ -13,6 +13,7 @@
   var SONIC_ICON_URL = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/Vs.sonic.exe.png';
   var HANK_ICON_URL = '/VsAccHank.png';
   var HANK_THUMBNAIL_URL = '/assets/vs-accelerant-hank-original.png?v=1';
+  var IMPOSTOR_ICON_URL = '/assets/v4icon.png';
   var FIRST_IMAGE = 'https://camo.githubusercontent.com/831fc627f5c4f8e44b50a16d9eaf4220feacc947f960c04febb3779e36a30056/68747470733a2f2f66696c65732e67616d6562616e616e612e636f6d2f696d672f73732f6d6f64732f363965636665623236386565632e6a7067';
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://redev325.github.io/impostorLegacyPublic/';
@@ -296,8 +297,8 @@
       logo.draggable = false;
       left.insertBefore(logo, parts.title);
     }
-    logo.src = selectedGame === 'sonic' ? SONIC_ICON_URL : selectedGame === 'hank' ? HANK_ICON_URL : ICON_URL;
-    logo.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : VIEWER_TITLE;
+    logo.src = selectedGame === 'sonic' ? SONIC_ICON_URL : selectedGame === 'hank' ? HANK_ICON_URL : selectedGame === 'impostor' ? IMPOSTOR_ICON_URL : ICON_URL;
+    logo.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : selectedGame === 'impostor' ? VIEWER_TITLE : '';
     logo.style.display = 'block';
     logo.style.visibility = 'visible';
     logo.style.width = '30px';
