@@ -494,6 +494,7 @@
           parts.stage.querySelector('#neo-sonic-old-build') ||
           parts.stage.querySelector('#neo-sonic-restored-build') ||
           parts.stage.querySelector('#neo-impostor-legacy-game') ||
+          parts.stage.querySelector('#neo-impostor-v4-game') ||
           parts.stage.querySelector('#neo-accelerant-hank-game');
         if (gameFrame) targets.push(gameFrame);
         targets.push(parts.stage);
@@ -834,6 +835,49 @@
     shell.style.visibility = 'visible';
   }
 
+  function embedVsImpostorV4(stage) {
+    if (!stage || getSelectedGame() !== 'vs-impostor') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+    stage.style.backgroundImage = 'none';
+    stage.style.backgroundColor = '#000';
+
+    var shell = stage.querySelector('#neo-impostor-selection-buttons');
+    if (shell) {
+      shell.style.display = 'none';
+      shell.style.visibility = 'hidden';
+      shell.style.pointerEvents = 'none';
+    }
+
+    var iframe = stage.querySelector('#neo-impostor-v4-game');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'neo-impostor-v4-game';
+      iframe.src = './game/Friday Night Funkin VS Impostor v4.html';
+      iframe.title = 'Friday Night Funkin VS Impostor V4';
+      iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map; pointer-lock';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('playsinline', '');
+      iframe.setAttribute('scrolling', 'no');
+      iframe.style.position = 'absolute';
+      iframe.style.inset = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+      iframe.style.display = 'block';
+      iframe.style.background = '#000';
+      iframe.style.zIndex = '1';
+      iframe.style.colorScheme = 'dark';
+      stage.appendChild(iframe);
+    } else {
+      iframe.style.display = 'block';
+      iframe.style.visibility = 'visible';
+      iframe.style.pointerEvents = 'auto';
+    }
+  }
+
   function setupImpostorSelection(stage) {
     if (!stage || getSelectedGame() !== 'vs-impostor') return;
 
@@ -920,6 +964,11 @@
         button.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
+
+          if (id === 'neo-impostor-selection-v4') {
+            embedVsImpostorV4(stage);
+            return;
+          }
 
           var x = event.clientX;
           var y = event.clientY;
