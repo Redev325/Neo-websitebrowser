@@ -344,24 +344,33 @@
     header.style.overflow = 'hidden';
     header.style.pointerEvents = 'auto';
 
-    var controls = header.querySelector('#neo-game-header-controls');
+    // Put the control strip directly on the viewer root, above the header
+    // and game layer. This avoids any header child/stacking-context intercepting
+    // the X or fullscreen clicks.
+    var controls = root.querySelector('#neo-game-header-controls');
     if (!controls) {
       controls = document.createElement('div');
       controls.id = 'neo-game-header-controls';
-      controls.style.position = 'absolute';
-      controls.style.right = '10px';
-      controls.style.top = '50%';
-      controls.style.transform = 'translateY(-50%)';
-      controls.style.display = 'flex';
-      controls.style.alignItems = 'center';
-      controls.style.gap = '8px';
-      controls.style.zIndex = '2147483647';
-      controls.style.height = '44px';
-      controls.style.padding = '0';
-      controls.style.minWidth = '94px';
-      controls.style.pointerEvents = 'auto';
-      header.appendChild(controls);
     }
+    if (controls.parentElement !== root) root.appendChild(controls);
+
+    root.style.pointerEvents = 'auto';
+    controls.style.position = 'absolute';
+    controls.style.right = '0';
+    controls.style.top = '0';
+    controls.style.transform = 'none';
+    controls.style.display = 'flex';
+    controls.style.alignItems = 'stretch';
+    controls.style.justifyContent = 'flex-end';
+    controls.style.gap = '0';
+    controls.style.zIndex = '2147483647';
+    controls.style.height = '60px';
+    controls.style.width = '120px';
+    controls.style.padding = '0';
+    controls.style.margin = '0';
+    controls.style.minWidth = '120px';
+    controls.style.pointerEvents = 'auto';
+    controls.style.overflow = 'visible';
 
     function makeButton(id, type, titleText) {
       var button = controls.querySelector('#' + id);
@@ -381,12 +390,12 @@
 
       button.setAttribute('aria-label', titleText);
       button.title = titleText;
-      // Keep the icon visually compact, but give it a much easier
-      // 44px hit target so clicks do not require pixel precision.
-      button.style.width = '48px';
-      button.style.height = '48px';
-      button.style.minWidth = '48px';
-      button.style.minHeight = '48px';
+      // Each button is one full 60px slot. There is no gap between them,
+      // so the entire visible control area is directly clickable.
+      button.style.width = '60px';
+      button.style.height = '60px';
+      button.style.minWidth = '60px';
+      button.style.minHeight = '60px';
       button.style.padding = '0';
       button.style.margin = '0';
       button.style.display = 'flex';
@@ -424,7 +433,7 @@
         function inExpandedRect(el) {
           if (!el || !el.isConnected) return false;
           var r = el.getBoundingClientRect();
-          var padX = 10, padY = 10;
+          var padX = 0, padY = 0;
           return event.clientX >= r.left - padX &&
                  event.clientX <= r.right + padX &&
                  event.clientY >= r.top - padY &&
