@@ -354,7 +354,7 @@
       controls.style.transform = 'translateY(-50%)';
       controls.style.display = 'flex';
       controls.style.alignItems = 'center';
-      controls.style.gap = '4px';
+      controls.style.gap = '8px';
       controls.style.zIndex = '2147483647';
       controls.style.height = '44px';
       controls.style.padding = '0';
@@ -383,10 +383,10 @@
       button.title = titleText;
       // Keep the icon visually compact, but give it a much easier
       // 44px hit target so clicks do not require pixel precision.
-      button.style.width = '44px';
-      button.style.height = '44px';
-      button.style.minWidth = '44px';
-      button.style.minHeight = '44px';
+      button.style.width = '48px';
+      button.style.height = '48px';
+      button.style.minWidth = '48px';
+      button.style.minHeight = '48px';
       button.style.padding = '0';
       button.style.margin = '0';
       button.style.display = 'flex';
@@ -409,6 +409,40 @@
 
     var fullscreenButton = makeButton('neo-game-fullscreen', 'fullscreen', 'Fullscreen');
     var closeButton = makeButton('neo-game-close', 'close', 'Exit');
+
+    // Some viewer layers can sit above the custom controls even though the
+    // controls have a high z-index. Add a document-level pointer hit test so
+    // the two controls remain easy to activate from anywhere inside their
+    // enlarged hit rectangles.
+    if (!document.__neoViewerControlPointerCapture) {
+      document.__neoViewerControlPointerCapture = true;
+      document.addEventListener('pointerdown', function (event) {
+        var fs = document.getElementById('neo-game-fullscreen');
+        var close = document.getElementById('neo-game-close');
+        if (!fs && !close) return;
+
+        function inExpandedRect(el) {
+          if (!el || !el.isConnected) return false;
+          var r = el.getBoundingClientRect();
+          var padX = 10, padY = 10;
+          return event.clientX >= r.left - padX &&
+                 event.clientX <= r.right + padX &&
+                 event.clientY >= r.top - padY &&
+                 event.clientY <= r.bottom + padY;
+        }
+
+        var hit = inExpandedRect(fs) ? fs : inExpandedRect(close) ? close : null;
+        if (!hit) return;
+
+        // Ignore the event if it already originated from the actual custom
+        // button; its normal handler will process it.
+        if (event.target === hit || (event.target && hit.contains(event.target))) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        try { hit.click(); } catch (_) {}
+      }, true);
+    }
 
     if (!fullscreenButton.__neoBound) {
       fullscreenButton.__neoBound = true;
