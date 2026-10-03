@@ -297,8 +297,8 @@
       logo.draggable = false;
       left.insertBefore(logo, parts.title);
     }
-    logo.src = selectedGame === 'sonic' ? SONIC_ICON_URL : selectedGame === 'hank' ? HANK_ICON_URL : selectedGame === 'impostor' ? IMPOSTOR_ICON_URL : ICON_URL;
-    logo.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : selectedGame === 'impostor' ? VIEWER_TITLE : '';
+    logo.src = selectedGame === 'sonic' ? SONIC_ICON_URL : selectedGame === 'hank' ? HANK_ICON_URL : selectedGame === 'impostor' ? IMPOSTOR_ICON_URL : selectedGame === 'vs-impostor' ? IMPOSTOR_ICON_URL : ICON_URL;
+    logo.alt = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : selectedGame === 'impostor' ? VIEWER_TITLE : selectedGame === 'vs-impostor' ? FOURTH_TITLE : '';
     logo.style.display = 'block';
     logo.style.visibility = 'visible';
     logo.style.width = '30px';
@@ -319,7 +319,7 @@
       }
     }
 
-    parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : VIEWER_TITLE;
+    parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : selectedGame === 'impostor' ? VIEWER_TITLE : selectedGame === 'vs-impostor' ? FOURTH_TITLE : parts.title.textContent;
     parts.title.title = parts.title.textContent;
     parts.title.style.display = 'block';
     parts.title.style.minWidth = '0';
@@ -931,6 +931,9 @@
         updateViewerLogo(parts, selectedGame);
       } else {
         root.setAttribute('data-neo-game-viewer', 'generic');
+        if (parts.title && exactText(parts.title) === FOURTH_TITLE) {
+          updateViewerLogo(parts, 'vs-impostor');
+        }
       }
     }
 
