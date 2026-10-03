@@ -6,6 +6,7 @@
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
   var SECOND_TITLE = 'Vs Sonic.exe(2.0-4.0)';
   var THIRD_TITLE = 'Vs Accelerant Hank';
+  var FOURTH_TITLE = 'Vs Impostor';
   var SECOND_IMAGE = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/vs-sonic-exe-2-0-4-0.jpg';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
@@ -47,7 +48,7 @@
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
-      if (t !== FIRST_TITLE && t !== SECOND_TITLE && t !== THIRD_TITLE && !/^Placeholder \d+$/.test(t)) continue;
+      if (t !== FIRST_TITLE && t !== SECOND_TITLE && t !== THIRD_TITLE && t !== FOURTH_TITLE && !/^Placeholder \d+$/.test(t)) continue;
       var card = cardFromTitle(nodes[i]);
       if (card && isLikelyExploreCard(card) && cards.indexOf(card) === -1) cards.push(card);
     }
@@ -69,6 +70,7 @@
       if (index === 0 && (t === 'Placeholder 1' || t === FIRST_TITLE)) return nodes[i];
       if (index === 1 && (t === 'Placeholder 2' || t === SECOND_TITLE)) return nodes[i];
       if (index === 2 && (t === 'Placeholder 3' || t === THIRD_TITLE)) return nodes[i];
+      if (index === 3 && t === FOURTH_TITLE) return nodes[i];
       if (index >= 2 && /^Placeholder \d+$/.test(t)) return nodes[i];
       if (wanted && t === wanted) return nodes[i];
     }
@@ -109,6 +111,20 @@
       image2.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;z-index:1;background:#000;';
       var svgs2 = preview.querySelectorAll('svg');
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
+    }
+    if (index === 3) {
+      // Card 004 is intentionally a blank thumbnail. Remove inherited
+      // placeholder artwork/content from the original React card.
+      title.textContent = FOURTH_TITLE;
+      preview.style.background = '#1a1a1a';
+      preview.style.backgroundColor = '#1a1a1a';
+      preview.style.backgroundImage = 'none';
+      preview.style.boxShadow = 'none';
+      var inheritedChildren = Array.prototype.slice.call(preview.children);
+      for (var ic = 0; ic < inheritedChildren.length; ic++) {
+        inheritedChildren[ic].style.display = 'none';
+        inheritedChildren[ic].style.visibility = 'hidden';
+      }
     }
     if (index === 2) {
       title.textContent = THIRD_TITLE;
