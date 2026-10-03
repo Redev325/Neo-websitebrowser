@@ -843,39 +843,143 @@
     stage.style.backgroundImage = 'url("https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/impselection.png")';
     stage.style.backgroundRepeat = 'no-repeat';
     stage.style.backgroundPosition = 'center center';
-    // Keep the complete selection artwork visible instead of cropping it.
     stage.style.backgroundSize = 'contain';
 
-    // Give the existing selection buttons the same feedback style used by
-    // the Sonic.EXE buttons without replacing or covering the background.
-    var buttons = stage.querySelectorAll('button:not(.neo-viewer-custom-control)');
-    for (var i = 0; i < buttons.length; i++) {
-      var button = buttons[i];
-      if (button.__neoImpostorHoverBound) continue;
-      button.__neoImpostorHoverBound = true;
+    var shell = stage.querySelector('#neo-impostor-selection-buttons');
+    if (!shell) {
+      shell = document.createElement('div');
+      shell.id = 'neo-impostor-selection-buttons';
+      shell.style.position = 'absolute';
+      shell.style.inset = '0';
+      shell.style.pointerEvents = 'none';
+      shell.style.zIndex = '12';
+      shell.style.overflow = 'hidden';
+      stage.appendChild(shell);
 
-      button.style.transition = 'filter .14s ease, box-shadow .14s ease, transform .14s ease';
-      button.style.willChange = 'filter, transform';
-      button.style.cursor = 'pointer';
+      function createSelectionButton(id, label, box) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.id = id;
+        button.className = 'neo-impostor-selection-button';
+        button.setAttribute('aria-label', label);
+        button.title = label;
 
-      button.addEventListener('mouseenter', function () {
-        this.style.filter = 'brightness(1.14) drop-shadow(0 0 10px rgba(255,70,70,.55))';
-        this.style.boxShadow = '0 0 18px rgba(255,60,60,.30)';
-        this.style.transform = 'scale(1.018)';
+        button.style.position = 'absolute';
+        button.style.boxSizing = 'border-box';
+        button.style.padding = '0';
+        button.style.margin = '0';
+        button.style.border = '0';
+        button.style.outline = '0';
+        button.style.background = 'transparent';
+        button.style.cursor = 'pointer';
+        button.style.pointerEvents = 'auto';
+        button.style.overflow = 'hidden';
+        button.style.borderRadius = '999px';
+        button.style.transformOrigin = 'center center';
+        button.style.transition = 'transform .14s ease';
+        button.dataset.srcX = String(box.x);
+        button.dataset.srcY = String(box.y);
+        button.dataset.srcW = String(box.w);
+        button.dataset.srcH = String(box.h);
+
+        // Crop the exact button artwork from the same source image. This
+        // preserves the image underneath while letting the visible button
+        // itself receive the Sonic-style hover filter.
+        var image = document.createElement('img');
+        image.src = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/impselection.png';
+        image.alt = '';
+        image.draggable = false;
+        image.style.position = 'absolute';
+        image.style.maxWidth = 'none';
+        image.style.pointerEvents = 'none';
+        image.style.userSelect = 'none';
+        image.style.display = 'block';
+        button.appendChild(image);
+
+        button.addEventListener('mouseenter', function () {
+          this.style.transform = 'scale(1.018)';
+          image.style.filter = 'brightness(1.14) drop-shadow(0 0 10px rgba(255,70,70,.55))';
+        });
+
+        button.addEventListener('mouseleave', function () {
+          this.style.transform = 'scale(1)';
+          image.style.filter = 'none';
+        });
+
+        button.addEventListener('mousedown', function (event) {
+          if (event.button !== 0) return;
+          this.style.transform = 'scale(.988)';
+        });
+
+        button.addEventListener('mouseup', function () {
+          this.style.transform = 'scale(1.018)';
+        });
+
+        // Keep the artwork above the background but do not add a square
+        // overlay or border around the button.
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          var x = event.clientX;
+          var y = event.clientY;
+          this.style.visibility = 'hidden';
+          var underlying = document.elementFromPoint(x, y);
+          this.style.visibility = 'visible';
+
+          try {
+            var targetButton = underlying && underlying.closest
+              ? underlying.closest('button,a,[role="button"]')
+              : null;
+            if (targetButton && targetButton !== this) targetButton.click();
+          } catch (_) {}
+        });
+
+        shell.appendChild(button);
+      }
+
+      // Exact source-image coordinates (1095 x 647) for the two rounded
+      // Vs Impostor selection buttons in impselection.png.
+      createSelectionButton('neo-impostor-selection-v4', 'Play Impostor V4', {
+        x: 336, y: 234, w: 430, h: 102
       });
-      button.addEventListener('mouseleave', function () {
-        this.style.filter = 'none';
-        this.style.boxShadow = 'none';
-        this.style.transform = 'scale(1)';
-      });
-      button.addEventListener('mousedown', function (event) {
-        if (event.button !== 0) return;
-        this.style.transform = 'scale(.988)';
-      });
-      button.addEventListener('mouseup', function () {
-        this.style.transform = 'scale(1.018)';
+      createSelectionButton('neo-impostor-selection-redot', 'Play Impostor RedDot Update', {
+        x: 336, y: 399, w: 430, h: 103
       });
     }
+
+    var stageRect = stage.getBoundingClientRect();
+    if (stageRect.width <= 0 || stageRect.height <= 0) return;
+
+    var sourceW = 1095, sourceH = 647;
+    var scale = Math.min(stageRect.width / sourceW, stageRect.height / sourceH);
+    var displayedW = sourceW * scale;
+    var displayedH = sourceH * scale;
+    var offsetX = (stageRect.width - displayedW) / 2;
+    var offsetY = (stageRect.height - displayedH) / 2;
+
+    var buttons = shell.querySelectorAll('.neo-impostor-selection-button');
+    for (var i = 0; i < buttons.length; i++) {
+      var button = buttons[i];
+      var x = Number(button.dataset.srcX);
+      var y = Number(button.dataset.srcY);
+      var w = Number(button.dataset.srcW);
+      var h = Number(button.dataset.srcH);
+
+      button.style.left = (offsetX + x * scale) + 'px';
+      button.style.top = (offsetY + y * scale) + 'px';
+      button.style.width = (w * scale) + 'px';
+      button.style.height = (h * scale) + 'px';
+
+      var image = button.querySelector('img');
+      image.style.width = displayedW + 'px';
+      image.style.height = displayedH + 'px';
+      image.style.left = (-x * scale) + 'px';
+      image.style.top = (-y * scale) + 'px';
+    }
+
+    shell.style.display = 'block';
+    shell.style.visibility = 'visible';
   }
 
   function embedImpostor(root, stage) {
