@@ -255,28 +255,32 @@
       simplifyCard(cards[i], i);
       if (i === 0 && !cards[i].__neoImpostorClickBound) {
         cards[i].__neoImpostorClickBound = true;
-        cards[i].addEventListener('click', function (event) {\n          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
+        cards[i].addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
           setSelectedGame('impostor');
           scheduleViewerActivation();
         }, true);
       }
       if (i === 1 && !cards[i].__neoSonicClickBound) {
         cards[i].__neoSonicClickBound = true;
-        cards[i].addEventListener('click', function (event) {\n          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
+        cards[i].addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
           setSelectedGame('sonic');
           scheduleViewerActivation();
         }, true);
       }
       if (i === 2 && !cards[i].__neoHankClickBound) {
         cards[i].__neoHankClickBound = true;
-        cards[i].addEventListener('click', function (event) {\n          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
+        cards[i].addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
           setSelectedGame('hank');
           scheduleViewerActivation();
         }, true);
       }
       if (i === 3 && !cards[i].__neoImpostorV4ClickBound) {
         cards[i].__neoImpostorV4ClickBound = true;
-        cards[i].addEventListener('click', function (event) {\n          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
+        cards[i].addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
           setSelectedGame('vs-impostor');
           scheduleViewerActivation();
         }, true);
