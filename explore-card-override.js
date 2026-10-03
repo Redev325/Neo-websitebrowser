@@ -341,7 +341,7 @@
     var selectedGame = getSelectedGame();
 
     header.style.position = 'relative';
-    header.style.overflow = 'hidden';
+    header.style.overflow = 'visible';
     header.style.pointerEvents = 'auto';
 
     // Put the control strip directly on the viewer root, above the header
@@ -419,165 +419,124 @@
     var fullscreenButton = makeButton('neo-game-fullscreen', 'fullscreen', 'Fullscreen');
     var closeButton = makeButton('neo-game-close', 'close', 'Exit');
 
-    // Some viewer layers can sit above the custom controls even though the
-    // controls have a high z-index. Add a document-level pointer hit test so
-    // the two controls remain easy to activate from anywhere inside their
-    // enlarged hit rectangles.
-    if (!document.__neoViewerControlPointerCapture) {
-      document.__neoViewerControlPointerCapture = true;
-      document.addEventListener('pointerdown', function (event) {
-        var fs = document.getElementById('neo-game-fullscreen');
-        var close = document.getElementById('neo-game-close');
-        if (!fs && !close) return;
-
-        function inExpandedRect(el) {
-          if (!el || !el.isConnected) return false;
-          var r = el.getBoundingClientRect();
-          var padX = 0, padY = 0;
-          return event.clientX >= r.left - padX &&
-                 event.clientX <= r.right + padX &&
-                 event.clientY >= r.top - padY &&
-                 event.clientY <= r.bottom + padY;
+    function exitFullscreenNow() {
+      var activeFullscreen =
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement;
+      if (!activeFullscreen) return false;
+      try {
+        var exit = document.exitFullscreen ||
+          document.webkitExitFullscreen ||
+          document.mozCancelFullScreen ||
+          document.msExitFullscreen;
+        if (exit) {
+          var exitResult = exit.call(document);
+          if (exitResult && typeof exitResult.catch === 'function') exitResult.catch(function () {});
         }
+      } catch (_) {}
+      return true;
+    }
 
-        var hit = inExpandedRect(fs) ? fs : inExpandedRect(close) ? close : null;
-        if (!hit) return;
+    function fullscreenNow() {
+      if (exitFullscreenNow()) return;
+      var targets = [];
+      if (parts.stage) {
+        var gameFrame =
+          parts.stage.querySelector('#neo-sonic-old-build') ||
+          parts.stage.querySelector('#neo-sonic-restored-build') ||
+          parts.stage.querySelector('#neo-impostor-legacy-game') ||
+          parts.stage.querySelector('#neo-accelerant-hank-game');
+        if (gameFrame) targets.push(gameFrame);
+        targets.push(parts.stage);
+      }
+      if (root) targets.push(root);
+      if (document.documentElement) targets.push(document.documentElement);
+      for (var ti = 0; ti < targets.length; ti++) {
+        var target = targets[ti];
+        if (!target) continue;
+        var request =
+          target.requestFullscreen ||
+          target.webkitRequestFullscreen ||
+          target.mozRequestFullScreen ||
+          target.msRequestFullscreen;
+        if (!request) continue;
+        try {
+          var result = request.call(target);
+          if (result && typeof result.catch === 'function') result.catch(function () {});
+          return;
+        } catch (_) {}
+      }
+    }
 
-        // Ignore the event if it already originated from the actual custom
-        // button; its normal handler will process it.
-        if (event.target === hit || (event.target && hit.contains(event.target))) return;
+    function closeViewerNow() {
+      exitFullscreenNow();
 
+      var liveClose = null;
+      try {
+        var candidates = Array.prototype.slice.call(
+          header.querySelectorAll('button:not(.neo-viewer-custom-control)')
+        );
+        for (var li = candidates.length - 1; li >= 0; li--) {
+          var candidate = candidates[li];
+          var label = ((candidate.getAttribute('aria-label') || '') + ' ' + (candidate.title || '')).toLowerCase();
+          if (label.indexOf('close') !== -1 || label.indexOf('exit') !== -1) {
+            liveClose = candidate;
+            break;
+          }
+        }
+        if (!liveClose && candidates.length) liveClose = candidates[candidates.length - 1];
+      } catch (_) {}
+
+      if (getSelectedGame()) setSelectedGame('');
+
+      try {
+        if (liveClose && liveClose !== closeButton) {
+          liveClose.click();
+        } else if (header.__neoNativeClose &&
+                   header.__neoNativeClose.isConnected &&
+                   header.__neoNativeClose !== closeButton) {
+          header.__neoNativeClose.click();
+        }
+      } catch (_) {}
+    }
+
+    // Handle the pointer on the control strip itself, not the small SVG icon.
+    // Every point in each 60px slot is a real activation area.
+    if (!controls.__neoPointerBound) {
+      controls.__neoPointerBound = true;
+      controls.addEventListener('pointerdown', function (event) {
+        var target = event.target && event.target.closest
+          ? event.target.closest('.neo-viewer-custom-control')
+          : null;
+        if (!target) return;
         event.preventDefault();
         event.stopPropagation();
-        try { hit.click(); } catch (_) {}
+        try {
+          if (target === fullscreenButton) fullscreenNow();
+          else if (target === closeButton) closeViewerNow();
+        } catch (_) {}
+      }, true);
+      controls.addEventListener('mousedown', function (event) {
+        if (event.button !== 0) return;
+        var target = event.target && event.target.closest
+          ? event.target.closest('.neo-viewer-custom-control')
+          : null;
+        if (!target) return;
+        event.preventDefault();
+        event.stopPropagation();
       }, true);
     }
 
-    if (!fullscreenButton.__neoBound) {
-      fullscreenButton.__neoBound = true;
-      fullscreenButton.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        var activeFullscreen =
-          document.fullscreenElement ||
-          document.webkitFullscreenElement ||
-          document.mozFullScreenElement ||
-          document.msFullscreenElement;
-
-        if (activeFullscreen) {
-          try {
-            var exit = document.exitFullscreen ||
-              document.webkitExitFullscreen ||
-              document.mozCancelFullScreen ||
-              document.msExitFullscreen;
-            if (exit) {
-              var exitResult = exit.call(document);
-              if (exitResult && typeof exitResult.catch === 'function') {
-                exitResult.catch(function () {});
-              }
-            }
-          } catch (_) {}
-          return;
-        }
-
-        // Prefer the actual game iframe, then the viewer stage, then the
-        // complete viewer root. The first successful request wins.
-        var targets = [];
-        if (parts.stage) {
-          var gameFrame =
-            parts.stage.querySelector('#neo-sonic-old-build') ||
-            parts.stage.querySelector('#neo-sonic-restored-build') ||
-            parts.stage.querySelector('#neo-impostor-legacy-game') ||
-            parts.stage.querySelector('#neo-accelerant-hank-game');
-          if (gameFrame) targets.push(gameFrame);
-          targets.push(parts.stage);
-        }
-        if (root) targets.push(root);
-        if (header.parentElement) targets.push(header.parentElement);
-        if (document.documentElement) targets.push(document.documentElement);
-
-        for (var ti = 0; ti < targets.length; ti++) {
-          var target = targets[ti];
-          if (!target) continue;
-          var request =
-            target.requestFullscreen ||
-            target.webkitRequestFullscreen ||
-            target.mozRequestFullScreen ||
-            target.msRequestFullscreen;
-          if (!request) continue;
-          try {
-            var result = request.call(target);
-            if (result && typeof result.catch === 'function') {
-              result.catch(function () {});
-            }
-            // A request was made; don't keep calling other fullscreen targets.
-            break;
-          } catch (_) {}
-        }
-      });
-    }
-
-    if (!closeButton.__neoBound) {
-      closeButton.__neoBound = true;
-      closeButton.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        var activeFullscreen =
-          document.fullscreenElement ||
-          document.webkitFullscreenElement ||
-          document.mozFullScreenElement ||
-          document.msFullscreenElement;
-
-        if (activeFullscreen) {
-          try {
-            var exit = document.exitFullscreen ||
-              document.webkitExitFullscreen ||
-              document.mozCancelFullScreen ||
-              document.msExitFullscreen;
-            if (exit) {
-              var exitResult = exit.call(document);
-              if (exitResult && typeof exitResult.catch === 'function') {
-                exitResult.catch(function () {});
-              }
-            }
-          } catch (_) {}
-        }
-
-        // Resolve the CURRENT native close button on every click because the
-        // React viewer can replace its header/button tree between renders.
-        var liveClose = null;
-        try {
-          var candidates = Array.prototype.slice.call(
-            header.querySelectorAll('button:not(.neo-viewer-custom-control)')
-          );
-          for (var li = candidates.length - 1; li >= 0; li--) {
-            var candidate = candidates[li];
-            var label = ((candidate.getAttribute('aria-label') || '') + ' ' + (candidate.title || '')).toLowerCase();
-            if (label.indexOf('close') !== -1 || label.indexOf('exit') !== -1) {
-              liveClose = candidate;
-              break;
-            }
-          }
-          if (!liveClose && candidates.length) liveClose = candidates[candidates.length - 1];
-        } catch (_) {}
-
-        if (getSelectedGame()) setSelectedGame('');
-
-        // Always invoke the real viewer close handler too. This closes the
-        // React modal state for both special and generic game viewers.
-        try {
-          if (liveClose && liveClose !== closeButton) {
-            liveClose.click();
-          } else if (header.__neoNativeClose &&
-                     header.__neoNativeClose.isConnected &&
-                     header.__neoNativeClose !== closeButton) {
-            header.__neoNativeClose.click();
-          }
-        } catch (_) {}
-      });
-    }
+    fullscreenButton.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    closeButton.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    };
 
     // Preserve the actual native close handler for generic viewers.
     // This lets the current X close placeholder/non-special viewers too.
