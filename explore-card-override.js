@@ -344,23 +344,21 @@
     header.style.overflow = 'visible';
     header.style.pointerEvents = 'auto';
 
-    // Put the control strip directly on the viewer root, above the header
-    // and game layer. This avoids any header child/stacking-context intercepting
-    // the X or fullscreen clicks.
-    var controls = root.querySelector('#neo-game-header-controls');
+    // Keep the controls inside the actual viewer header so they stay aligned
+    // with the bar and inherit its exact vertical position.
+    var controls = header.querySelector('#neo-game-header-controls');
     if (!controls) {
       controls = document.createElement('div');
       controls.id = 'neo-game-header-controls';
+      header.appendChild(controls);
+    } else if (controls.parentElement !== header) {
+      header.appendChild(controls);
     }
-    if (controls.parentElement !== root) root.appendChild(controls);
 
-    root.style.pointerEvents = 'auto';
+    header.style.pointerEvents = 'auto';
     controls.style.position = 'absolute';
     controls.style.right = '0';
-    // The controls are attached to the viewer root, so anchor their vertical
-    // position to the actual header height instead of the whole viewer.
-    var headerHeight = header.getBoundingClientRect().height || 56;
-    controls.style.top = (headerHeight / 2) + 'px';
+    controls.style.top = '50%';
     controls.style.transform = 'translateY(-50%)';
     controls.style.display = 'flex';
     controls.style.alignItems = 'stretch';
