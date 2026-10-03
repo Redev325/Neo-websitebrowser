@@ -965,23 +965,19 @@
           event.preventDefault();
           event.stopPropagation();
 
+          // The two choices are one selection screen. Pressing either
+          // button hides the entire pair for this viewer session.
+          var selectionShell = stage.querySelector('#neo-impostor-selection-buttons');
+          if (selectionShell) {
+            selectionShell.style.display = 'none';
+            selectionShell.style.visibility = 'hidden';
+            selectionShell.style.pointerEvents = 'none';
+          }
+
           if (id === 'neo-impostor-selection-v4') {
             embedVsImpostorV4(stage);
             return;
           }
-
-          var x = event.clientX;
-          var y = event.clientY;
-          this.style.visibility = 'hidden';
-          var underlying = document.elementFromPoint(x, y);
-          this.style.visibility = 'visible';
-
-          try {
-            var targetButton = underlying && underlying.closest
-              ? underlying.closest('button,a,[role="button"]')
-              : null;
-            if (targetButton && targetButton !== this) targetButton.click();
-          } catch (_) {}
         });
 
         shell.appendChild(button);
