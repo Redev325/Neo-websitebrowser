@@ -176,12 +176,23 @@
     }
   }
   function setSelectedGame(value) {
+    var previousValue = window.__neoSelectedGame || '';
     try {
       if (value) sessionStorage.setItem(SELECTED_GAME_KEY, value);
       else sessionStorage.removeItem(SELECTED_GAME_KEY);
     } catch (_) {}
     window.__neoSelectedGame = value || '';
     window.__neoSonicViewer = value === 'sonic';
+
+    // The Vs Impostor selection screen is reset whenever a new viewer
+    // session is opened. Clicking either selection button then dismisses
+    // both buttons until this viewer is closed.
+    if (value === 'vs-impostor' && previousValue !== 'vs-impostor') {
+      window.__neoImpostorSelectionDismissed = false;
+    } else if (!value) {
+      window.__neoImpostorSelectionDismissed = false;
+    }
+
     if (!value && window.__neoViewerHeaderObserver) {
       try { window.__neoViewerHeaderObserver.disconnect(); } catch (_) {}
       window.__neoViewerHeaderObserver = null;
@@ -967,6 +978,10 @@
 
           // The two choices are one selection screen. Pressing either
           // button hides the entire pair for this viewer session.
+          // Dismiss the complete pair for the rest of this viewer
+          // session. It is reset when the viewer is closed/reopened.
+          window.__neoImpostorSelectionDismissed = true;
+
           var selectionShell = stage.querySelector('#neo-impostor-selection-buttons');
           if (selectionShell) {
             selectionShell.style.display = 'none';
@@ -1023,8 +1038,15 @@
       image.style.top = (-y * scale) + 'px';
     }
 
-    shell.style.display = 'block';
-    shell.style.visibility = 'visible';
+    if (window.__neoImpostorSelectionDismissed) {
+      shell.style.display = 'none';
+      shell.style.visibility = 'hidden';
+      shell.style.pointerEvents = 'none';
+    } else {
+      shell.style.display = 'block';
+      shell.style.visibility = 'visible';
+      shell.style.pointerEvents = 'auto';
+    }
   }
 
   function embedImpostor(root, stage) {
