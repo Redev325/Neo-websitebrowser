@@ -283,6 +283,7 @@
 
   function updateViewerLogo(parts, selectedGame) {
     if (!parts || !parts.left || !parts.title) return;
+
     var left = parts.left;
     var desiredIcon =
       selectedGame === 'sonic' ? SONIC_ICON_URL :
@@ -295,30 +296,48 @@
     left.style.alignItems = 'center';
     left.style.gap = '10px';
     left.style.minWidth = '0';
-    left.style.paddingLeft = desiredIcon ? '40px' : '0';
-    left.style.backgroundRepeat = 'no-repeat';
-    left.style.backgroundPosition = '0 center';
-    left.style.backgroundSize = desiredIcon ? '30px 30px' : '0 0';
-    left.style.backgroundColor = 'transparent';
     left.style.animation = 'none';
     left.style.transition = 'none';
 
-    // Use a background image on the stable header container instead of
-    // inserting/replacing an <img>. The React viewer can re-render its
-    // children, but this keeps the game icon from flashing.
-    if (left.__neoViewerIconUrl !== desiredIcon) {
-      left.__neoViewerIconUrl = desiredIcon;
-      left.style.backgroundImage = desiredIcon ? 'url("' + desiredIcon.replace(/"/g, '\\\"') + '")' : 'none';
+    // Keep one real image in the header instead of replacing it every
+    // mutation. This preserves the original Legacy icon rendering and stops
+    // the icon from blinking during React re-renders.
+    var logo = left.querySelector('#neo-game-header-logo');
+    if (!logo) {
+      logo = document.createElement('img');
+      logo.id = 'neo-game-header-logo';
+      logo.alt = '';
+      logo.draggable = false;
+      logo.loading = 'eager';
+      logo.decoding = 'async';
+      logo.style.display = 'block';
+      logo.style.visibility = 'visible';
+      logo.style.width = '30px';
+      logo.style.height = '30px';
+      logo.style.flex = '0 0 30px';
+      logo.style.objectFit = 'contain';
+      logo.style.objectPosition = 'center';
+      logo.style.imageRendering = 'auto';
+      logo.style.position = 'relative';
+      logo.style.pointerEvents = 'none';
+      logo.style.background = 'transparent';
+      logo.style.border = '0';
+      left.insertBefore(logo, parts.title);
     }
 
-    var injectedLogo = left.querySelector('#neo-game-header-logo');
-    if (injectedLogo) injectedLogo.remove();
+    if (logo.src !== desiredIcon && desiredIcon) logo.src = desiredIcon;
+    if (!desiredIcon) {
+      logo.style.display = 'none';
+    } else {
+      logo.style.display = 'block';
+      logo.style.visibility = 'visible';
+    }
 
-    // Hide the app's generic icon, leaving the stable custom background icon.
+    // Hide the app's generic icon, leaving the real game icon.
     var children = left.children;
     for (var ci = 0; ci < children.length; ci++) {
       var child = children[ci];
-      if (child !== parts.title && child.tagName === 'DIV') {
+      if (child !== logo && child !== parts.title && child.tagName === 'DIV') {
         child.style.display = 'none';
       }
     }
