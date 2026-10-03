@@ -342,6 +342,7 @@
 
     header.style.position = 'relative';
     header.style.overflow = 'hidden';
+    header.style.pointerEvents = 'auto';
 
     var controls = header.querySelector('#neo-game-header-controls');
     if (!controls) {
@@ -355,7 +356,9 @@
       controls.style.alignItems = 'center';
       controls.style.gap = '4px';
       controls.style.zIndex = '2147483647';
-      controls.style.height = '36px';
+      controls.style.height = '44px';
+      controls.style.padding = '0';
+      controls.style.minWidth = '94px';
       controls.style.pointerEvents = 'auto';
       header.appendChild(controls);
     }
@@ -378,10 +381,12 @@
 
       button.setAttribute('aria-label', titleText);
       button.title = titleText;
-      button.style.width = '34px';
-      button.style.height = '34px';
-      button.style.minWidth = '34px';
-      button.style.minHeight = '34px';
+      // Keep the icon visually compact, but give it a much easier
+      // 44px hit target so clicks do not require pixel precision.
+      button.style.width = '44px';
+      button.style.height = '44px';
+      button.style.minWidth = '44px';
+      button.style.minHeight = '44px';
       button.style.padding = '0';
       button.style.margin = '0';
       button.style.display = 'flex';
@@ -390,6 +395,8 @@
       button.style.cursor = 'pointer';
       button.style.pointerEvents = 'auto';
       button.style.visibility = 'visible';
+      button.style.touchAction = 'manipulation';
+      button.style.userSelect = 'none';
       button.style.opacity = '1';
       button.style.color = 'inherit';
       button.style.background = 'transparent';
@@ -920,6 +927,18 @@
         updateViewerLogo(parts, selectedGame);
       } else {
         root.setAttribute('data-neo-game-viewer', 'generic');
+      }
+    }
+
+    // The game surface itself must remain fully interactive.
+    if (parts.stage) {
+      parts.stage.style.pointerEvents = 'auto';
+      parts.stage.style.userSelect = 'none';
+    }
+    if (parts.stage) {
+      var interactiveFrames = parts.stage.querySelectorAll('iframe');
+      for (var pf = 0; pf < interactiveFrames.length; pf++) {
+        interactiveFrames[pf].style.pointerEvents = 'auto';
       }
     }
 
