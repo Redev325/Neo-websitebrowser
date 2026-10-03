@@ -316,7 +316,7 @@ u.length===0?g.jsx("p",{className:"text-center text-muted-foreground py-16",chil
 g.jsx("div",{className:"grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4",children:u.map((f,h)=>
 g.jsx(_E,{delay:Math.min(h*6,300),children:
 g.jsxs("div",{className:"neo-explore-card group relative w-full text-left rounded-lg overflow-hidden border border-border/60 bg-[#1a1a1a] hover:border-accent/50 hover:-translate-y-1 hover:shadow-xl hover:shadow-accent/10 transition-all duration-300",children:[
-g.jsxs("button",{type:"button",onClick:()=>t(f),className:"block w-full text-left",children:[
+g.jsxs("div",{onClick:()=>t(f),className:"block w-full text-left",role:"button",tabIndex:0,onKeyDown:m=>{if(m.key==="Enter"||m.key===" "){m.preventDefault(),t(f)}},children:[
 g.jsx("div",{className:"aspect-video w-full relative overflow-hidden bg-[#161616]"}),
 g.jsxs("div",{className:"p-3 flex flex-col gap-2",children:[
 g.jsx("p",{className:"text-sm font-bold text-white truncate",children:f.title}),
