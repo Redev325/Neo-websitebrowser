@@ -334,71 +334,78 @@
   }
 
   function updateViewerControls(parts, root) {
-    if (!parts || !parts.right) return;
-    var row = parts.right;
-    row.style.display = 'flex';
-    row.style.alignItems = 'center';
-    row.style.gap = '4px';
-    row.style.flexShrink = '0';
+    if (!parts || !parts.header) return;
 
-    var buttons = Array.prototype.slice.call(row.querySelectorAll('button'));
-    if (!buttons.length) return;
+    var header = parts.header;
+    var selectedGame = getSelectedGame();
+    if (selectedGame !== 'impostor' && selectedGame !== 'sonic' && selectedGame !== 'hank') return;
 
-    // Built viewer: the last native button is the actual X/close handler.
-    var close = buttons[buttons.length - 1];
-    for (var i = 0; i < buttons.length - 1; i++) {
-      buttons[i].style.display = 'none';
-      buttons[i].style.visibility = 'hidden';
-      buttons[i].style.pointerEvents = 'none';
-    }
-    close.style.display = 'flex';
-    close.style.visibility = 'visible';
-    close.style.pointerEvents = 'auto';
-    close.style.opacity = '1';
-    close.style.width = '28px';
-    close.style.height = '28px';
-    close.style.padding = '0';
-    close.style.margin = '0';
-    close.setAttribute('aria-label', 'Exit');
-    close.title = 'Exit';
+    header.style.position = 'relative';
+    header.style.overflow = 'hidden';
 
-    if (!close.__neoCloseBound) {
-      close.__neoCloseBound = true;
-      close.addEventListener('click', function () {
-        setSelectedGame('');
-      }, true);
+    var controls = header.querySelector('#neo-game-header-controls');
+    if (!controls) {
+      controls = document.createElement('div');
+      controls.id = 'neo-game-header-controls';
+      controls.style.position = 'absolute';
+      controls.style.right = '10px';
+      controls.style.top = '50%';
+      controls.style.transform = 'translateY(-50%)';
+      controls.style.display = 'flex';
+      controls.style.alignItems = 'center';
+      controls.style.gap = '4px';
+      controls.style.zIndex = '2147483647';
+      controls.style.height = '36px';
+      controls.style.pointerEvents = 'auto';
+      header.appendChild(controls);
     }
 
-    var fs = row.querySelector('#neo-game-fullscreen');
-    if (!fs) {
-      fs = document.createElement('button');
-      fs.id = 'neo-game-fullscreen';
-      fs.type = 'button';
-      fs.setAttribute('aria-label', 'Fullscreen');
-      fs.title = 'Fullscreen';
-      fs.innerHTML = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      fs.style.width = '28px';
-      fs.style.height = '28px';
-      fs.style.padding = '0';
-      fs.style.margin = '0';
-      fs.style.border = '0';
-      fs.style.background = 'transparent';
-      fs.style.color = 'inherit';
-      fs.style.borderRadius = '4px';
-      fs.style.display = 'flex';
-      fs.style.alignItems = 'center';
-      fs.style.justifyContent = 'center';
-      fs.style.cursor = 'pointer';
-      fs.style.flex = '0 0 28px';
-      row.insertBefore(fs, close);
-    }
-    fs.style.display = 'flex';
-    fs.style.visibility = 'visible';
-    fs.style.pointerEvents = 'auto';
+    function makeButton(id, type, titleText) {
+      var button = controls.querySelector('#' + id);
+      if (!button) {
+        button = document.createElement('button');
+        button.id = id;
+        button.className = 'neo-viewer-custom-control';
+        button.type = 'button';
+        controls.appendChild(button);
+      }
 
-    if (!fs.__neoBound) {
-      fs.__neoBound = true;
-      fs.addEventListener('click', function (event) {
+      if (type === 'close') {
+        button.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+      } else {
+        button.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      }
+
+      button.setAttribute('aria-label', titleText);
+      button.title = titleText;
+      button.style.width = '34px';
+      button.style.height = '34px';
+      button.style.minWidth = '34px';
+      button.style.minHeight = '34px';
+      button.style.padding = '0';
+      button.style.margin = '0';
+      button.style.display = 'flex';
+      button.style.alignItems = 'center';
+      button.style.justifyContent = 'center';
+      button.style.cursor = 'pointer';
+      button.style.pointerEvents = 'auto';
+      button.style.visibility = 'visible';
+      button.style.opacity = '1';
+      button.style.color = 'inherit';
+      button.style.background = 'transparent';
+      button.style.border = '0';
+      button.style.borderRadius = '6px';
+      button.style.position = 'relative';
+      button.style.zIndex = '2147483647';
+      return button;
+    }
+
+    var fullscreenButton = makeButton('neo-game-fullscreen', 'fullscreen', 'Fullscreen');
+    var closeButton = makeButton('neo-game-close', 'close', 'Exit');
+
+    if (!fullscreenButton.__neoBound) {
+      fullscreenButton.__neoBound = true;
+      fullscreenButton.addEventListener('click', function (event) {
         event.preventDefault();
         event.stopPropagation();
 
@@ -418,31 +425,64 @@
           return;
         }
 
-        // Prefer the actual game surface. For the Sonic.EXE 2.0 build this is
-        // the cross-origin iframe, which is explicitly marked allowfullscreen.
         var target = null;
-        if (parts && parts.stage) {
+        if (parts.stage) {
           target =
             parts.stage.querySelector('#neo-sonic-old-build') ||
             parts.stage.querySelector('#neo-sonic-restored-build') ||
             parts.stage.querySelector('#neo-impostor-legacy-game') ||
+            parts.stage.querySelector('#neo-accelerant-hank-game') ||
             parts.stage;
         }
-        target = target || root;
+        target = target || root || header.parentElement;
 
-        try {
-          var request =
-            target.requestFullscreen ||
-            target.webkitRequestFullscreen ||
-            target.mozRequestFullScreen ||
-            target.msRequestFullscreen;
+        var request =
+          target.requestFullscreen ||
+          target.webkitRequestFullscreen ||
+          target.mozRequestFullScreen ||
+          target.msRequestFullscreen;
 
-          if (request) {
+        if (request) {
+          try {
             var result = request.call(target);
             if (result && typeof result.catch === 'function') result.catch(function () {});
-          }
-        } catch (_) {}
+          } catch (_) {}
+        }
       });
+    }
+
+    if (!closeButton.__neoBound) {
+      closeButton.__neoBound = true;
+      closeButton.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        var activeFullscreen =
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement;
+
+        if (activeFullscreen) {
+          try {
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+            else if (document.msExitFullscreen) document.msExitFullscreen();
+          } catch (_) {}
+        }
+
+        setSelectedGame('');
+      });
+    }
+
+    // The old native viewer bar controls are hidden so there is exactly one
+    // visible X and one visible Fullscreen button.
+    var nativeButtons = header.querySelectorAll('button:not(.neo-viewer-custom-control)');
+    for (var i = 0; i < nativeButtons.length; i++) {
+      nativeButtons[i].style.display = 'none';
+      nativeButtons[i].style.visibility = 'hidden';
+      nativeButtons[i].style.pointerEvents = 'none';
     }
   }
 
