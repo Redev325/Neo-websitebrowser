@@ -189,10 +189,10 @@
     }
   }
   function getSelectedGame() {
-    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank') return window.__neoSelectedGame;
+    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank' || window.__neoSelectedGame === 'vs-impostor') return window.__neoSelectedGame;
     try {
       var value = sessionStorage.getItem(SELECTED_GAME_KEY);
-      if (value === 'sonic' || value === 'impostor' || value === 'hank') {
+      if (value === 'sonic' || value === 'impostor' || value === 'hank' || value === 'vs-impostor') {
         window.__neoSelectedGame = value;
         window.__neoSonicViewer = value === 'sonic';
         return value;
@@ -234,6 +234,13 @@
         cards[i].__neoHankClickBound = true;
         cards[i].addEventListener('click', function () {
           setSelectedGame('hank');
+          scheduleViewerActivation();
+        }, true);
+      }
+      if (i === 3 && !cards[i].__neoImpostorV4ClickBound) {
+        cards[i].__neoImpostorV4ClickBound = true;
+        cards[i].addEventListener('click', function () {
+          setSelectedGame('vs-impostor');
           scheduleViewerActivation();
         }, true);
       }
@@ -827,6 +834,50 @@
     shell.style.visibility = 'visible';
   }
 
+  function setupImpostorSelection(stage) {
+    if (!stage || getSelectedGame() !== 'vs-impostor') return;
+
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+    stage.style.backgroundColor = '#000';
+    stage.style.backgroundImage = 'url("https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/impselection.png")';
+    stage.style.backgroundRepeat = 'no-repeat';
+    stage.style.backgroundPosition = 'center center';
+    // Keep the complete selection artwork visible instead of cropping it.
+    stage.style.backgroundSize = 'contain';
+
+    // Give the existing selection buttons the same feedback style used by
+    // the Sonic.EXE buttons without replacing or covering the background.
+    var buttons = stage.querySelectorAll('button:not(.neo-viewer-custom-control)');
+    for (var i = 0; i < buttons.length; i++) {
+      var button = buttons[i];
+      if (button.__neoImpostorHoverBound) continue;
+      button.__neoImpostorHoverBound = true;
+
+      button.style.transition = 'filter .14s ease, box-shadow .14s ease, transform .14s ease';
+      button.style.willChange = 'filter, transform';
+      button.style.cursor = 'pointer';
+
+      button.addEventListener('mouseenter', function () {
+        this.style.filter = 'brightness(1.14) drop-shadow(0 0 10px rgba(255,70,70,.55))';
+        this.style.boxShadow = '0 0 18px rgba(255,60,60,.30)';
+        this.style.transform = 'scale(1.018)';
+      });
+      button.addEventListener('mouseleave', function () {
+        this.style.filter = 'none';
+        this.style.boxShadow = 'none';
+        this.style.transform = 'scale(1)';
+      });
+      button.addEventListener('mousedown', function (event) {
+        if (event.button !== 0) return;
+        this.style.transform = 'scale(.988)';
+      });
+      button.addEventListener('mouseup', function () {
+        this.style.transform = 'scale(1.018)';
+      });
+    }
+  }
+
   function embedImpostor(root, stage) {
     if (!root || !stage || getSelectedGame() !== 'impostor') return;
     if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
@@ -963,8 +1014,12 @@
 
     if (parts.title) {
       parts.title.setAttribute('data-neo-game-viewer-title', selectedGame || 'generic');
-      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor') {
-        parts.title.textContent = selectedGame === 'sonic' ? SONIC_VIEWER_TITLE : selectedGame === 'hank' ? THIRD_TITLE : VIEWER_TITLE;
+      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor' || selectedGame === 'vs-impostor') {
+        parts.title.textContent =
+          selectedGame === 'sonic' ? SONIC_VIEWER_TITLE :
+          selectedGame === 'hank' ? THIRD_TITLE :
+          selectedGame === 'impostor' ? VIEWER_TITLE :
+          FOURTH_TITLE;
         root.setAttribute('data-neo-game-viewer', selectedGame);
         updateViewerLogo(parts, selectedGame);
       } else {
@@ -1000,7 +1055,15 @@
       if (restoredSonicFrame) restoredSonicFrame.remove();
       if (parts.stage) parts.stage.removeAttribute('data-neo-sonic-active-build');
     }
-    if (selectedGame === 'impostor') embedImpostor(root, parts.stage);
+    if (selectedGame === 'vs-impostor') {
+      // The non-Legacy Vs Impostor viewer is a selection screen: keep the
+      // supplied artwork as the stage background and style its existing
+      // buttons without replacing the image.
+      setupImpostorSelection(parts.stage);
+    } else if (selectedGame === 'impostor') {
+      // Legacy keeps its existing embedded game and icon behavior.
+      embedImpostor(root, parts.stage);
+    }
     if (selectedGame === 'hank') embedHank(root, parts.stage);
   }
 
