@@ -269,6 +269,7 @@
         var candidate = titleNodes[i];
         var t = exactText(candidate);
         if (t === 'Placeholder 1' || t === 'Placeholder 2' || t === 'Placeholder 3' ||
+            t === FOURTH_TITLE || /^Placeholder \d{3}$/.test(t) ||
             t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE ||
             t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE) {
           title = candidate;
@@ -338,7 +339,6 @@
 
     var header = parts.header;
     var selectedGame = getSelectedGame();
-    if (selectedGame !== 'impostor' && selectedGame !== 'sonic' && selectedGame !== 'hank') return;
 
     header.style.position = 'relative';
     header.style.overflow = 'hidden';
@@ -472,8 +472,33 @@
           } catch (_) {}
         }
 
-        setSelectedGame('');
+        if (getSelectedGame()) {
+          setSelectedGame('');
+        } else {
+          try {
+            if (header.__neoNativeClose && header.__neoNativeClose !== closeButton) {
+              header.__neoNativeClose.click();
+            }
+          } catch (_) {}
+        }
       });
+    }
+
+    // Preserve the actual native close handler for generic viewers.
+    // This lets the current X close placeholder/non-special viewers too.
+    if (!header.__neoNativeClose) {
+      var nativeCandidates = Array.prototype.slice.call(header.querySelectorAll('button:not(.neo-viewer-custom-control)'));
+      for (var nc = nativeCandidates.length - 1; nc >= 0; nc--) {
+        var candidate = nativeCandidates[nc];
+        var label = ((candidate.getAttribute('aria-label') || '') + ' ' + (candidate.title || '')).toLowerCase();
+        if (label.indexOf('close') !== -1 || label.indexOf('exit') !== -1) {
+          header.__neoNativeClose = candidate;
+          break;
+        }
+      }
+      if (!header.__neoNativeClose && nativeCandidates.length) {
+        header.__neoNativeClose = nativeCandidates[nativeCandidates.length - 1];
+      }
     }
 
     // The old native viewer bar controls are hidden so there is exactly one
