@@ -943,7 +943,7 @@
       createSelectionButton('neo-impostor-selection-v4', 'Play Impostor V4', {
         x: 336, y: 234, w: 430, h: 102
       });
-      createSelectionButton('neo-impostor-selection-redot', 'Play Impostor RedDot Update', {
+      createSelectionButton('neo-impostor-selection-redot', 'Play Impostor Reboot (Updog)', {
         x: 336, y: 399, w: 430, h: 103
       });
     }
