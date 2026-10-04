@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  if (window.__neoSimpleGameUIV12) return;
+  if (window.__neoSimpleGameUIV13) return;
   window.__neoSimpleGameUIV12 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
