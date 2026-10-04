@@ -1308,7 +1308,6 @@
   function run() {
     if (!findViewerRoot()) {
       try { simplifyExplore(); } catch (_) {}
-      try { repairAllExploreFavorites(); } catch (_) {}
     }
     try { simplifyViewer(); } catch (_) {}
   }
