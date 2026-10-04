@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   if (window.__neoSimpleGameUIV12) return;
-  window.__neoSimpleGameUIV5 = true;
+  window.__neoSimpleGameUIV12 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
   var SECOND_TITLE = 'Vs Sonic.exe(2.0-4.0)';
