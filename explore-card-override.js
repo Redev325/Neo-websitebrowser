@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  if (window.__neoSimpleGameUIV7) return;
+  if (window.__neoSimpleGameUIV8) return;
   window.__neoSimpleGameUIV5 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
@@ -286,6 +286,68 @@
     } catch (_) {}
     return '';
   }
+  function repairAllExploreFavorites() {
+    if (!isExplorePage()) return;
+    var cards = document.querySelectorAll('.neo-explore-card');
+    var limit = Math.min(cards.length, 4);
+    for (var i = 0; i < limit; i++) {
+      var card = cards[i];
+      if (!card || !isLikelyExploreCard(card)) continue;
+      var favorite = null;
+      var controls = card.querySelectorAll('button[aria-label]');
+      for (var j = 0; j < controls.length; j++) {
+        var label = String(controls[j].getAttribute('aria-label') || '').toLowerCase();
+        if (label === 'add to favorites' || label === 'remove from favorites') {
+          favorite = controls[j];
+          break;
+        }
+      }
+      if (!favorite) continue;
+
+      card.style.setProperty('position', 'relative', 'important');
+      var preview = card.querySelector('.aspect-video');
+      if (!preview) continue;
+      preview.style.setProperty('position', 'relative', 'important');
+
+      var overlay = preview.querySelector('.neo-force-favorite');
+      if (!overlay) {
+        overlay = document.createElement('button');
+        overlay.type = 'button';
+        overlay.className = 'neo-force-favorite';
+        overlay.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          var target = event.currentTarget.__neoNativeFavorite;
+          if (target && typeof target.click === 'function') target.click();
+        });
+        preview.appendChild(overlay);
+      }
+
+      overlay.__neoNativeFavorite = favorite;
+      var isFav = String(favorite.getAttribute('aria-label') || '').toLowerCase() === 'remove from favorites';
+      overlay.setAttribute('aria-label', isFav ? 'Remove from favorites' : 'Add to favorites');
+      overlay.title = overlay.getAttribute('aria-label');
+      overlay.innerHTML =
+        '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="' +
+        (isFav ? 'currentColor' : 'none') +
+        '" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path></svg>';
+      overlay.style.cssText =
+        'position:absolute!important;top:8px!important;right:8px!important;' +
+        'width:34px!important;height:34px!important;min-width:34px!important;min-height:34px!important;' +
+        'padding:0!important;margin:0!important;display:flex!important;visibility:visible!important;' +
+        'opacity:1!important;align-items:center!important;justify-content:center!important;' +
+        'z-index:2147483647!important;pointer-events:auto!important;box-sizing:border-box!important;' +
+        'border:1px solid rgba(255,255,255,.16)!important;border-radius:9999px!important;' +
+        'background:rgba(0,0,0,.68)!important;color:' +
+        (isFav ? 'hsl(var(--accent))' : '#ffffff') +
+        '!important;cursor:pointer!important;';
+      favorite.style.setProperty('display', 'none', 'important');
+      favorite.style.setProperty('visibility', 'hidden', 'important');
+      favorite.style.setProperty('pointer-events', 'none', 'important');
+    }
+  }
+
   function simplifyExplore() {
     if (!isExplorePage()) {
       window.__neoLastExplorePath = location.pathname;
@@ -1338,6 +1400,7 @@
   function run() {
     if (!findViewerRoot()) {
       try { simplifyExplore(); } catch (_) {}
+      try { repairAllExploreFavorites(); } catch (_) {}
     }
     try { simplifyViewer(); } catch (_) {}
   }
