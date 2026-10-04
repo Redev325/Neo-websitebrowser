@@ -153,7 +153,7 @@
         impostorThumbnail.className = 'neo-vs-impostor-card-image';
         preview.appendChild(impostorThumbnail);
       }
-      impostorThumbnail.src = 'https://pbs.twimg.com/media/FmijPVFX0AMAKug.jpg';
+      impostorThumbnail.src = '/assets/vs-impostor-thumbnail.webp?v=2';
       impostorThumbnail.alt = FOURTH_TITLE;
       impostorThumbnail.draggable = false;
       impostorThumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;background:#000;';
