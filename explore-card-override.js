@@ -1,7 +1,7 @@
 (function () {
   'use strict';
-  if (window.__neoSimpleGameUIV11) return;
-  window.__neoSimpleGameUIV11 = true;
+  if (window.__neoSimpleGameUIV12) return;
+  window.__neoSimpleGameUIV5 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
   var SECOND_TITLE = 'Vs Sonic.exe(2.0-4.0)';
@@ -80,15 +80,9 @@
   }
   function repairFavoriteButtons(card) {
     if (!card) return;
-    card.style.setProperty('position', 'relative', 'important');
     var buttons = card.querySelectorAll('button[aria-label]');
     for (var i = 0; i < buttons.length; i++) {
       var button = buttons[i];
-      if (button.classList.contains('neo-restored-favorite-button') ||
-          button.classList.contains('neo-force-favorite')) {
-        button.remove();
-        continue;
-      }
       var label = String(button.getAttribute('aria-label') || '').toLowerCase();
       if (label !== 'add to favorites' && label !== 'remove from favorites') continue;
       button.style.setProperty('display', 'flex', 'important');
@@ -103,12 +97,12 @@
       button.style.setProperty('min-height', '1.75rem', 'important');
       button.style.setProperty('align-items', 'center', 'important');
       button.style.setProperty('justify-content', 'center', 'important');
-      button.style.setProperty('z-index', '2147483647', 'important');
+      button.style.setProperty('z-index', '50', 'important');
       button.style.setProperty('pointer-events', 'auto', 'important');
       button.style.setProperty('border-radius', '9999px', 'important');
-      button.style.setProperty('cursor', 'pointer', 'important');
     }
   }
+
   function simplifyCard(card, index) {
     var title = getCardTitle(card, index), preview = card.querySelector('.aspect-video');
     if (!title || !preview) return;
@@ -275,10 +269,7 @@
       if (i === 0 && !cards[i].__neoImpostorClickBound) {
         cards[i].__neoImpostorClickBound = true;
         cards[i].addEventListener('click', function (event) {
-          if (event.target && event.target.closest && (
-            event.target.closest('button[aria-label*="favorite" i]') ||
-            event.target.closest('.neo-restored-favorite-button')
-          )) return;
+          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
           setSelectedGame('impostor');
           scheduleViewerActivation();
         }, true);
@@ -1346,7 +1337,7 @@
             break;
           }
         }
-      }).observe(document.documentElement, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:['aria-label']});
+      }).observe(document.documentElement, {childList:true, subtree:true, characterData:true});
     } catch (_) {}
     window.addEventListener('resize', schedule, {passive:true});
     document.addEventListener('fullscreenchange', keepNativeCursorInViewer);
