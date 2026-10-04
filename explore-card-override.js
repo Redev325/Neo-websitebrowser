@@ -140,17 +140,30 @@
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
     }
     if (index === 3) {
-      // Card 004 is intentionally a blank thumbnail. Remove inherited
-      // placeholder artwork/content from the original React card.
+      // Card 004 uses the supplied Vs Impostor artwork as its thumbnail.
       title.textContent = FOURTH_TITLE;
-      preview.style.background = '#1a1a1a';
-      preview.style.backgroundColor = '#1a1a1a';
+      preview.style.background = '#000';
+      preview.style.backgroundColor = '#000';
       preview.style.backgroundImage = 'none';
       preview.style.boxShadow = 'none';
+
+      var impostorThumbnail = preview.querySelector('.neo-vs-impostor-card-image');
+      if (!impostorThumbnail) {
+        impostorThumbnail = document.createElement('img');
+        impostorThumbnail.className = 'neo-vs-impostor-card-image';
+        preview.appendChild(impostorThumbnail);
+      }
+      impostorThumbnail.src = '/assets/vs-impostor-thumbnail.webp?v=1';
+      impostorThumbnail.alt = FOURTH_TITLE;
+      impostorThumbnail.draggable = false;
+      impostorThumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;background:#000;';
+      
       var inheritedChildren = Array.prototype.slice.call(preview.children);
       for (var ic = 0; ic < inheritedChildren.length; ic++) {
-        inheritedChildren[ic].style.display = 'none';
-        inheritedChildren[ic].style.visibility = 'hidden';
+        var child = inheritedChildren[ic];
+        if (child === impostorThumbnail) continue;
+        child.style.display = 'none';
+        child.style.visibility = 'hidden';
       }
     }
     if (index === 2) {
