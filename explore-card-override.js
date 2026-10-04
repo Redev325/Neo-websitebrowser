@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  if (window.__neoSimpleGameUIV9) return;
+  if (window.__neoSimpleGameUIV10) return;
   window.__neoSimpleGameUIV5 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
@@ -86,6 +86,8 @@
     var buttons = card.querySelectorAll('button[aria-label]');
     for (var i = 0; i < buttons.length; i++) {
       var candidate = buttons[i];
+      if (candidate.classList.contains('neo-restored-favorite-button') ||
+          candidate.classList.contains('neo-force-favorite')) continue;
       var candidateLabel = String(candidate.getAttribute('aria-label') || '').toLowerCase();
       if (candidateLabel === 'add to favorites' || candidateLabel === 'remove from favorites') {
         native = candidate;
@@ -328,7 +330,10 @@
           if (cardNode) {
             var currentButtons = cardNode.querySelectorAll('button[aria-label]');
             for (var k = 0; k < currentButtons.length; k++) {
-              var currentLabel = String(currentButtons[k].getAttribute('aria-label') || '').toLowerCase();
+              var currentButton = currentButtons[k];
+              if (currentButton.classList.contains('neo-restored-favorite-button') ||
+                  currentButton.classList.contains('neo-force-favorite')) continue;
+              var currentLabel = String(currentButton.getAttribute('aria-label') || '').toLowerCase();
               if (currentLabel === 'add to favorites' || currentLabel === 'remove from favorites') {
                 target = currentButtons[k];
                 break;
