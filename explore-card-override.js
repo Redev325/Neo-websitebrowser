@@ -153,10 +153,10 @@
         impostorThumbnail.className = 'neo-vs-impostor-card-image';
         preview.appendChild(impostorThumbnail);
       }
-      impostorThumbnail.src = '/assets/vs-impostor-thumbnail.webp?v=2';
+      if (impostorThumbnail.getAttribute('src') !== '/assets/V4icon.png?v=1') impostorThumbnail.src = '/assets/V4icon.png?v=1';
       impostorThumbnail.alt = FOURTH_TITLE;
       impostorThumbnail.draggable = false;
-      impostorThumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;background:#000;';
+      impostorThumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;background:transparent;';
       
       var inheritedChildren = Array.prototype.slice.call(preview.children);
       for (var ic = 0; ic < inheritedChildren.length; ic++) {
