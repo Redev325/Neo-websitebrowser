@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   if (window.__neoSimpleGameUIV13) return;
-  window.__neoSimpleGameUIV12 = true;
+  window.__neoSimpleGameUIV14 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
   var SECOND_TITLE = 'Vs Sonic.exe(2.0-4.0)';
@@ -80,29 +80,63 @@
   }
   function repairFavoriteButtons(card) {
     if (!card) return;
-    var buttons = card.querySelectorAll('button[aria-label]');
-    for (var i = 0; i < buttons.length; i++) {
-      var button = buttons[i];
-      var label = String(button.getAttribute('aria-label') || '').toLowerCase();
-      if (label !== 'add to favorites' && label !== 'remove from favorites') continue;
-      button.style.setProperty('display', 'flex', 'important');
-      button.style.setProperty('visibility', 'visible', 'important');
-      button.style.setProperty('opacity', '1', 'important');
-      button.style.setProperty('position', 'absolute', 'important');
-      button.style.setProperty('top', '0.5rem', 'important');
-      button.style.setProperty('right', '0.5rem', 'important');
-      button.style.setProperty('width', '1.75rem', 'important');
-      button.style.setProperty('height', '1.75rem', 'important');
-      button.style.setProperty('min-width', '1.75rem', 'important');
-      button.style.setProperty('min-height', '1.75rem', 'important');
-      button.style.setProperty('align-items', 'center', 'important');
-      button.style.setProperty('justify-content', 'center', 'important');
-      button.style.setProperty('z-index', '50', 'important');
-      button.style.setProperty('pointer-events', 'auto', 'important');
-      button.style.setProperty('border-radius', '9999px', 'important');
-    }
-  }
+    var buttons = card.querySelectorAll('button[aria-label="Add to favorites"], button[aria-label="Remove from favorites"]');
+    if (!buttons.length) return;
 
+    var native = buttons[0];
+    var preview = card.querySelector('.aspect-video');
+    if (!preview) return;
+
+    // Keep React's real Favorite button for state/logic, but make the visible
+    // control independent of React's card markup so it cannot disappear.
+    native.style.setProperty('display', 'none', 'important');
+    native.style.setProperty('visibility', 'hidden', 'important');
+    native.style.setProperty('pointer-events', 'none', 'important');
+
+    preview.style.setProperty('position', 'relative', 'important');
+    var favorite = preview.querySelector('.neo-old-favorite');
+    if (!favorite) {
+      favorite = document.createElement('button');
+      favorite.type = 'button';
+      favorite.className = 'neo-old-favorite';
+      favorite.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        var target = event.currentTarget.__neoNativeFavorite;
+        if (!target || !target.isConnected) {
+          var owner = event.currentTarget.closest('.neo-explore-card');
+          if (owner) {
+            var fresh = owner.querySelectorAll('button[aria-label="Add to favorites"], button[aria-label="Remove from favorites"]');
+            target = fresh.length ? fresh[0] : null;
+          }
+        }
+        if (target && typeof target.click === 'function') target.click();
+      });
+      preview.appendChild(favorite);
+    }
+
+    favorite.__neoNativeFavorite = native;
+    var isFavorite = String(native.getAttribute('aria-label') || '').toLowerCase() === 'remove from favorites';
+    favorite.setAttribute('aria-label', 'Favorite');
+    favorite.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+    favorite.innerHTML =
+      '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="' +
+      (isFavorite ? 'currentColor' : 'none') +
+      '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"></path></svg>';
+    favorite.style.cssText =
+      'position:absolute!important;top:.5rem!important;right:.5rem!important;' +
+      'width:1.75rem!important;height:1.75rem!important;min-width:1.75rem!important;min-height:1.75rem!important;' +
+      'display:flex!important;visibility:visible!important;opacity:1!important;' +
+      'align-items:center!important;justify-content:center!important;' +
+      'z-index:2147483647!important;pointer-events:auto!important;' +
+      'border:0!important;border-radius:9999px!important;' +
+      'background:rgba(0,0,0,.4)!important;padding:0!important;margin:0!important;' +
+      'color:' + (isFavorite ? 'hsl(var(--accent))' : 'rgba(255,255,255,.78)') + '!important;' +
+      'cursor:pointer!important;box-sizing:border-box!important;';
+  }
   function simplifyCard(card, index) {
     var title = getCardTitle(card, index), preview = card.querySelector('.aspect-video');
     if (!title || !preview) return;
@@ -1337,7 +1371,7 @@
             break;
           }
         }
-      }).observe(document.documentElement, {childList:true, subtree:true, characterData:true});
+      }).observe(document.documentElement, {childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:['aria-label']});
     } catch (_) {}
     window.addEventListener('resize', schedule, {passive:true});
     document.addEventListener('fullscreenchange', keepNativeCursorInViewer);
