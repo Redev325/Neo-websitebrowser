@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  if (window.__neoSimpleGameUIV6) return;
+  if (window.__neoSimpleGameUIV7) return;
   window.__neoSimpleGameUIV5 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
@@ -101,7 +101,10 @@
     native.style.setProperty('visibility', 'hidden', 'important');
     native.style.setProperty('pointer-events', 'none', 'important');
 
-    var visibleButton = card.querySelector('.neo-restored-favorite-button');
+    var preview = card.querySelector('.aspect-video');
+    if (!preview) return;
+
+    var visibleButton = preview.querySelector('.neo-restored-favorite-button');
     if (!visibleButton) {
       visibleButton = document.createElement('button');
       visibleButton.type = 'button';
@@ -111,7 +114,7 @@
         event.stopPropagation();
         if (native && typeof native.click === 'function') native.click();
       });
-      card.appendChild(visibleButton);
+      preview.appendChild(visibleButton);
     }
 
     var label = String(native.getAttribute('aria-label') || 'Add to favorites');
@@ -302,7 +305,10 @@
       if (i === 0 && !cards[i].__neoImpostorClickBound) {
         cards[i].__neoImpostorClickBound = true;
         cards[i].addEventListener('click', function (event) {
-          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
+          if (event.target && event.target.closest && (
+            event.target.closest('button[aria-label*="favorite" i]') ||
+            event.target.closest('.neo-restored-favorite-button')
+          )) return;
           setSelectedGame('impostor');
           scheduleViewerActivation();
         }, true);
