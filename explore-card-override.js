@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  if (window.__neoSimpleGameUIV8) return;
+  if (window.__neoSimpleGameUIV9) return;
   window.__neoSimpleGameUIV5 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
@@ -317,8 +317,27 @@
         overlay.addEventListener('click', function (event) {
           event.preventDefault();
           event.stopPropagation();
-          var target = event.currentTarget.__neoNativeFavorite;
-          if (target && typeof target.click === 'function') target.click();
+          event.stopImmediatePropagation();
+
+          // React can replace the original favorite button after every state
+          // update, so never keep a stale DOM reference. Find the current
+          // native favorite control from this card each time the overlay is used.
+          var previewNode = event.currentTarget.parentElement;
+          var cardNode = previewNode && previewNode.closest ? previewNode.closest('.neo-explore-card') : null;
+          var target = null;
+          if (cardNode) {
+            var currentButtons = cardNode.querySelectorAll('button[aria-label]');
+            for (var k = 0; k < currentButtons.length; k++) {
+              var currentLabel = String(currentButtons[k].getAttribute('aria-label') || '').toLowerCase();
+              if (currentLabel === 'add to favorites' || currentLabel === 'remove from favorites') {
+                target = currentButtons[k];
+                break;
+              }
+            }
+          }
+          if (target && typeof target.click === 'function') {
+            target.click();
+          }
         });
         preview.appendChild(overlay);
       }
