@@ -133,6 +133,35 @@
       var svgs2 = preview.querySelectorAll('svg');
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
     }
+    if (index === 4) {
+      // Card 005 uses the supplied Vs Tricky artwork as its thumbnail.
+      title.textContent = FIFTH_TITLE;
+      preview.style.background = '#000';
+      preview.style.backgroundColor = '#000';
+      preview.style.backgroundImage = 'none';
+      preview.style.boxShadow = 'none';
+
+      var trickyThumbnail = preview.querySelector('.neo-tricky-card-image');
+      if (!trickyThumbnail) {
+        trickyThumbnail = document.createElement('img');
+        trickyThumbnail.className = 'neo-tricky-card-image';
+        preview.appendChild(trickyThumbnail);
+      }
+      if (trickyThumbnail.getAttribute('src') !== '/assets/Vstricky.png?v=1') {
+        trickyThumbnail.src = '/assets/Vstricky.png?v=1';
+      }
+      trickyThumbnail.alt = FIFTH_TITLE;
+      trickyThumbnail.draggable = false;
+      trickyThumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;background:#000;image-rendering:auto;';
+
+      var trickyChildren = Array.prototype.slice.call(preview.children);
+      for (var tc = 0; tc < trickyChildren.length; tc++) {
+        var trickyChild = trickyChildren[tc];
+        if (trickyChild === trickyThumbnail) continue;
+        trickyChild.style.display = 'none';
+        trickyChild.style.visibility = 'hidden';
+      }
+    }
     if (index === 3) {
       // Card 004 uses the supplied Vs Impostor artwork as its thumbnail.
       title.textContent = FOURTH_TITLE;
