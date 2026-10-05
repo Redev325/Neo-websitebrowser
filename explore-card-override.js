@@ -8,6 +8,7 @@
   var THIRD_TITLE = 'Vs Accelerant Hank';
   var FOURTH_TITLE = 'Vs Impostor';
   var FIFTH_TITLE = 'Vs Tricky';
+  var SIXTH_TITLE = 'Vs Tricky:Clowned Out';
   var SECOND_IMAGE = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/vs-sonic-exe-2-0-4-0.jpg';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
@@ -51,7 +52,7 @@
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
       if (t !== FIRST_TITLE && t !== SECOND_TITLE && t !== THIRD_TITLE && t !== FOURTH_TITLE &&
-          t !== 'Neo Game 004' && t !== 'Neo Game 4' && t !== FIFTH_TITLE && !/^Placeholder \d+$/.test(t)) continue;
+          t !== 'Neo Game 004' && t !== 'Neo Game 4' && t !== FIFTH_TITLE && t !== SIXTH_TITLE && !/^Placeholder \d+$/.test(t)) continue;
       var card = cardFromTitle(nodes[i]);
       if (card && isLikelyExploreCard(card) && cards.indexOf(card) === -1) cards.push(card);
     }
@@ -75,6 +76,7 @@
       if (index === 2 && (t === 'Placeholder 3' || t === THIRD_TITLE)) return nodes[i];
       if (index === 3 && (t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4')) return nodes[i];
       if (index === 4 && (t === 'Placeholder 005' || t === FIFTH_TITLE)) return nodes[i];
+      if (index === 5 && (t === 'Placeholder 006' || t === SIXTH_TITLE)) return nodes[i];
       if (index >= 2 && /^Placeholder \d+$/.test(t)) return nodes[i];
       if (wanted && t === wanted) return nodes[i];
     }
@@ -132,6 +134,32 @@
       image2.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;z-index:1;background:#000;';
       var svgs2 = preview.querySelectorAll('svg');
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
+    }
+    if (index === 5) {
+      // Card 006 uses the current Explore card treatment.
+      title.textContent = SIXTH_TITLE;
+      preview.style.background = '#000';
+      preview.style.backgroundColor = '#000';
+      preview.style.backgroundImage = 'none';
+      preview.style.boxShadow = 'none';
+
+      var clownedThumbnail = preview.querySelector('.neo-tricky-clowned-card-image');
+      if (!clownedThumbnail) {
+        clownedThumbnail = document.createElement('img');
+        clownedThumbnail.className = 'neo-tricky-clowned-card-image';
+        preview.appendChild(clownedThumbnail);
+      }
+      clownedThumbnail.alt = SIXTH_TITLE;
+      clownedThumbnail.draggable = false;
+      clownedThumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;background:#000;image-rendering:auto;';
+
+      var clownedChildren = Array.prototype.slice.call(preview.children);
+      for (var cc = 0; cc < clownedChildren.length; cc++) {
+        var clownedChild = clownedChildren[cc];
+        if (clownedChild === clownedThumbnail) continue;
+        clownedChild.style.display = 'none';
+        clownedChild.style.visibility = 'hidden';
+      }
     }
     if (index === 4) {
       // Card 005 uses the supplied Vs Tricky artwork as its thumbnail.
@@ -364,7 +392,7 @@
         var t = exactText(candidate);
         if (t === 'Placeholder 1' || t === 'Placeholder 2' || t === 'Placeholder 3' ||
             t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4' || /^Placeholder \d{3}$/.test(t) ||
-            t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE || t === 'Placeholder 005' || t === FIFTH_TITLE ||
+            t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE || t === 'Placeholder 005' || t === FIFTH_TITLE || t === 'Placeholder 006' || t === SIXTH_TITLE ||
             t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE) {
           title = candidate;
           break;
