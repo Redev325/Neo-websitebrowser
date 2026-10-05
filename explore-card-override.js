@@ -149,6 +149,9 @@
         clownedThumbnail.className = 'neo-tricky-clowned-card-image';
         preview.appendChild(clownedThumbnail);
       }
+      if (clownedThumbnail.getAttribute('src') !== '/assets/trickyclownedout.png?v=1') {
+        clownedThumbnail.src = '/assets/trickyclownedout.png?v=1';
+      }
       clownedThumbnail.alt = SIXTH_TITLE;
       clownedThumbnail.draggable = false;
       clownedThumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;background:#000;image-rendering:auto;';
