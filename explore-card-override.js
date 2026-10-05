@@ -414,7 +414,7 @@
       selectedGame === 'hank' ? HANK_ICON_URL :
       selectedGame === 'impostor' ? ICON_URL :
       selectedGame === 'vs-impostor' ? IMPOSTOR_ICON_URL :
-      selectedGame === 'tricky' ? '/assets/Vstrickylogo.png?v=1' :
+      selectedGame === 'tricky' ? '/assets/TrickyCOLogo.webp?v=1' :
       '';
 
     left.style.display = 'flex';
