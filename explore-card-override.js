@@ -9,7 +9,7 @@
   var FOURTH_TITLE = 'Vs Impostor';
   var FIFTH_TITLE = 'Vs Tricky';
   var SIXTH_TITLE = 'Vs Tricky:Clowned Out';
-  var TRICKY_CO_LOGO_URL = '/assets/TrickyCOLogo.webp?v=1';
+  var TRICKY_ICON_URL = '/assets/Vstrickylogo.png?v=1';
   var SECOND_IMAGE = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/vs-sonic-exe-2-0-4-0.jpg';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
@@ -365,8 +365,10 @@
         cards[i].__neoClownedOutClickBound = true;
         cards[i].addEventListener('click', function (event) {
           if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
-          setSelectedGame('tricky-clowned-out');
-          scheduleViewerActivation();
+          // Clowned Out is listed on Explore, but it does not have a game/viewer yet.
+          event.preventDefault();
+          event.stopPropagation();
+          if (event.stopImmediatePropagation) event.stopImmediatePropagation();
         }, true);
       }
     }
@@ -423,8 +425,8 @@
       selectedGame === 'hank' ? HANK_ICON_URL :
       selectedGame === 'impostor' ? ICON_URL :
       selectedGame === 'vs-impostor' ? IMPOSTOR_ICON_URL :
-      selectedGame === 'tricky' ? '/assets/Vstrickylogo.png?v=1' :
-      selectedGame === 'tricky-clowned-out' ? TRICKY_CO_LOGO_URL :
+      selectedGame === 'tricky' ? TRICKY_ICON_URL :
+      selectedGame === 'tricky-clowned-out' ? '/assets/TrickyCOLogo.webp?v=1' :
       '';
 
     left.style.display = 'flex';
@@ -1196,7 +1198,7 @@
   }
 
   function embedTricky(root, stage) {
-    if (!root || !stage || (getSelectedGame() !== 'tricky' && getSelectedGame() !== 'tricky-clowned-out')) return;
+    if (!root || !stage || getSelectedGame() !== 'tricky') return;
     if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
     stage.style.overflow = 'hidden';
     var iframe = stage.querySelector('#neo-tricky-game');
@@ -1384,7 +1386,7 @@
       embedImpostor(root, parts.stage);
     }
     if (selectedGame === 'hank') embedHank(root, parts.stage);
-    if (selectedGame === 'tricky' || selectedGame === 'tricky-clowned-out') embedTricky(root, parts.stage);
+    if (selectedGame === 'tricky') embedTricky(root, parts.stage);
   }
 
   function scheduleViewerActivation() {
