@@ -7,6 +7,7 @@
   var SECOND_TITLE = 'Vs Sonic.exe(2.0-4.0)';
   var THIRD_TITLE = 'Vs Accelerant Hank';
   var FOURTH_TITLE = 'Vs Impostor';
+  var FIFTH_TITLE = 'Vs Tricky';
   var SECOND_IMAGE = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/vs-sonic-exe-2-0-4-0.jpg';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
@@ -50,7 +51,7 @@
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
       if (t !== FIRST_TITLE && t !== SECOND_TITLE && t !== THIRD_TITLE && t !== FOURTH_TITLE &&
-          t !== 'Neo Game 004' && t !== 'Neo Game 4' && !/^Placeholder \d+$/.test(t)) continue;
+          t !== 'Neo Game 004' && t !== 'Neo Game 4' && t !== FIFTH_TITLE && !/^Placeholder \d+$/.test(t)) continue;
       var card = cardFromTitle(nodes[i]);
       if (card && isLikelyExploreCard(card) && cards.indexOf(card) === -1) cards.push(card);
     }
@@ -73,6 +74,7 @@
       if (index === 1 && (t === 'Placeholder 2' || t === SECOND_TITLE)) return nodes[i];
       if (index === 2 && (t === 'Placeholder 3' || t === THIRD_TITLE)) return nodes[i];
       if (index === 3 && (t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4')) return nodes[i];
+      if (index === 4 && (t === 'Placeholder 005' || t === FIFTH_TITLE)) return nodes[i];
       if (index >= 2 && /^Placeholder \d+$/.test(t)) return nodes[i];
       if (wanted && t === wanted) return nodes[i];
     }
@@ -218,7 +220,7 @@
     // The Vs Impostor selection screen is reset whenever a new viewer
     // session is opened. Clicking either selection button then dismisses
     // both buttons until this viewer is closed.
-    if (value === 'vs-impostor' && previousValue !== 'vs-impostor') {
+    if ((value === 'vs-impostor' || value === 'tricky') && value !== previousValue) {
       window.__neoImpostorSelectionDismissed = false;
     } else if (!value) {
       window.__neoImpostorSelectionDismissed = false;
@@ -231,10 +233,10 @@
     }
   }
   function getSelectedGame() {
-    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank' || window.__neoSelectedGame === 'vs-impostor') return window.__neoSelectedGame;
+    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank' || window.__neoSelectedGame === 'vs-impostor' || window.__neoSelectedGame === 'tricky') return window.__neoSelectedGame;
     try {
       var value = sessionStorage.getItem(SELECTED_GAME_KEY);
-      if (value === 'sonic' || value === 'impostor' || value === 'hank' || value === 'vs-impostor') {
+      if (value === 'sonic' || value === 'impostor' || value === 'hank' || value === 'vs-impostor' || value === 'tricky') {
         window.__neoSelectedGame = value;
         window.__neoSonicViewer = value === 'sonic';
         return value;
@@ -290,6 +292,14 @@
           scheduleViewerActivation();
         }, true);
       }
+      if (i === 4 && !cards[i].__neoTrickyClickBound) {
+        cards[i].__neoTrickyClickBound = true;
+        cards[i].addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
+          setSelectedGame('tricky');
+          scheduleViewerActivation();
+        }, true);
+      }
     }
   }
   function findViewerRoot() {
@@ -325,7 +335,7 @@
         var t = exactText(candidate);
         if (t === 'Placeholder 1' || t === 'Placeholder 2' || t === 'Placeholder 3' ||
             t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4' || /^Placeholder \d{3}$/.test(t) ||
-            t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE ||
+            t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE || t === 'Placeholder 005' || t === FIFTH_TITLE ||
             t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE) {
           title = candidate;
           break;
@@ -408,6 +418,7 @@
       selectedGame === 'hank' ? THIRD_TITLE :
       selectedGame === 'impostor' ? VIEWER_TITLE :
       selectedGame === 'vs-impostor' ? FOURTH_TITLE :
+      selectedGame === 'tricky' ? FIFTH_TITLE :
       parts.title.textContent;
 
     if (parts.title.textContent !== desiredTitle) parts.title.textContent = desiredTitle;
@@ -1112,6 +1123,34 @@
     }
   }
 
+  function embedTricky(root, stage) {
+    if (!root || !stage || getSelectedGame() !== 'tricky') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+    var iframe = stage.querySelector('#neo-tricky-game');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'neo-tricky-game';
+      iframe.src = './game/Friday%20Night%20Funkin%27_%20vs.%20Tricky.html';
+      iframe.title = 'Vs Tricky';
+      iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map; pointer-lock';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('playsinline', '');
+      iframe.setAttribute('scrolling', 'no');
+      iframe.style.position = 'absolute';
+      iframe.style.inset = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+      iframe.style.display = 'block';
+      iframe.style.background = '#000';
+      iframe.style.zIndex = '1';
+      stage.appendChild(iframe);
+    }
+  }
+
   function embedHank(root, stage) {
     if (!root || !stage || getSelectedGame() !== 'hank') return;
     if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
@@ -1143,7 +1182,7 @@
 
   function removeStrayGameIframe() {
     if (!isExplorePage() || getSelectedGame()) return;
-    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build, #neo-sonic-restored-build, #neo-accelerant-hank-game');
+    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build, #neo-sonic-restored-build, #neo-accelerant-hank-game, #neo-tricky-game');
     for (var i = 0; i < frames.length; i++) frames[i].remove();
   }
 
@@ -1220,7 +1259,7 @@
 
     if (parts.title) {
       parts.title.setAttribute('data-neo-game-viewer-title', selectedGame || 'generic');
-      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor' || selectedGame === 'vs-impostor') {
+      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor' || selectedGame === 'vs-impostor' || selectedGame === 'tricky') {
         parts.title.textContent =
           selectedGame === 'sonic' ? SONIC_VIEWER_TITLE :
           selectedGame === 'hank' ? THIRD_TITLE :
@@ -1271,6 +1310,7 @@
       embedImpostor(root, parts.stage);
     }
     if (selectedGame === 'hank') embedHank(root, parts.stage);
+    if (selectedGame === 'tricky') embedTricky(root, parts.stage);
   }
 
   function scheduleViewerActivation() {
