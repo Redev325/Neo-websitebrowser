@@ -281,7 +281,7 @@
     // The Vs Impostor selection screen is reset whenever a new viewer
     // session is opened. Clicking either selection button then dismisses
     // both buttons until this viewer is closed.
-    if ((value === 'vs-impostor' || value === 'tricky' || value === 'tricky-clowned-out') && value !== previousValue) {
+    if ((value === 'vs-impostor' || value === 'tricky') && value !== previousValue) {
       window.__neoImpostorSelectionDismissed = false;
     } else if (!value) {
       window.__neoImpostorSelectionDismissed = false;
@@ -294,10 +294,10 @@
     }
   }
   function getSelectedGame() {
-    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank' || window.__neoSelectedGame === 'vs-impostor' || window.__neoSelectedGame === 'tricky' || window.__neoSelectedGame === 'tricky-clowned-out') return window.__neoSelectedGame;
+    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank' || window.__neoSelectedGame === 'vs-impostor' || window.__neoSelectedGame === 'tricky') return window.__neoSelectedGame;
     try {
       var value = sessionStorage.getItem(SELECTED_GAME_KEY);
-      if (value === 'sonic' || value === 'impostor' || value === 'hank' || value === 'vs-impostor' || value === 'tricky' || value === 'tricky-clowned-out') {
+      if (value === 'sonic' || value === 'impostor' || value === 'hank' || value === 'vs-impostor' || value === 'tricky') {
         window.__neoSelectedGame = value;
         window.__neoSonicViewer = value === 'sonic';
         return value;
@@ -426,7 +426,6 @@
       selectedGame === 'impostor' ? ICON_URL :
       selectedGame === 'vs-impostor' ? IMPOSTOR_ICON_URL :
       selectedGame === 'tricky' ? TRICKY_ICON_URL :
-      selectedGame === 'tricky-clowned-out' ? '/assets/TrickyCOLogo.webp?v=1' :
       '';
 
     left.style.display = 'flex';
@@ -492,7 +491,6 @@
       selectedGame === 'impostor' ? VIEWER_TITLE :
       selectedGame === 'vs-impostor' ? FOURTH_TITLE :
       selectedGame === 'tricky' ? FIFTH_TITLE :
-      selectedGame === 'tricky-clowned-out' ? SIXTH_TITLE :
       parts.title.textContent;
 
     if (parts.title.textContent !== desiredTitle) parts.title.textContent = desiredTitle;
@@ -1333,14 +1331,14 @@
 
     if (parts.title) {
       parts.title.setAttribute('data-neo-game-viewer-title', selectedGame || 'generic');
-      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor' || selectedGame === 'vs-impostor' || selectedGame === 'tricky' || selectedGame === 'tricky-clowned-out') {
+      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor' || selectedGame === 'vs-impostor' || selectedGame === 'tricky') {
         parts.title.textContent =
           selectedGame === 'sonic' ? SONIC_VIEWER_TITLE :
           selectedGame === 'hank' ? THIRD_TITLE :
           selectedGame === 'impostor' ? VIEWER_TITLE :
           selectedGame === 'vs-impostor' ? FOURTH_TITLE :
           selectedGame === 'tricky' ? FIFTH_TITLE :
-          SIXTH_TITLE;
+          parts.title.textContent;
         root.setAttribute('data-neo-game-viewer', selectedGame);
         updateViewerLogo(parts, selectedGame);
       } else {
