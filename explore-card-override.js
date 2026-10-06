@@ -10,7 +10,7 @@
   var FIFTH_TITLE = 'Vs Tricky';
   var SIXTH_TITLE = 'Vs Tricky:Clowned Out';
   var TRICKY_ICON_URL = '/assets/Vstrickylogo.png?v=1';
-  var SECOND_IMAGE = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/vs-sonic-exe-2-0-4-0.jpg';
+  var SECOND_IMAGE = '/assets/Vs.exe.png?v=1';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
   var SONIC_VIEWER_TITLE = 'Vs Sonic.exe(2.0-4.0)';
   var SONIC_ICON_URL = 'https://raw.githubusercontent.com/Redev325/Neo-websitebrowser/main/assets/Vs.sonic.exe.png';
@@ -132,7 +132,7 @@
       if (!image2) { image2 = document.createElement('img'); image2.className = 'neo-sonic-exe-card-image'; preview.appendChild(image2); }
       image2.src = SECOND_IMAGE;
       image2.alt = SECOND_TITLE;
-      image2.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;z-index:1;background:#000;';
+      image2.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;display:block;z-index:1;background:#000;image-rendering:auto;backface-visibility:hidden;transform:translateZ(0);';
       var svgs2 = preview.querySelectorAll('svg');
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
     }
