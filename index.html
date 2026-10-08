@@ -182,4 +182,181 @@
   <script>
     (function(){function fsActive(){return!!(document.fullscreenElement||document.webkitFullscreenElement);}function broadcast(state){var frames=document.querySelectorAll('iframe');for(var i=0;i<frames.length;i++){try{frames[i].contentWindow.postMessage({source:'neo-browser-shell',nativeCursor:state},'*');}catch(e){}}}function sync(){var fs=fsActive();document.documentElement.classList.toggle('neo-native-cursor',fs);broadcast(fs);}document.addEventListener('fullscreenchange',sync);document.addEventListener('webkitfullscreenchange',sync);window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-cursor'||!d.hello)return;try{e.source.postMessage({source:'neo-browser-shell',nativeCursor:fsActive()},'*');}catch(err){}});})();
   </script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var NEO_RANDOM_TEXTS = [
+        "Insert text",
+        "I see you",
+        "Study more",
+        "Games and more",
+        "Martin is gay",
+        "Hello",
+        "Why are you here",
+        "Is this website goated",
+        "Please press esc refresh and power to go to the movies tab (please don't do it)",
+        "Please press Ctrl shift refresh to go to the games tab",
+        "Please press Ctrl shift and q 2 times to get secret games",
+        "Made with hopes and dreams",
+        "Ok",
+        "I know your IP address",
+        "wsp",
+        "Please never enter this website again",
+        "This is a dream and you are hallucinating being here",
+        "Insert funny joke",
+        "Next neo update is in 2099",
+        "Welcome ig",
+        "We have been notified to ban you from this website please do not come back",
+        "I know what you did",
+        "Ouu Shi",
+        "Hi thanks for seeing this website with a lot of games",
+        "you are not supposed to be here",
+        "Error 463: failed to parse packaging",
+        "Error 436: If you see this error your data has been breached and your information is public",
+        "Please dont take any of these jokes to seriously",
+        "I know where you live",
+        "Ip address found!:198.125.87.210",
+        "if you see this congratulations you have found the most rarest text insert ever",
+        "OOPS if you happen to see this text Were sorry!",
+        "Send yams",
+        "this text is from 2026",
+        "Wsp",
+        "Please exit this website immediately as your account has been compromised.",
+        "Please-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exit",
+        "Um I cant type anything??????",
+        "Please help me code this website",
+        "I know what you're doing right now"
+      ];
+
+      var lastIndex = -1;
+
+      function isHomePage() {
+        var path = (location.pathname || "/").replace(/\/+$/, "") || "/";
+        return path === "/";
+      }
+
+      function pickRandomIndex() {
+        if (NEO_RANDOM_TEXTS.length <= 1) return 0;
+        var index;
+        do {
+          index = Math.floor(Math.random() * NEO_RANDOM_TEXTS.length);
+        } while (index === lastIndex);
+        lastIndex = index;
+        return index;
+      }
+
+      function findRandomTextElements() {
+        if (!isHomePage()) return [];
+        var nodes = document.querySelectorAll("a, p, span, div, h1, h2, h3, h4, h5, h6");
+        var matches = [];
+        for (var i = 0; i < nodes.length; i++) {
+          var node = nodes[i];
+          if (node.children.length !== 0) continue;
+          if (String(node.textContent || "").trim() !== "Enter text") continue;
+          var rect = node.getBoundingClientRect();
+          if (rect.width <= 0 || rect.height <= 0) continue;
+          matches.push(node);
+        }
+        return matches;
+      }
+
+      function applyRandomText(forceNew) {
+        if (!isHomePage()) return;
+        var elements = findRandomTextElements();
+        if (!elements.length) return;
+
+        if (forceNew || lastIndex < 0) pickRandomIndex();
+        var text = NEO_RANDOM_TEXTS[lastIndex];
+
+        for (var i = 0; i < elements.length; i++) {
+          var element = elements[i];
+          if (element.__neoRandomTextBound) continue;
+
+          element.__neoRandomTextBound = true;
+          element.setAttribute("role", "button");
+          element.setAttribute("tabindex", "0");
+          element.setAttribute("aria-label", "Change homepage text");
+          element.title = "Click to change text";
+          element.style.cursor = "pointer";
+          element.style.userSelect = "none";
+
+          element.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            var previous = lastIndex;
+            do {
+              pickRandomIndex();
+            } while (lastIndex === previous && NEO_RANDOM_TEXTS.length > 1);
+
+            var nextText = NEO_RANDOM_TEXTS[lastIndex];
+            var targets = findRandomTextElements();
+            for (var j = 0; j < targets.length; j++) {
+              targets[j].textContent = nextText;
+            }
+          }, true);
+
+          element.addEventListener("keydown", function (event) {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            event.stopPropagation();
+
+            var previous = lastIndex;
+            do {
+              pickRandomIndex();
+            } while (lastIndex === previous && NEO_RANDOM_TEXTS.length > 1);
+
+            var nextText = NEO_RANDOM_TEXTS[lastIndex];
+            var targets = findRandomTextElements();
+            for (var j = 0; j < targets.length; j++) {
+              targets[j].textContent = nextText;
+            }
+          }, true);
+        }
+
+        for (var k = 0; k < elements.length; k++) {
+          elements[k].textContent = text;
+        }
+      }
+
+      function start() {
+        // Always choose a fresh line for a new page load/tab.
+        lastIndex = -1;
+
+        var attempts = 0;
+        var timer = setInterval(function () {
+          attempts++;
+          applyRandomText(false);
+          if (attempts >= 50 || findRandomTextElements().length) {
+            if (findRandomTextElements().length) clearInterval(timer);
+          }
+        }, 100);
+
+        try {
+          new MutationObserver(function () {
+            applyRandomText(false);
+          }).observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            characterData: true
+          });
+        } catch (_) {}
+
+        window.addEventListener("popstate", function () {
+          lastIndex = -1;
+          setTimeout(function () { applyRandomText(false); }, 100);
+          setTimeout(function () { applyRandomText(false); }, 500);
+        });
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", start, { once: true });
+      } else {
+        start();
+      }
+    })();
+  </script>
+
 </body></html>
