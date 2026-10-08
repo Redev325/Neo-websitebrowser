@@ -43,6 +43,7 @@ The browser injects a Neo cursor/flare into proxied HTML so the visual cursor co
 
 Some complex websites and games may still not work because they can use WebSockets, service workers, custom networking, restrictive security policies, or APIs that need additional proxy-aware handling.
 
+
 ## Search
 
 Typing normal words in the Neo Browser search bar uses the browser's built-in search flow. Direct website URLs continue to use the proxy. The proxy also injects a same-origin cursor bridge into proxied HTML so the Neo cursor can remain visible while the pointer is inside the iframe.
@@ -50,3 +51,9 @@ Typing normal words in the Neo Browser search bar uses the browser's built-in se
 ## Performance
 
 Built assets are cacheable for one year on Vercel, browser logo assets use WebP, duplicate font loading was removed, and the Base44 editor badge script is not loaded.
+
+## Text Randomizer
+List of text:
+"Insert text" "I see you" "Study more" "Games and more" "Martin is gay" "Hello" "Why are you here" "Is this website goated" "Please press esc refresh and power to go to the movies tab (please don't do it)" "Please press Ctrl shift refresh to go to the games tab" "Please press Ctrl shift and q 2 times to get secret games" "Made with hopes and dreams" "Ok" "I know your IP address" "wsp" "Please never enter this website again" "This is a dream and you are hallucinating being here" "Insert funny joke" "Next neo update is in 2099" "Welcome ig" "We have been notified to ban you from this website please do not come back" "I know what you did" "Ouu Shi" "Hi thanks for seeing this website with a lot of games" "you are not supposed to be here" "Error 463: failed to parse packaging" "Error 436: If you see this error your data has been breached and your information is public" "Please dont take any of these jokes to seriously" "I know where you live" "Ip address found!:198.125.87.210" "if you see this congratulations you have found the most rarest text insert ever" "OOPS if you happen to see this text Were sorry!" "Send yams" "this text is from 2026" "Wsp" "Please exit this website immediately as your account has been compromised." "Please-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exitPlease-exit" "Um I cant type anything??????" "Please help me code this website" "I know what you're doing right now"
+
+Keep in mind if you want to remove this fork it and remove it manually or disable the setting in neo website
