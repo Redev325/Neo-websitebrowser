@@ -150,7 +150,7 @@
         clownedThumbnail.className = 'neo-tricky-clowned-card-image';
         preview.appendChild(clownedThumbnail);
       }
-      if (clownedThumbnail.getAttribute('src') !== '/assets/vsclownedout.png?v=1') {
+      if (clownedThumbnail.getAttribute('src') !== '/assets/vsclownedout-hq.svg?v=1') {
         clownedThumbnail.src = '/assets/vsclownedout.png?v=1';
       }
       clownedThumbnail.alt = SIXTH_TITLE;
