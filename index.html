@@ -231,154 +231,144 @@
       ];
 
       var lastIndex = -1;
-      var randomTextTargets = [];
+      var target = null;
+      var refreshQueued = false;
 
       function isHomePage() {
         var path = (location.pathname || "/").replace(/\/+$/, "") || "/";
         return path === "/";
       }
 
-      function pickRandomIndex() {
+      function pickRandom() {
+        var next;
         if (NEO_RANDOM_TEXTS.length <= 1) return 0;
-        var index;
         do {
-          index = Math.floor(Math.random() * NEO_RANDOM_TEXTS.length);
-        } while (index === lastIndex);
-        lastIndex = index;
-        return index;
+          next = Math.floor(Math.random() * NEO_RANDOM_TEXTS.length);
+        } while (next === lastIndex);
+        return next;
       }
 
-      function findRandomTextElements() {
-        if (!isHomePage()) return [];
+      function findLogo() {
+        var logos = document.querySelectorAll('img[alt="NEO"]');
+        for (var i = 0; i < logos.length; i++) {
+          var logo = logos[i];
+          var r = logo.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0 && logo.parentElement) return logo;
+        }
+        return null;
+      }
+
+      function makeTarget(logo) {
+        if (!logo || !logo.parentElement) return null;
 
         var existing = document.querySelector('[data-neo-random-home-text="true"]');
-        if (existing && existing.isConnected) return [existing];
+        if (existing && existing.isConnected) return existing;
 
-        // The current compiled homepage no longer includes a literal
-        // "Enter text" node, so create the subtitle directly beneath
-        // the NEO logo instead.
-        var logos = document.querySelectorAll('img[alt="NEO"]');
-        var logo = null;
-        for (var i = 0; i < logos.length; i++) {
-          var rect = logos[i].getBoundingClientRect();
-          if (rect.width > 0 && rect.height > 0) {
-            logo = logos[i];
-            break;
-          }
-        }
-        if (!logo || !logo.parentElement) return [];
+        var el = document.createElement("div");
+        el.setAttribute("data-neo-random-home-text", "true");
+        el.setAttribute("role", "button");
+        el.setAttribute("tabindex", "0");
+        el.setAttribute("aria-label", "Change homepage text");
+        el.title = "Click to change text";
+        el.style.cssText =
+          "display:block;width:100%;box-sizing:border-box;" +
+          "margin:-18px 0 24px;padding:0 12px;text-align:center;" +
+          "font-size:16px;line-height:1.25;font-weight:800;" +
+          "letter-spacing:0;color:hsl(var(--accent));" +
+          "text-shadow:0 0 10px hsl(var(--accent)/.28);" +
+          "cursor:pointer;user-select:none;position:relative;z-index:20;";
 
-        var target = document.createElement("div");
-        target.setAttribute("data-neo-random-home-text", "true");
-        target.textContent = "Insert text";
-        target.setAttribute("role", "button");
-        target.setAttribute("tabindex", "0");
-        target.setAttribute("aria-label", "Change homepage text");
-        target.title = "Click to change text";
-
-        // Match the compact red subtitle style from the homepage design
-        // without changing the surrounding layout.
-        target.style.display = "block";
-        target.style.width = "100%";
-        target.style.boxSizing = "border-box";
-        target.style.margin = "-18px 0 24px";
-        target.style.padding = "0 12px";
-        target.style.textAlign = "center";
-        target.style.fontSize = "16px";
-        target.style.lineHeight = "1.25";
-        target.style.fontWeight = "800";
-        target.style.letterSpacing = "0";
-        target.style.color = "hsl(var(--accent))";
-        target.style.textShadow = "0 0 10px hsl(var(--accent) / .28)";
-        target.style.cursor = "pointer";
-        target.style.userSelect = "none";
-        target.style.position = "relative";
-        target.style.zIndex = "20";
-
-        logo.parentElement.insertBefore(target, logo.nextSibling);
-        return [target];
-      }
-
-      function displayRandomText() {
-        var text = NEO_RANDOM_TEXTS[lastIndex];
-        for (var i = 0; i < randomTextTargets.length; i++) {
-          var target = randomTextTargets[i];
-          if (target && target.isConnected) target.textContent = text;
-        }
-      }
-
-      function chooseNewRandomText() {
-        pickRandomIndex();
-        displayRandomText();
-      }
-
-      function applyRandomText(forceNew) {
-        if (!isHomePage()) return;
-        var elements = findRandomTextElements();
-        if (!elements.length) return;
-
-        if (forceNew || lastIndex < 0) pickRandomIndex();
-        var text = NEO_RANDOM_TEXTS[lastIndex];
-
-        for (var i = 0; i < elements.length; i++) {
-          var element = elements[i];
-          if (!element.__neoRandomTextBound) {
-            element.__neoRandomTextBound = true;
-            element.setAttribute("role", "button");
-            element.setAttribute("tabindex", "0");
-            element.setAttribute("aria-label", "Change homepage text");
-            element.title = "Click to change text";
-            element.style.cursor = "pointer";
-            element.style.userSelect = "none";
-
-            element.addEventListener("click", function (event) {
-              event.preventDefault();
-              event.stopPropagation();
-              chooseNewRandomText();
-            }, true);
-
-            element.addEventListener("keydown", function (event) {
-              if (event.key !== "Enter" && event.key !== " ") return;
-              event.preventDefault();
-              event.stopPropagation();
-              chooseNewRandomText();
-            }, true);
+        function changeText() {
+          lastIndex = pickRandom();
+          if (target && target.isConnected) {
+            target.textContent = NEO_RANDOM_TEXTS[lastIndex];
           }
         }
 
-        randomTextTargets = elements.slice();
-        for (var k = 0; k < randomTextTargets.length; k++) {
-          randomTextTargets[k].textContent = text;
+        el.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          changeText();
+        }, true);
+
+        el.addEventListener("keydown", function (event) {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          event.stopPropagation();
+          changeText();
+        }, true);
+
+        logo.parentElement.insertBefore(el, logo.nextSibling);
+        target = el;
+        return el;
+      }
+
+      function sync() {
+        if (!isHomePage()) {
+          target = null;
+          return;
         }
+
+        var logo = findLogo();
+        if (!logo) return;
+
+        var current = document.querySelector('[data-neo-random-home-text="true"]');
+        if (current && current.isConnected) {
+          target = current;
+          return;
+        }
+
+        target = makeTarget(logo);
+        if (target) {
+          if (lastIndex < 0) lastIndex = pickRandom();
+          target.textContent = NEO_RANDOM_TEXTS[lastIndex];
+        }
+      }
+
+      function queueSync() {
+        if (refreshQueued) return;
+        refreshQueued = true;
+        requestAnimationFrame(function () {
+          refreshQueued = false;
+          sync();
+        });
       }
 
       function start() {
-        // Always choose a fresh line for a new page load/tab.
-        lastIndex = -1;
+        lastIndex = pickRandom();
+        sync();
 
-        var attempts = 0;
-        var timer = setInterval(function () {
-          attempts++;
-          applyRandomText(false);
-          if (attempts >= 50 || findRandomTextElements().length) {
-            if (findRandomTextElements().length) clearInterval(timer);
+        // Lightweight: only watch structural changes under the React root.
+        // Do not observe text mutations, which can create a render loop.
+        var root = document.getElementById("root");
+        if (root) {
+          try {
+            new MutationObserver(function () {
+              queueSync();
+            }).observe(root, { childList: true, subtree: true });
+          } catch (_) {}
+        }
+
+        // Give React a few frames to mount the homepage, then stop.
+        var frames = 0;
+        function waitForHome() {
+          frames++;
+          sync();
+          if (frames < 90 && !document.querySelector('[data-neo-random-home-text="true"]')) {
+            requestAnimationFrame(waitForHome);
           }
-        }, 100);
-
-        try {
-          new MutationObserver(function () {
-            applyRandomText(false);
-          }).observe(document.documentElement, {
-            childList: true,
-            subtree: true,
-            characterData: true
-          });
-        } catch (_) {}
+        }
+        requestAnimationFrame(waitForHome);
 
         window.addEventListener("popstate", function () {
-          lastIndex = -1;
-          setTimeout(function () { applyRandomText(false); }, 100);
-          setTimeout(function () { applyRandomText(false); }, 500);
+          if (!isHomePage()) {
+            target = null;
+            return;
+          }
+          lastIndex = pickRandom();
+          requestAnimationFrame(function () {
+            requestAnimationFrame(sync);
+          });
         });
       }
 
