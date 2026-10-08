@@ -231,13 +231,22 @@
         "press Ctrl shift r to go to comments"
       ];
 
+      var STORAGE_KEY = "neo-home-random-text-enabled";
       var lastIndex = -1;
       var target = null;
-      var refreshQueued = false;
+      var syncQueued = false;
 
       function isHomePage() {
         var path = (location.pathname || "/").replace(/\/+$/, "") || "/";
         return path === "/";
+      }
+
+      function isEnabled() {
+        try {
+          return localStorage.getItem(STORAGE_KEY) !== "0";
+        } catch (_) {
+          return true;
+        }
       }
 
       function pickRandom() {
@@ -250,20 +259,29 @@
       }
 
       function findLogo() {
+        if (!isHomePage()) return null;
         var logos = document.querySelectorAll('img[alt="NEO"]');
         for (var i = 0; i < logos.length; i++) {
-          var logo = logos[i];
-          var r = logo.getBoundingClientRect();
-          if (r.width > 0 && r.height > 0 && logo.parentElement) return logo;
+          var r = logos[i].getBoundingClientRect();
+          if (r.width > 0 && r.height > 0 && logos[i].parentElement) return logos[i];
         }
         return null;
       }
 
-      function makeTarget(logo) {
-        if (!logo || !logo.parentElement) return null;
+      function removeTarget() {
+        var existing = document.querySelector('[data-neo-random-home-text="true"]');
+        if (existing) existing.remove();
+        target = null;
+      }
+
+      function createTarget(logo) {
+        if (!logo || !logo.parentElement || !isEnabled()) return null;
 
         var existing = document.querySelector('[data-neo-random-home-text="true"]');
-        if (existing && existing.isConnected) return existing;
+        if (existing && existing.isConnected) {
+          target = existing;
+          return existing;
+        }
 
         var el = document.createElement("div");
         el.setAttribute("data-neo-random-home-text", "true");
@@ -280,10 +298,9 @@
           "cursor:pointer;user-select:none;position:relative;z-index:20;";
 
         function changeText() {
+          if (!isEnabled()) return;
           lastIndex = pickRandom();
-          if (target && target.isConnected) {
-            target.textContent = NEO_RANDOM_TEXTS[lastIndex];
-          }
+          el.textContent = NEO_RANDOM_TEXTS[lastIndex];
         }
 
         el.addEventListener("click", function (event) {
@@ -304,37 +321,27 @@
         return el;
       }
 
-      function randomTextEnabled() {
-        try {
-          return localStorage.getItem("neo-home-random-text-enabled") !== "0";
-        } catch (_) {
-          return true;
-        }
-      }
-
       function sync() {
         if (!isHomePage()) {
           target = null;
           return;
         }
 
-        if (!randomTextEnabled()) {
-          var disabledTarget = document.querySelector('[data-neo-random-home-text="true"]');
-          if (disabledTarget) disabledTarget.remove();
-          target = null;
+        if (!isEnabled()) {
+          removeTarget();
           return;
         }
 
         var logo = findLogo();
         if (!logo) return;
 
-        var current = document.querySelector('[data-neo-random-home-text="true"]');
-        if (current && current.isConnected) {
-          target = current;
+        var existing = document.querySelector('[data-neo-random-home-text="true"]');
+        if (existing && existing.isConnected) {
+          target = existing;
           return;
         }
 
-        target = makeTarget(logo);
+        target = createTarget(logo);
         if (target) {
           if (lastIndex < 0) lastIndex = pickRandom();
           target.textContent = NEO_RANDOM_TEXTS[lastIndex];
@@ -342,10 +349,10 @@
       }
 
       function queueSync() {
-        if (refreshQueued) return;
-        refreshQueued = true;
+        if (syncQueued) return;
+        syncQueued = true;
         requestAnimationFrame(function () {
-          refreshQueued = false;
+          syncQueued = false;
           sync();
         });
       }
@@ -354,30 +361,29 @@
         lastIndex = pickRandom();
         sync();
 
-        // Lightweight: only watch structural changes under the React root.
-        // Do not observe text mutations, which can create a render loop.
         var root = document.getElementById("root");
         if (root) {
           try {
             new MutationObserver(function () {
-              queueSync();
+              if (isHomePage()) queueSync();
             }).observe(root, { childList: true, subtree: true });
           } catch (_) {}
         }
 
-        // Give React a few frames to mount the homepage, then stop.
         var frames = 0;
         function waitForHome() {
           frames++;
           sync();
-          if (frames < 90 && !document.querySelector('[data-neo-random-home-text="true"]')) {
+          if (frames < 90 && !document.querySelector('[data-neo-random-home-text="true"]') && isHomePage()) {
             requestAnimationFrame(waitForHome);
           }
         }
         requestAnimationFrame(waitForHome);
 
         window.addEventListener("neo-random-text-setting", function () {
-          if (randomTextEnabled()) lastIndex = pickRandom();
+          if (isEnabled()) {
+            lastIndex = pickRandom();
+          }
           sync();
         });
 
@@ -399,6 +405,7 @@
         start();
       }
     })();
+  </script>
 
   <script>
     (function () {
@@ -414,93 +421,104 @@
         }
       }
 
-      function findSettingsPanel() {
+      function setEnabled(value) {
+        try {
+          localStorage.setItem(STORAGE_KEY, value ? "1" : "0");
+        } catch (_) {}
+
+        window.dispatchEvent(new CustomEvent("neo-random-text-setting"));
+        updateButtons();
+      }
+
+      function findSettingsHeader() {
         var nodes = document.querySelectorAll("p,span,div");
         for (var i = 0; i < nodes.length; i++) {
           var node = nodes[i];
           if (String(node.textContent || "").trim() !== "Customize accent, tab name, icon and more.") continue;
-
-          var parent = node.parentElement;
-          for (var depth = 0; depth < 8 && parent; depth++, parent = parent.parentElement) {
-            if (parent.querySelector && parent.querySelector('input,button')) return parent;
-          }
+          return node.parentElement;
         }
         return null;
       }
 
-      function addSetting() {
-        var panel = findSettingsPanel();
-        if (!panel) return;
+      function updateButtons() {
+        var row = document.querySelector('[data-neo-random-text-setting="true"]');
+        if (!row) return;
 
-        if (panel.querySelector('[data-neo-random-text-setting="true"]')) {
-          updateToggle();
+        var enabled = isEnabled();
+        var enable = row.querySelector('[data-neo-random-text-action="enable"]');
+        var disable = row.querySelector('[data-neo-random-text-action="disable"]');
+
+        if (enable) {
+          enable.style.color = enabled ? "hsl(var(--accent))" : "hsl(var(--foreground))";
+          enable.style.borderColor = enabled ? "hsl(var(--accent)/.5)" : "hsl(var(--border)/.5)";
+          enable.style.background = enabled ? "hsl(var(--accent)/.13)" : "hsl(var(--background)/.6)";
+        }
+
+        if (disable) {
+          disable.style.color = !enabled ? "hsl(var(--accent))" : "hsl(var(--foreground))";
+          disable.style.borderColor = !enabled ? "hsl(var(--accent)/.5)" : "hsl(var(--border)/.5)";
+          disable.style.background = !enabled ? "hsl(var(--accent)/.13)" : "hsl(var(--background)/.6)";
+        }
+      }
+
+      function addSetting() {
+        var header = findSettingsHeader();
+        if (!header) return;
+
+        var existing = header.querySelector('[data-neo-random-text-setting="true"]');
+        if (existing) {
+          updateButtons();
           return;
         }
 
         var row = document.createElement("div");
         row.setAttribute("data-neo-random-text-setting", "true");
         row.style.cssText =
-          "margin-top:24px;padding:14px 0 0;" +
+          "margin-top:14px;padding-top:14px;" +
           "border-top:1px solid hsl(var(--border)/.4);";
-
-        var top = document.createElement("div");
-        top.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;";
-
-        var copy = document.createElement("div");
-        copy.style.minWidth = "0";
 
         var title = document.createElement("p");
         title.textContent = "Homepage random text";
         title.style.cssText =
           "margin:0 0 4px;font-size:14px;font-weight:600;color:hsl(var(--foreground));";
 
-        var desc = document.createElement("p");
-        desc.textContent = "Show the random clickable text under the NEO logo.";
-        desc.style.cssText =
-          "margin:0;font-size:12px;line-height:1.35;color:hsl(var(--muted-foreground));";
+        var description = document.createElement("p");
+        description.textContent = "Enable or disable the random clickable text on the homepage.";
+        description.style.cssText =
+          "margin:0 0 10px;font-size:12px;line-height:1.35;color:hsl(var(--muted-foreground));";
 
-        var button = document.createElement("button");
-        button.type = "button";
-        button.setAttribute("data-neo-random-text-toggle", "true");
-        button.style.cssText =
-          "flex:none;min-width:82px;padding:8px 12px;border-radius:10px;" +
-          "border:1px solid hsl(var(--border)/.5);background:hsl(var(--background)/.6);" +
-          "font-size:12px;font-weight:600;color:hsl(var(--foreground));" +
-          "cursor:pointer;transition:all .2s ease;";
+        var buttons = document.createElement("div");
+        buttons.style.cssText = "display:flex;gap:8px;width:100%;";
 
-        button.addEventListener("click", function (event) {
-          event.preventDefault();
-          event.stopPropagation();
+        function makeButton(label, action, value) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = label;
+          button.setAttribute("data-neo-random-text-action", action);
+          button.style.cssText =
+            "flex:1;min-width:0;padding:8px 10px;border-radius:10px;" +
+            "border:1px solid hsl(var(--border)/.5);" +
+            "background:hsl(var(--background)/.6);" +
+            "font-size:12px;font-weight:600;" +
+            "cursor:pointer;transition:all .2s ease;";
+          button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            setEnabled(value);
+          });
+          return button;
+        }
 
-          var next = !isEnabled();
-          try {
-            localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
-          } catch (_) {}
+        buttons.appendChild(makeButton("Enable", "enable", true));
+        buttons.appendChild(makeButton("Disable", "disable", false));
 
-          updateToggle();
-          window.dispatchEvent(new CustomEvent("neo-random-text-setting"));
-        });
+        row.appendChild(title);
+        row.appendChild(description);
+        row.appendChild(buttons);
 
-        copy.appendChild(title);
-        copy.appendChild(desc);
-        top.appendChild(copy);
-        top.appendChild(button);
-        row.appendChild(top);
-
-        // Put the setting directly below the Settings description.
-        panel.appendChild(row);
-        updateToggle();
-      }
-
-      function updateToggle() {
-        var button = document.querySelector('[data-neo-random-text-toggle="true"]');
-        if (!button) return;
-        var enabled = isEnabled();
-        button.textContent = enabled ? "Enabled" : "Disabled";
-        button.setAttribute("aria-pressed", enabled ? "true" : "false");
-        button.style.color = enabled ? "hsl(var(--accent))" : "hsl(var(--muted-foreground))";
-        button.style.borderColor = enabled ? "hsl(var(--accent)/.45)" : "hsl(var(--border)/.5)";
-        button.style.background = enabled ? "hsl(var(--accent)/.12)" : "hsl(var(--background)/.6)";
+        // Put it directly beneath the Settings description.
+        header.appendChild(row);
+        updateButtons();
       }
 
       function queueAdd() {
@@ -509,14 +527,14 @@
         });
       }
 
+      window.addEventListener("neo-open-settings", queueAdd);
+
       document.addEventListener("click", function (event) {
         var button = event.target && event.target.closest
           ? event.target.closest('button[aria-label="Settings"]')
           : null;
         if (button) queueAdd();
       }, true);
-
-      window.addEventListener("neo-open-settings", queueAdd);
 
       try {
         var root = document.getElementById("root");
@@ -531,8 +549,6 @@
 
       queueAdd();
     })();
-  </script>
-
   </script>
 
 </body></html>
