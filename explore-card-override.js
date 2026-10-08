@@ -305,6 +305,110 @@
     } catch (_) {}
     return '';
   }
+  function findPinnedClownedOutCard() {
+    var node = document.querySelector('[data-neo-pinned-game="tricky-clowned-out"]');
+    return node && node.isConnected ? node : null;
+  }
+
+  function createPinnedClownedOutCard(existingCards) {
+    if (!isExplorePage()) return null;
+    var existing = findPinnedClownedOutCard();
+    if (existing) return existing;
+
+    // The pinned game must not depend on the Explore/README-backed game data.
+    // Reuse the first real card only as a visual template, then give the
+    // fallback its own title, artwork and click handler.
+    var template = existingCards && existingCards.length ? existingCards[0] : null;
+    if (!template || !template.parentElement) return null;
+
+    var card = template.cloneNode(false);
+    card.setAttribute('data-neo-pinned-game', 'tricky-clowned-out');
+    card.removeAttribute('data-neo-explore-card');
+    card.style.position = 'relative';
+    card.style.overflow = 'hidden';
+    card.style.height = 'auto';
+    card.style.minHeight = '0';
+    card.style.paddingBottom = '0';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+
+    var templatePreview = template.querySelector('.aspect-video');
+    var preview = templatePreview ? templatePreview.cloneNode(false) : document.createElement('div');
+    preview.className = templatePreview ? templatePreview.className : 'aspect-video';
+    preview.replaceChildren();
+    preview.style.position = 'relative';
+    preview.style.width = '100%';
+    preview.style.height = 'auto';
+    preview.style.minHeight = '0';
+    preview.style.aspectRatio = '16 / 9';
+    preview.style.flex = '0 0 auto';
+    preview.style.background = '#000';
+    preview.style.backgroundColor = '#000';
+
+    var image = document.createElement('img');
+    image.src = '/assets/vsclownedout.png?v=1';
+    image.alt = SIXTH_TITLE;
+    image.draggable = false;
+    image.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;display:block;z-index:1;background:#000;image-rendering:auto;-ms-interpolation-mode:bicubic;backface-visibility:hidden;transform:translateZ(0);';
+    preview.appendChild(image);
+
+    var templateTitle = getCardTitle(template, 0);
+    var title = templateTitle ? templateTitle.cloneNode(false) : document.createElement('div');
+    title.textContent = SIXTH_TITLE;
+    title.style.display = 'block';
+    title.style.width = '100%';
+    title.style.boxSizing = 'border-box';
+    title.style.margin = '0';
+    title.style.padding = '14px';
+    title.style.fontWeight = '800';
+    title.style.fontSize = '15px';
+    title.style.lineHeight = '1.2';
+    title.style.position = 'relative';
+    title.style.zIndex = '2';
+
+    var templateFavorite = template.querySelector('button[aria-label="Add to favorites"], button[aria-label="Remove from favorites"]');
+    var favorite = templateFavorite ? templateFavorite.cloneNode(true) : document.createElement('button');
+    favorite.type = 'button';
+    favorite.setAttribute('aria-label', 'Add to favorites');
+    favorite.title = 'Add to favorites';
+    favorite.style.position = 'absolute';
+    favorite.style.top = '0.5rem';
+    favorite.style.right = '0.5rem';
+    favorite.style.zIndex = '1000';
+    favorite.style.pointerEvents = 'auto';
+    favorite.style.display = 'flex';
+    favorite.style.visibility = 'visible';
+    favorite.style.opacity = '1';
+
+    function syncPinnedFavorite() {
+      var key = 'neo-favorite-tricky-clowned-out';
+      var active = false;
+      try { active = localStorage.getItem(key) === '1'; } catch (_) {}
+      favorite.setAttribute('aria-label', active ? 'Remove from favorites' : 'Add to favorites');
+      favorite.title = active ? 'Remove from favorites' : 'Add to favorites';
+    }
+    favorite.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var key = 'neo-favorite-tricky-clowned-out';
+      var active = false;
+      try { active = localStorage.getItem(key) === '1'; } catch (_) {}
+      try { localStorage.setItem(key, active ? '0' : '1'); } catch (_) {}
+      syncPinnedFavorite();
+    }, true);
+
+    card.replaceChildren(preview, title, favorite);
+    card.addEventListener('click', function (event) {
+      if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
+      setSelectedGame('tricky-clowned-out');
+      scheduleViewerActivation();
+    }, true);
+
+    template.parentElement.appendChild(card);
+    syncPinnedFavorite();
+    return card;
+  }
+
   function simplifyExplore() {
     if (!isExplorePage()) {
       window.__neoLastExplorePath = location.pathname;
@@ -319,6 +423,10 @@
     // The viewer can remain mounted under the clicked card while it is open.
     if (getSelectedGame()) return;
     var cards = findCards();
+    if (!findPinnedClownedOutCard() && cards.length) {
+      createPinnedClownedOutCard(cards);
+      cards = findCards();
+    }
     for (var i = 0; i < cards.length; i++) {
       simplifyCard(cards[i], i);
       if (i === 0 && !cards[i].__neoImpostorClickBound) {
