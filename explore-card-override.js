@@ -155,7 +155,7 @@
       }
       clownedThumbnail.alt = SIXTH_TITLE;
       clownedThumbnail.draggable = false;
-      clownedThumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;z-index:1;background:#000;image-rendering:auto;';
+      clownedThumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;display:block;z-index:1;background:#000;image-rendering:auto;-ms-interpolation-mode:bicubic;backface-visibility:hidden;transform:translateZ(0);';
 
       var clownedChildren = Array.prototype.slice.call(preview.children);
       for (var cc = 0; cc < clownedChildren.length; cc++) {
