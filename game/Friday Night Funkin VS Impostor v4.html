@@ -23,6 +23,13 @@
   window.__neoV4DiagnosticsInstalled = true;
   var panel = null;
   var entries = [];
+  var recentAssetRequests = [];
+  function rememberAssetRequest(url) {
+    url = String(url || "");
+    if (!url || !/(json|xml|png|atlas|txt|lua|ogg|mp3|mp4)/i.test(url)) return;
+    recentAssetRequests.push(url);
+    if (recentAssetRequests.length > 14) recentAssetRequests.shift();
+  }
   function showPanel() {
     if (panel && panel.isConnected) return panel;
     panel = document.createElement("section");
@@ -73,7 +80,8 @@
     var message = event && event.message || "JavaScript error";
     var where = event && event.filename ? event.filename + ":" + (event.lineno || 0) + ":" + (event.colno || 0) : "source location unavailable";
     var stack = event && event.error && event.error.stack ? "\n" + event.error.stack : "";
-    report("JavaScript error", message + "\n" + where + stack);
+    var recent = recentAssetRequests.length ? "\n\nRecent game asset requests (newest last):\n" + recentAssetRequests.join("\n") : "";
+    report("JavaScript error", message + "\n" + where + stack + recent);
   });
   window.addEventListener("unhandledrejection", function (event) {
     var reason = event && event.reason;
@@ -90,7 +98,12 @@
   }, true);
   if (window.XMLHttpRequest && XMLHttpRequest.prototype) {
     var prototype = XMLHttpRequest.prototype;
+    var originalOpen = prototype.open;
     var originalSend = prototype.send;
+    prototype.open = function (method, url) {
+      rememberAssetRequest(url);
+      return originalOpen.apply(this, arguments);
+    };
     prototype.send = function () {
       var xhr = this;
       var serial = (xhr.__neoV4DiagnosticSerial || 0) + 1;
