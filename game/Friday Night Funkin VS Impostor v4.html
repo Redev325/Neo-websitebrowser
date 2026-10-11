@@ -45,7 +45,7 @@
     hint.textContent = "Please send a screenshot of this panel if the game stays black.";
     hint.style.cssText = "margin-bottom:8px;color:#ddd;font:12px/1.4 sans-serif;";
     panel.appendChild(hint);
-    document.body.appendChild(panel);
+    (document.body || document.documentElement).appendChild(panel);
     entries.forEach(function (entry) { appendEntry(entry); });
     return panel;
   }
