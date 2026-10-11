@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<base href="https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@main/imposter-v4%20copy/"><script>window.addEventListener("keydown",function(e){if([32,37,38,39,40].indexOf(e.keyCode)>-1){e.preventDefault();}},false);</script>
+	<base href="https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/"><script>window.addEventListener("keydown",function(e){if([32,37,38,39,40].indexOf(e.keyCode)>-1){e.preventDefault();}},false);</script>
 		
 	<meta charset="utf-8"> 
 	
@@ -15,99 +15,6 @@
 	<link rel="shortcut icon" type="image/png" href="./favicon.png">
 	
 	
-	<script>
-/*
- * VS Impostor V4 Reactor performance compatibility patch:
- * reactor2.lua repeatedly emits the same Camera Follow Pos event every frame
- * while an animation is playing. Deduplicate identical camera targets to avoid
- * unnecessary event churn during Reactor gameplay.
- */
-(function () {
-  "use strict";
-  var proto = window.XMLHttpRequest && XMLHttpRequest.prototype;
-  if (!proto || proto.__neoReactorPerformancePatch) return;
-  proto.__neoReactorPerformancePatch = true;
-
-  var previousOpen = proto.open;
-  var textDescriptor = Object.getOwnPropertyDescriptor(proto, "responseText");
-
-  function readText(xhr) {
-    try {
-      if (textDescriptor && typeof textDescriptor.get === "function") {
-        return textDescriptor.get.call(xhr);
-      }
-      return xhr.responseText;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function optimizeReactorStage(raw) {
-    if (typeof raw !== "string" || raw.indexOf("Camera Follow Pos") < 0 ||
-        !/function\s+onUpdate\s*\(/.test(raw) ||
-        raw.indexOf("neoSetCameraTarget") >= 0) return null;
-
-    var replacements = 0;
-    var optimized = raw.replace(
-      /triggerEvent\(\s*(['"])Camera Follow Pos\1\s*,\s*([^,\r\n]+)\s*,\s*([^)]+)\)/g,
-      function (_, quote, x, y) {
-        replacements++;
-        return "neoSetCameraTarget(" + x.trim() + ", " + y.trim() + ")";
-      }
-    );
-    if (!replacements) return null;
-
-    var helper = [
-      "local neoLastCameraFollowX = nil",
-      "local neoLastCameraFollowY = nil",
-      "function neoSetCameraTarget(x, y)",
-      "  if x ~= neoLastCameraFollowX or y ~= neoLastCameraFollowY then",
-      "    neoLastCameraFollowX = x",
-      "    neoLastCameraFollowY = y",
-      "    triggerEvent('Camera Follow Pos', x, y)",
-      "  end",
-      "end",
-      ""
-    ].join("\n");
-
-    optimized = optimized.replace(/function\s+onCreate\s*\(\s*\)/, helper + "function onCreate()");
-    if (optimized === raw || optimized.indexOf("neoSetCameraTarget") < 0) return null;
-    return optimized;
-  }
-
-  proto.open = function (method, url) {
-    var result = previousOpen.apply(this, arguments);
-    var isReactorStage = /\/assets\/stages\/reactor2\.lua(?:[?#]|$)/i.test(String(url || ""));
-    if (isReactorStage && !this.__neoReactorStageListener) {
-      var xhr = this;
-      xhr.__neoReactorStageListener = true;
-      xhr.addEventListener("readystatechange", function () {
-        if (xhr.readyState !== 4 || xhr.__neoReactorStagePatched ||
-            xhr.status < 200 || xhr.status >= 300) return;
-        var type = "";
-        try { type = xhr.responseType || ""; } catch (_) {}
-        if (type !== "" && type !== "text") return;
-        var optimized = optimizeReactorStage(readText(xhr));
-        if (!optimized) return;
-        try {
-          Object.defineProperty(xhr, "responseText", {
-            configurable: true,
-            get: function () { return optimized; }
-          });
-        } catch (_) {}
-        try {
-          Object.defineProperty(xhr, "response", {
-            configurable: true,
-            get: function () { return optimized; }
-          });
-        } catch (_) {}
-        xhr.__neoReactorStagePatched = true;
-      });
-    }
-    return result;
-  };
-})();
-</script>
 	<script type="text/javascript" src="./VSImpostor.js"></script>
 	
 	<script>
