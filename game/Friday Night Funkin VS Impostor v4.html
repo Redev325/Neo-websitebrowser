@@ -121,7 +121,65 @@
   }
 })();
 </script>
-	<script type="text/javascript" crossorigin="anonymous" src="./VSImpostor.js"></script>
+	<script>
+/* VS Impostor V4 runtime fix: the Toogus background picker included an unhandled index 6. */
+(function () {
+  "use strict";
+  var bundleUrl = "https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js";
+  var target = '"sussus toogus"==G.SONG.song.toLowerCase()&&(this.walker=new Ll(m.random.int(0,6),[-700,1850],70,.8),new Ll(m.random.int(0,6),[-700,1850],70,.8),new Ll(m.random.int(0,6),[-700,1850],70,.8))';
+
+  function reportFatal(error) {
+    if (error && error.__neoV4Reported) return;
+    try { if (error) error.__neoV4Reported = true; } catch (_) {}
+    var message = error && error.message ? error.message : String(error || "unknown loader error");
+    console.error("VS Impostor V4 patched engine failed:", error);
+    try {
+      window.dispatchEvent(new ErrorEvent("error", {
+        message: "VS Impostor V4 patched engine failed: " + message,
+        filename: bundleUrl,
+        error: error instanceof Error ? error : new Error(message)
+      }));
+    } catch (_) {}
+  }
+
+  window.__neoV4EngineReady = fetch(bundleUrl, { cache: "no-store" })
+    .then(function (response) {
+      if (!response.ok) throw new Error("Engine download failed (HTTP " + response.status + ").");
+      return response.text();
+    })
+    .then(function (source) {
+      var occurrences = source.split(target).length - 1;
+      var invalidRanges = (source.match(/m\.random\.int\(0,6\)/g) || []).length;
+      if (occurrences !== 1 || invalidRanges !== 3) {
+        throw new Error("Unexpected upstream engine version; refusing to patch an unknown build.");
+      }
+
+      var fixedTarget = target.replace(/m\.random\.int\(0,6\)/g, "m.random.int(0,5)");
+      source = source.replace(target, fixedTarget);
+      if (source.indexOf(target) !== -1 ||
+          (source.match(/m\.random\.int\(0,6\)/g) || []).length !== 0) {
+        throw new Error("The Toogus random-index patch did not validate.");
+      }
+
+      return new Promise(function (resolve, reject) {
+        var blobUrl = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
+        var engineScript = document.createElement("script");
+        engineScript.type = "text/javascript";
+        engineScript.onload = function () { URL.revokeObjectURL(blobUrl); resolve(); };
+        engineScript.onerror = function () {
+          URL.revokeObjectURL(blobUrl);
+          reject(new Error("Browser refused to execute the patched game engine."));
+        };
+        engineScript.src = blobUrl;
+        document.head.appendChild(engineScript);
+      });
+    })
+    .catch(function (error) {
+      reportFatal(error);
+      throw error;
+    });
+})();
+</script>
 	
 	<script>
 		window.addEventListener ("touchmove", function (event) { event.preventDefault (); }, { capture: false, passive: false });
@@ -252,7 +310,21 @@
 	<div id="openfl-content"></div>
 	
 	<script type="text/javascript">
-		lime.embed ("VS Impostor", "openfl-content", 1280, 720, { parameters: {} });
+		window.__neoV4EngineReady.then(function () {
+      if (!window.lime || typeof window.lime.embed !== "function") {
+        throw new Error("Game engine loaded without the Lime embed API.");
+      }
+      window.lime.embed("VS Impostor", "openfl-content", 1280, 720, { parameters: {} });
+    }).catch(function (error) {
+      if (error && error.__neoV4Reported) return;
+      console.error("VS Impostor V4 could not start:", error);
+      try {
+        window.dispatchEvent(new ErrorEvent("error", {
+          message: "VS Impostor V4 could not start: " + (error && error.message || String(error)),
+          error: error instanceof Error ? error : new Error(String(error))
+        }));
+      } catch (_) {}
+    });
 	</script>
 	
 
