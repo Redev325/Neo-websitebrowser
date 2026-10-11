@@ -15,7 +15,100 @@
 	<link rel="shortcut icon" type="image/png" href="./favicon.png">
 	
 	
-	<script type="text/javascript" src="./VSImpostor.js"></script>
+	<script>
+/* NEO_V4_ERROR_DIAGNOSTICS: visible only when the game reports a runtime or asset error. */
+(function () {
+  "use strict";
+  if (window.__neoV4DiagnosticsInstalled) return;
+  window.__neoV4DiagnosticsInstalled = true;
+  var panel = null;
+  var entries = [];
+  function showPanel() {
+    if (panel && panel.isConnected) return panel;
+    panel = document.createElement("section");
+    panel.id = "neo-v4-error-diagnostics";
+    panel.setAttribute("role", "alert");
+    panel.style.cssText = "position:fixed;left:10px;right:10px;top:10px;z-index:2147483647;max-width:760px;max-height:42vh;overflow:auto;padding:12px;background:rgba(12,12,16,.97);color:#fff;border:2px solid #ff5353;border-radius:8px;font:12px/1.45 monospace;box-shadow:0 6px 24px rgba(0,0,0,.6);pointer-events:auto;user-select:text;";
+    var head = document.createElement("div");
+    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font:bold 13px/1.4 sans-serif;";
+    var title = document.createElement("span");
+    title.textContent = "VS Impostor V4 — loading/runtime error";
+    var close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "Close";
+    close.style.cssText = "padding:4px 8px;color:#111;background:#fff;border:0;border-radius:4px;cursor:pointer;";
+    close.addEventListener("click", function () { if (panel) panel.remove(); panel = null; });
+    head.appendChild(title);
+    head.appendChild(close);
+    panel.appendChild(head);
+    var hint = document.createElement("div");
+    hint.textContent = "Please send a screenshot of this panel if the game stays black.";
+    hint.style.cssText = "margin-bottom:8px;color:#ddd;font:12px/1.4 sans-serif;";
+    panel.appendChild(hint);
+    document.body.appendChild(panel);
+    entries.forEach(function (entry) { appendEntry(entry); });
+    return panel;
+  }
+  function appendEntry(entry) {
+    if (!panel || !panel.isConnected) return;
+    var row = document.createElement("pre");
+    row.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;margin:6px 0 0;padding:6px;background:#222;border-radius:4px;color:#ffdede;";
+    row.textContent = entry;
+    panel.appendChild(row);
+  }
+  function report(title, detail) {
+    var text = title + "\n" + String(detail || "No additional details");
+    entries.push(text);
+    if (entries.length > 8) entries.shift();
+    showPanel();
+    while (panel && panel.children.length > 3 + entries.length) panel.removeChild(panel.children[3]);
+    // Rebuild entries so the panel always shows the latest eight events.
+    if (panel) {
+      while (panel.children.length > 3) panel.removeChild(panel.lastChild);
+      entries.forEach(appendEntry);
+    }
+  }
+  window.addEventListener("error", function (event) {
+    if (event && event.target && event.target !== window) return;
+    var message = event && event.message || "JavaScript error";
+    var where = event && event.filename ? event.filename + ":" + (event.lineno || 0) + ":" + (event.colno || 0) : "source location unavailable";
+    var stack = event && event.error && event.error.stack ? "\n" + event.error.stack : "";
+    report("JavaScript error", message + "\n" + where + stack);
+  });
+  window.addEventListener("unhandledrejection", function (event) {
+    var reason = event && event.reason;
+    var detail = reason && (reason.stack || reason.message) ? (reason.stack || reason.message) : String(reason || "Unknown promise rejection");
+    report("Unhandled promise rejection", detail);
+  });
+  document.addEventListener("error", function (event) {
+    var el = event && event.target;
+    if (!el || el === window) return;
+    var tag = String(el.tagName || "").toUpperCase();
+    if (["SCRIPT", "LINK", "AUDIO", "VIDEO", "SOURCE"].indexOf(tag) < 0) return;
+    var url = el.currentSrc || el.src || el.href || "unknown URL";
+    report("Resource failed (" + tag + ")", url);
+  }, true);
+  if (window.XMLHttpRequest && XMLHttpRequest.prototype) {
+    var prototype = XMLHttpRequest.prototype;
+    var originalSend = prototype.send;
+    prototype.send = function () {
+      var xhr = this;
+      var serial = (xhr.__neoV4DiagnosticSerial || 0) + 1;
+      xhr.__neoV4DiagnosticSerial = serial;
+      xhr.addEventListener("loadend", function () {
+        if (xhr.__neoV4DiagnosticSerial !== serial) return;
+        if (xhr.status >= 400) report("Asset/data request failed (HTTP " + xhr.status + ")", xhr.responseURL || "Request URL unavailable");
+      }, { once: true });
+      xhr.addEventListener("error", function () {
+        if (xhr.__neoV4DiagnosticSerial !== serial) return;
+        report("Asset/data request network error", xhr.responseURL || "Request URL unavailable");
+      }, { once: true });
+      return originalSend.apply(this, arguments);
+    };
+  }
+})();
+</script>
+	<script type="text/javascript" crossorigin="anonymous" src="./VSImpostor.js"></script>
 	
 	<script>
 		window.addEventListener ("touchmove", function (event) { event.preventDefault (); }, { capture: false, passive: false });
