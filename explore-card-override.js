@@ -982,7 +982,7 @@
     if (!iframe) {
       iframe = document.createElement('iframe');
       iframe.id = 'neo-impostor-v4-game';
-      iframe.src = './game/Friday Night Funkin VS Impostor v4.html?v=3b4689ab';
+      iframe.src = './game/Friday Night Funkin VS Impostor v4.html?v=c6f39746';
       iframe.title = 'Friday Night Funkin VS Impostor V4';
       iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map; pointer-lock';
       iframe.setAttribute('allowfullscreen', '');
