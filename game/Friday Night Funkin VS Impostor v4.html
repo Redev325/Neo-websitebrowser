@@ -264,17 +264,19 @@
         throw new Error("The Toogus random-index patch did not validate.");
       }
 
-      // Some builds construct the missing game-over sound ID dynamically, so it may
-      // not exist as a literal in the downloaded bundle. Rewrite it when present;
-      // the runtime Assets.getSound fallback below covers dynamically-built IDs.
-      var missingGameOverAsset = "assets/music/new_Gameover.ogg";
-      var availableGameOverAsset = "assets/shared/music/gameover_v4_LOOP.ogg";
-      var missingGameOverCount = source.split(missingGameOverAsset).length - 1;
-      if (missingGameOverCount > 0) {
-        source = source.split(missingGameOverAsset).join(availableGameOverAsset);
-        if (source.indexOf(missingGameOverAsset) !== -1) {
-          throw new Error("The new_Gameover asset-path rewrite did not validate.");
-        }
+      // Ejected currently names a game-over loop that is absent from the build.
+      // Use the normal V4 game-over loop configured by GameOverSubstate.resetVariables.
+      // The sound ID is assembled at runtime, so patch the loop setting itself.
+      var brokenEjectedLoop = 'uc.loopSoundName="new_Gameover"';
+      var fixedEjectedLoop = 'uc.loopSoundName="gameover_v4_LOOP"';
+      var brokenEjectedLoopCount = source.split(brokenEjectedLoop).length - 1;
+      if (brokenEjectedLoopCount !== 1) {
+        throw new Error("Could not validate the Ejected game-over loop setting in this engine build.");
+      }
+      source = source.replace(brokenEjectedLoop, fixedEjectedLoop);
+      if (source.indexOf(brokenEjectedLoop) !== -1 ||
+          source.split(fixedEjectedLoop).length - 1 !== 1) {
+        throw new Error("The Ejected game-over loop fix did not validate.");
       }
 
       // HaxeFlixel can throw when animation.addByPrefix receives a null prefix.
@@ -296,73 +298,7 @@
         var blobUrl = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
         var engineScript = document.createElement("script");
         engineScript.type = "text/javascript";
-        engineScript.onload = function () {
-          URL.revokeObjectURL(blobUrl);
-
-          // Lime may expose/replace the Assets API after the engine script executes.
-          // Keep the narrow fallback installed as the runtime initializes.
-          var missingSoundId = "assets/music/new_Gameover.ogg";
-          var fallbackSoundId = "assets/shared/music/gameover_v4_LOOP.ogg";
-
-          function normalizeSoundId(id) {
-            return String(id == null ? "" : id)
-              .replace(/\\/g, "/")
-              .replace(/^(?:\.\/)+/, "")
-              .toLowerCase();
-          }
-
-          function installFallbackOn(assets) {
-            if (!assets || typeof assets.getSound !== "function") return false;
-            var current = assets.getSound;
-            if (current.__neoV4GameOverSoundFallback) return true;
-
-            var original = current.__neoV4OriginalGetSound || current;
-            var wrapper = function (id) {
-              var normalizedId = normalizeSoundId(id);
-              var wantedId = normalizeSoundId(missingSoundId);
-              if (normalizedId === wantedId || normalizedId.slice(-(wantedId.length + 1)) === "/" + wantedId) {
-                return original.call(this, fallbackSoundId);
-              }
-              return original.apply(this, arguments);
-            };
-            wrapper.__neoV4GameOverSoundFallback = true;
-            wrapper.__neoV4OriginalGetSound = original;
-            try {
-              assets.getSound = wrapper;
-              if (assets.getSound !== wrapper) return false;
-              return true;
-            } catch (_) {
-              return false;
-            }
-          }
-
-          function installGameOverFallback() {
-            var candidates = [];
-            try {
-              if (window.lime && window.lime.utils && window.lime.utils.Assets) candidates.push(window.lime.utils.Assets);
-            } catch (_) {}
-            try {
-              if (window.openfl && window.openfl.utils && window.openfl.utils.Assets) candidates.push(window.openfl.utils.Assets);
-            } catch (_) {}
-
-            var installed = false;
-            candidates.forEach(function (assets) {
-              if (installFallbackOn(assets)) installed = true;
-            });
-            if (installed) window.__neoV4GameOverFallbackInstalled = true;
-            return installed;
-          }
-
-          // Try now and retry during initialization. Keep checking in case the
-          // engine replaces the static API after lime.embed starts.
-          installGameOverFallback();
-          if (!window.__neoV4GameOverFallbackTimer) {
-            window.__neoV4GameOverFallbackTimer = window.setInterval(function () {
-              installGameOverFallback();
-            }, 500);
-          }
-          resolve();
-        };
+        engineScript.onload = function () { URL.revokeObjectURL(blobUrl); resolve(); };
         engineScript.onerror = function () {
           URL.revokeObjectURL(blobUrl);
           reject(new Error("Browser refused to execute the patched game engine."));
