@@ -515,10 +515,12 @@
 	</style>
 	
 <style id="neo-v4-cutscene-clarity-style">
-/* Lightweight video-only adjustment. No SVG filter or processing of the game canvas. */
+/* Keep the native video layer unfiltered: CSS filters can cause white video frames
+   on some hardware-accelerated browser/GPU combinations. */
 video[data-neo-v4-cutscene-clarity="true"] {
   image-rendering: auto;
-  filter: contrast(1.025) saturate(1.015);
+  filter: none !important;
+  background-color: #000;
 }
 </style>
 </head>
