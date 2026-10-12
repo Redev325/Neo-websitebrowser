@@ -40,24 +40,20 @@
 })();
 </script>
 <script>
-/* NEO_V4_REACTOR_CAMERA_OPTIMIZATION: skip repeated identical camera-follow events. */
+/* NEO_V4_STAGE_CAMERA_OPTIMIZATION: emit Camera Follow Pos only when the target changes. */
 (function () {
   "use strict";
   var proto = window.XMLHttpRequest && XMLHttpRequest.prototype;
-  if (!proto || proto.__neoV4ReactorCameraOptimization) return;
-  proto.__neoV4ReactorCameraOptimization = true;
+  if (!proto || proto.__neoV4StageCameraOptimization) return;
+  proto.__neoV4StageCameraOptimization = true;
   var nativeOpen = proto.open;
   var responseTextDescriptor = Object.getOwnPropertyDescriptor(proto, "responseText");
 
   function readResponse(xhr) {
     try {
-      if (responseTextDescriptor && typeof responseTextDescriptor.get === "function") {
-        return responseTextDescriptor.get.call(xhr);
-      }
+      if (responseTextDescriptor && typeof responseTextDescriptor.get === "function") return responseTextDescriptor.get.call(xhr);
       return xhr.responseText;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { return null; }
   }
 
   function optimizeStage(raw) {
@@ -90,28 +86,24 @@
 
   proto.open = function (method, url) {
     var result = nativeOpen.apply(this, arguments);
-    if (!/\/assets\/stages\/reactor2\.lua(?:[?#]|$)/i.test(String(url || "")) ||
-        this.__neoV4ReactorStageListener) return result;
+    var targetUrl = String(url || "");
+    var isReactorStage = /\/assets\/stages\/reactor2\.lua(?:[?#]|$)/i.test(targetUrl);
+    var isEjectedStage = /\/assets\/stages\/ejected\.lua(?:[?#]|$)/i.test(targetUrl);
+    if ((!isReactorStage && !isEjectedStage) || this.__neoV4StageListener) return result;
     var xhr = this;
-    xhr.__neoV4ReactorStageListener = true;
+    xhr.__neoV4StageListener = true;
     xhr.addEventListener("readystatechange", function () {
-      if (xhr.readyState !== 4 || xhr.__neoV4ReactorStagePatched ||
-          xhr.status < 200 || xhr.status >= 300) return;
+      if (xhr.readyState !== 4 || xhr.__neoV4StagePatched || xhr.status < 200 || xhr.status >= 300) return;
       var responseType = "";
       try { responseType = xhr.responseType || ""; } catch (_) {}
       if (responseType !== "" && responseType !== "text") return;
       var optimized = optimizeStage(readResponse(xhr));
       if (!optimized) return;
       try {
-        Object.defineProperty(xhr, "responseText", {
-          configurable: true,
-          get: function () { return optimized; }
-        });
-        Object.defineProperty(xhr, "response", {
-          configurable: true,
-          get: function () { return optimized; }
-        });
-        xhr.__neoV4ReactorStagePatched = true;
+        Object.defineProperty(xhr, "responseText", { configurable: true, get: function () { return optimized; } });
+        Object.defineProperty(xhr, "response", { configurable: true, get: function () { return optimized; } });
+        xhr.__neoV4StagePatched = true;
+        xhr.__neoV4StageOptimizedName = isEjectedStage ? "ejected" : "reactor2";
       } catch (_) {}
     });
     return result;
@@ -309,6 +301,25 @@
       if (source.indexOf(oldShaderMethod) !== -1 ||
           source.indexOf("Fallback vertex shader also failed") === -1) {
         throw new Error("The OpenFL shader-compatibility patch did not validate.");
+      }
+
+      // NEO_V4_VIDEO_STALL_RECOVERY: settle FlxVideo on completion, playback rejection, media error, or prolonged stall.
+      var oldVideoPlayMethod = 'play:function(t,e,a,i,n,s){null!=this.__video&&(this.__video.volume=xe.__soundTransform.volume*this.__soundTransform.volume,"string"==typeof t?this.__video.src=t:this.__video.srcObject=t,this.__video.play())},requestVideoStatus:';
+      var newVideoPlayMethod = 'play:function(t,e,a,i,n,s){if(null!=this.__video){this.__video.volume=xe.__soundTransform.volume*this.__soundTransform.volume;"string"==typeof t?this.__video.src=t:this.__video.srcObject=t;var p=this.__video.play(),o=this;p&&"function"==typeof p.catch&&p.catch(function(err){console.warn("NEO_V4_VIDEO_PLAY_RECOVERY: video play() rejected",err);o.__dispatchStatus("NetStream.Play.error");});}},requestVideoStatus:';
+      var videoPlayMethodCount = source.split(oldVideoPlayMethod).length - 1;
+      if (videoPlayMethodCount !== 1) throw new Error("Could not validate the HTML5 video play() recovery target.");
+      source = source.replace(oldVideoPlayMethod, newVideoPlayMethod);
+      if (source.indexOf(oldVideoPlayMethod) !== -1 || source.indexOf("NEO_V4_VIDEO_PLAY_RECOVERY") === -1) {
+        throw new Error("The HTML5 video play() recovery patch did not validate.");
+      }
+
+      var oldFlxVideoFinish = 'i.addEventListener("netStatus",function(t){"NetStream.Play.Complete"==t.info.code&&(n.dispose(),m.game.contains(a)&&m.game.removeChild(a),null!=e.finishCallback&&e.finishCallback())}),n.play(t)';
+      var newFlxVideoFinish = 'var f=!1,w=null,l=-1,c=Date.now(),h=n.__video,d=function(){if(f)return;f=!0;null!=w&&(clearInterval(w),w=null);try{n.dispose()}catch(_){}m.game.contains(a)&&m.game.removeChild(a);null!=e.finishCallback&&e.finishCallback()};i.addEventListener("netStatus",function(t){var q=t&&t.info?t.info.code:"";("NetStream.Play.Complete"==q||"NetStream.Play.error"==q||"NetStream.Play.StreamNotFound"==q)&&d()}),null!=h&&(h.addEventListener("error",d,!1),w=setInterval(function(){if(f){clearInterval(w);return}if(h.error){d();return}if(!h.paused&&h.currentTime>l+.02){l=h.currentTime;c=Date.now()}else if(!h.paused&&h.readyState>=2&&Date.now()-c>8000){console.warn("NEO_V4_VIDEO_STALL_RECOVERY: cutscene made no progress for 8 seconds; continuing safely");d()}},1000)),n.play(t)';
+      var flxVideoFinishCount = source.split(oldFlxVideoFinish).length - 1;
+      if (flxVideoFinishCount !== 1) throw new Error("Could not validate the FlxVideo completion handler.");
+      source = source.replace(oldFlxVideoFinish, newFlxVideoFinish);
+      if (source.indexOf(oldFlxVideoFinish) !== -1 || source.indexOf("NEO_V4_VIDEO_STALL_RECOVERY") === -1) {
+        throw new Error("The FlxVideo stall recovery patch did not validate.");
       }
 
       // NEO_V4_EJECTED_TEST_SHORTCUT: add a URL-only quick launch for debugging the Ejected sequence.
@@ -565,38 +576,7 @@ video[data-neo-v4-cutscene-clarity="true"] {
 	
 
   <script>
-  // HTML5 fallback for the known Ejected cutscene transition getting stuck.
-  // Only send a single Enter key event when that cutscene video ends or fails.
-  (function () {
-    var watched = new WeakSet();
-    function isEjectedVideo(video) {
-      var src = String(video.currentSrc || video.src || "").toLowerCase();
-      return src.indexOf("ejected.mp4") !== -1;
-    }
-    function continueAfterVideo() {
-      var options = { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true };
-      try {
-        document.dispatchEvent(new KeyboardEvent("keydown", options));
-        window.setTimeout(function () {
-          document.dispatchEvent(new KeyboardEvent("keyup", options));
-        }, 80);
-      } catch (_) {}
-    }
-    function watchVideo(video) {
-      if (watched.has(video)) return;
-      watched.add(video);
-      function recover() {
-        if (isEjectedVideo(video)) window.setTimeout(continueAfterVideo, 250);
-      }
-      video.addEventListener("ended", recover, { once: true });
-      video.addEventListener("error", recover, { once: true });
-    }
-    function scanVideos() {
-      document.querySelectorAll("video").forEach(watchVideo);
-    }
-    scanVideos();
-    new MutationObserver(scanVideos).observe(document.documentElement, { childList: true, subtree: true });
-  })();
+  // Cutscene recovery is handled by the patched FlxVideo callback; no synthetic keypresses are generated.
   </script>
 
 
