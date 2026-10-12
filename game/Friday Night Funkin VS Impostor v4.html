@@ -8,8 +8,7 @@
 	<title>Game 22808</title>
 
   <script>
-  /* NEO_V4_EJECTED_PRELOAD: download the small Ejected cutscene during game startup
-     and warm one muted video frame before the player selects the song. */
+  /* NEO_V4_EJECTED_PRELOAD: buffer the small Ejected cutscene during startup without starting a second video decoder. */
   (function () {
     "use strict";
     if (window.__neoV4EjectedPreloadInstalled) return;
@@ -37,9 +36,6 @@
     video.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:.001;pointer-events:none;z-index:2147483646;";
     video.src = state.url;
 
-    var warmStarted = false;
-    var warmTimeout = 0;
-
     function updateBuffered() {
       try {
         var total = 0;
@@ -51,50 +47,18 @@
       } catch (_) {}
     }
 
-    function finishWarmup(success) {
-      if (warmTimeout) {
-        clearTimeout(warmTimeout);
-        warmTimeout = 0;
-      }
-      try { video.pause(); } catch (_) {}
-      try {
-        if (Number(video.currentTime) > 0.05) video.currentTime = 0;
-      } catch (_) {}
-      state.warmedFrame = !!success;
-      state.status = success ? "ready" : (video.readyState >= 2 ? "decoded" : "loaded");
-      updateBuffered();
-      console.info("NEO_V4_EJECTED_PRELOAD:", state.status, state);
-    }
-
-    function warmDecoder() {
-      if (warmStarted || !video.isConnected || video.readyState < 2) return;
-      warmStarted = true;
-      state.status = "warming-decoder";
-      warmTimeout = setTimeout(function () { finishWarmup(false); }, 1600);
-      if (typeof video.requestVideoFrameCallback === "function") {
-        try {
-          video.requestVideoFrameCallback(function () { finishWarmup(true); });
-        } catch (_) {}
-      }
-      try {
-        var result = video.play();
-        if (result && typeof result.catch === "function") {
-          result.catch(function (error) {
-            state.error = String(error && error.message || error);
-            finishWarmup(false);
-          });
-        }
-      } catch (error) {
-        state.error = String(error && error.message || error);
-        finishWarmup(false);
-      }
-    }
-
+    /* Download and buffer Ejected before play, but do not call video.play() here.
+       A second active decoder during game initialization can starve the game renderer on low-power devices. */
     function mountAndWarm() {
       if (document.body && !video.isConnected) {
         document.body.appendChild(video);
       }
-      warmDecoder();
+      updateBuffered();
+      if (video.readyState >= 2) {
+        state.status = "preloaded";
+      } else if (video.readyState >= 1) {
+        state.status = "metadata-loaded";
+      }
     }
 
     video.addEventListener("loadedmetadata", function () {
@@ -103,14 +67,15 @@
       mountAndWarm();
     });
     video.addEventListener("loadeddata", function () {
-      state.status = "decoded";
+      state.status = "preloaded";
+      state.warmedFrame = false;
       updateBuffered();
       mountAndWarm();
     });
     video.addEventListener("progress", updateBuffered);
     video.addEventListener("canplaythrough", function () {
       updateBuffered();
-      if (!warmStarted && video.readyState >= 2) mountAndWarm();
+      mountAndWarm();
     });
     video.addEventListener("error", function () {
       state.status = "unavailable";
@@ -139,13 +104,13 @@
 	
 	
 	<script>
-/* NEO_V4_BALANCED_RENDERING: reduce high-DPI GPU work without lowering game timing or FPS. */
+/* NEO_V4_PERFORMANCE_SAFE_MODE: render at a smaller internal pixel density to reduce GPU load and UI stalls. */
 (function () {
   "use strict";
   if (window.__neoV4BalancedRenderingInstalled) return;
   window.__neoV4BalancedRenderingInstalled = true;
   var nativeDpr = Number(window.devicePixelRatio) || 1;
-  var renderDpr = Math.min(nativeDpr, 1.5);
+  var renderDpr = Math.min(nativeDpr, 0.8);
   window.__neoV4OriginalDevicePixelRatio = nativeDpr;
   window.__neoV4RenderDevicePixelRatio = renderDpr;
   if (renderDpr < nativeDpr) {
@@ -451,20 +416,21 @@
       // Ejected-Hard's first player-side note is 28774.193548 ms, so the cutoff is 25274.193548 ms.
       var oldEjectedVideoEvent = 'case"Ejected Video":this.startVideo("ejected");break;';
       // NEO_V4_EJECTED_AUDIO_SYNC_FIX: hold chart audio while the video covers active notes.
-      var newEjectedVideoEvent = 'case"Ejected Video":this.__neoEjectedEventVideo=!0;var state=this,cutoff=25.2741935483871,finished=!1;function finishEjectedCutscene(reason){if(finished)return;finished=!0;if(window.__neoV4EjectedCutoffTimer){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null}var activeVideo=window.__neoV4ActiveFlxVideo;if(activeVideo&&typeof activeVideo.__neoV4ForceFinish==="function")try{activeVideo.__neoV4ForceFinish()}catch(error){console.warn("NEO_V4_EJECTED_CUTOFF: could not close video",error)}state.__neoEjectedEventVideo=!1;try{state.inCutscene=!1;state.canPause=!0;state.camGame.set_visible(!0);state.camHUD.set_visible(!0)}catch(error){console.warn("NEO_V4_EJECTED_CUTOFF: could not reveal gameplay",error)}window.__neoV4FinishEjectedCutscene=null;console.info("NEO_V4_EJECTED_CUTOFF: closed cutscene without seeking the song clock ("+reason+")")}window.__neoV4FinishEjectedCutscene=finishEjectedCutscene;if(window.__neoV4EjectedCutoffTimer)clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=window.setInterval(function(){if(finished)return;var active=window.__neoV4ActiveFlxVideo;var video=active&&active.__neoV4HtmlVideo;if(video&&isFinite(video.currentTime)&&video.currentTime>=cutoff)finishEjectedCutscene("video-time")},100);this.startVideo("ejected");break;';;
+      var newEjectedVideoEvent = "case\"Ejected Video\":this.__neoEjectedEventVideo=!0;var state=this,music=m.sound&&m.sound.music,vocals=this.vocals,cutoff=25274.1935483871,startedAt=Date.now(),finished=!1;function holdTracks(){var currentMusic=m.sound&&m.sound.music;if(currentMusic)music=currentMusic;var currentVocals=state.vocals;if(currentVocals)vocals=currentVocals;if(music&&typeof music.pause===\"function\")try{music.pause()}catch(_){}if(vocals&&typeof vocals.pause===\"function\")try{vocals.pause()}catch(_){}}function seekAndResume(track){if(!track)return;try{if(typeof track.pause===\"function\")track.pause();if(typeof track.play===\"function\"){track.play(!0,cutoff);return}if(typeof track.set_time===\"function\")track.set_time(cutoff);else if(typeof track.setTime===\"function\")track.setTime(cutoff);else if(\"time\"in track)track.time=cutoff;else console.warn(\"NEO_V4_EJECTED_CLOCK: no writable sound-time accessor\",track);if(typeof track.resume===\"function\")track.resume()}catch(error){console.warn(\"NEO_V4_EJECTED_CLOCK: audio resume failed\",error)}}function finishEjectedCutscene(reason){if(finished)return;finished=!0;if(window.__neoV4EjectedCutoffTimer){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null}var activeVideo=window.__neoV4ActiveFlxVideo;if(activeVideo&&typeof activeVideo.__neoV4ForceFinish===\"function\")try{activeVideo.__neoV4ForceFinish()}catch(error){console.warn(\"NEO_V4_EJECTED_CLOCK: could not close video\",error)}state.__neoEjectedEventVideo=!1;try{state.inCutscene=!1;state.canPause=!0;state.camGame.set_visible(!0);state.camHUD.set_visible(!0)}catch(error){console.warn(\"NEO_V4_EJECTED_CLOCK: could not reveal gameplay\",error)}var finalMusic=m.sound&&m.sound.music?m.sound.music:music;var finalVocals=state.vocals||vocals;seekAndResume(finalMusic);if(finalVocals!==finalMusic)seekAndResume(finalVocals);window.__neoV4FinishEjectedCutscene=null;console.warn(\"NEO_V4_EJECTED_CLOCK: resumed synchronized gameplay at \"+cutoff+\" ms (\"+reason+\")\")}window.__neoV4FinishEjectedCutscene=finishEjectedCutscene;holdTracks();if(window.__neoV4EjectedCutoffTimer)clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=window.setInterval(function(){if(finished){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null;return}holdTracks();if(Date.now()-startedAt>=cutoff)finishEjectedCutscene(\"target-time\")},25);this.startVideo(\"ejected\");break;";
       var ejectedVideoEventCount = source.split(oldEjectedVideoEvent).length - 1;
       if (ejectedVideoEventCount !== 1) throw new Error("Could not validate the Ejected Video chart-event handler.");
       source = source.replace(oldEjectedVideoEvent, newEjectedVideoEvent);
       if (source.indexOf(oldEjectedVideoEvent) !== -1 ||
           source.indexOf("__neoEjectedEventVideo=!0") === -1 ||
           source.indexOf("window.__neoV4FinishEjectedCutscene=finishEjectedCutscene") === -1 ||
-          source.indexOf("video.currentTime>=cutoff") === -1 ||
+          source.indexOf("track.play(!0,cutoff)") === -1 ||
+          source.indexOf("Date.now()-startedAt>=cutoff") === -1 ||
           source.indexOf("window.__neoV4EjectedCutoffTimer=window.setInterval") === -1) {
-        throw new Error("The Ejected video-time-only cutoff patch did not validate.");
+        throw new Error("The Ejected synchronized cutscene handoff patch did not validate.");
       }
 
-      // NEO_V4_EJECTED_VIDEO_CLOCK_CUTOFF: keep the current-time cutoff as a fallback, but stop the video
-      // immediately when the chart reaches "Ejected Start" so its white transition cannot stall gameplay.
+      // NEO_V4_EJECTED_SYNCED_CUTOFF: pause audio under the cutscene, then resume at the matching chart time.
+      // Ejected Start still reveals gameplay when reached, while the wall-clock cutoff handles a stuck video.
       var ejectedStartEvent = 'case"Ejected Start":this.camGame.flash(-1,.35),this.canPause=!0,this.camGame.set_visible(!0),this.camHUD.set_visible(!0);break;';
       var ejectedStartCount = source.split(ejectedStartEvent).length - 1;
       if (ejectedStartCount !== 1 || source.indexOf('case"Ejected Start":if(window.__neoV4FinishEjectedCutscene)') !== -1) {
