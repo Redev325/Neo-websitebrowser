@@ -341,7 +341,8 @@
       if (oldVideoCallbackCount !== 1) throw new Error("Could not validate the PlayState video completion callback.");
       source = source.replace(oldVideoCallback, newVideoCallback);
       if (source.indexOf(oldVideoCallback) !== -1 ||
-          source.indexOf("e.__neoEjectedEventVideo=!1;e.inCutscene=!1;return;") === -1) {
+          source.indexOf("e.__neoEjectedEventVideo=!1;e.inCutscene=!1;") === -1 ||
+          source.indexOf("e.__neoEjectedResumeMusic=!1;e.__neoEjectedResumeVocals=!1;return;") === -1) {
         throw new Error("The Ejected event video callback fix did not validate.");
       }
 
