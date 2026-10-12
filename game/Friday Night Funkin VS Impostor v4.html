@@ -496,21 +496,71 @@ video[data-neo-v4-cutscene-clarity="true"] {
 	<div id="openfl-content"></div>
 	
 	<script type="text/javascript">
-		window.__neoV4EngineReady.then(function () {
-      if (!window.lime || typeof window.lime.embed !== "function") {
-        throw new Error("Game engine loaded without the Lime embed API.");
+		(function () {
+      "use strict";
+
+      function startGameFromUserGesture() {
+        if (!window.lime || typeof window.lime.embed !== "function") {
+          throw new Error("Game engine loaded without the Lime embed API.");
+        }
+        window.__neoV4AudioStartGesture = true;
+        window.lime.embed("VS Impostor", "openfl-content", 1280, 720, { parameters: {} });
       }
-      window.lime.embed("VS Impostor", "openfl-content", 1280, 720, { parameters: {} });
-    }).catch(function (error) {
-      if (error && error.__neoV4Reported) return;
-      console.error("VS Impostor V4 could not start:", error);
-      try {
-        window.dispatchEvent(new ErrorEvent("error", {
-          message: "VS Impostor V4 could not start: " + (error && error.message || String(error)),
-          error: error instanceof Error ? error : new Error(String(error))
-        }));
-      } catch (_) {}
-    });
+
+      function showEjectedTestStartButton() {
+        var overlay = document.createElement("div");
+        overlay.id = "neo-v4-ejected-test-start";
+        overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:#050509;color:#fff;font-family:Arial,sans-serif;text-align:center;padding:24px;box-sizing:border-box;";
+        var card = document.createElement("div");
+        card.style.cssText = "max-width:520px;width:100%;padding:28px 24px;background:#121218;border:1px solid #454552;border-radius:14px;box-sizing:border-box;box-shadow:0 12px 40px rgba(0,0,0,.45);";
+        var title = document.createElement("div");
+        title.textContent = "VS Impostor V4 — Ejected Test";
+        title.style.cssText = "font-size:22px;font-weight:700;margin-bottom:10px;";
+        var detail = document.createElement("div");
+        detail.textContent = "Click below to start the test. This click enables the browser to start the game's audio.";
+        detail.style.cssText = "font-size:14px;line-height:1.5;color:#d0d0d8;margin-bottom:20px;";
+        var button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "Click to start Ejected test";
+        button.style.cssText = "font-size:16px;font-weight:700;padding:13px 20px;color:#fff;background:#d33;border:0;border-radius:8px;cursor:pointer;";
+        button.addEventListener("click", function () {
+          button.disabled = true;
+          button.textContent = "Starting…";
+          try {
+            startGameFromUserGesture();
+            overlay.remove();
+          } catch (error) {
+            button.disabled = false;
+            button.textContent = "Try starting again";
+            throw error;
+          }
+        });
+        card.appendChild(title);
+        card.appendChild(detail);
+        card.appendChild(button);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+      }
+
+      window.__neoV4EngineReady.then(function () {
+        var testMode = new URLSearchParams(window.location.search).get("testEjected") === "1";
+        if (testMode) {
+          // Do not embed or initialize audio until an in-page user click occurs.
+          showEjectedTestStartButton();
+          return;
+        }
+        startGameFromUserGesture();
+      }).catch(function (error) {
+        if (error && error.__neoV4Reported) return;
+        console.error("VS Impostor V4 could not start:", error);
+        try {
+          window.dispatchEvent(new ErrorEvent("error", {
+            message: "VS Impostor V4 could not start: " + (error && error.message || String(error)),
+            error: error instanceof Error ? error : new Error(String(error))
+          }));
+        } catch (_) {}
+      });
+    })();
 	</script>
 	
 
