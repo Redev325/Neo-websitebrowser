@@ -264,17 +264,17 @@
         throw new Error("The Toogus random-index patch did not validate.");
       }
 
-      // The upstream bundle references a game-over sound that is not included in this build.
-      // Alias the missing path to the existing V4 game-over loop in assets/shared/music.
+      // Some builds construct the missing game-over sound ID dynamically, so it may
+      // not exist as a literal in the downloaded bundle. Rewrite it when present;
+      // the runtime Assets.getSound fallback below covers dynamically-built IDs.
       var missingGameOverAsset = "assets/music/new_Gameover.ogg";
       var availableGameOverAsset = "assets/shared/music/gameover_v4_LOOP.ogg";
       var missingGameOverCount = source.split(missingGameOverAsset).length - 1;
-      if (missingGameOverCount < 1) {
-        throw new Error("Could not validate the missing new_Gameover sound path in this engine build.");
-      }
-      source = source.split(missingGameOverAsset).join(availableGameOverAsset);
-      if (source.indexOf(missingGameOverAsset) !== -1) {
-        throw new Error("The new_Gameover asset-path fix did not validate.");
+      if (missingGameOverCount > 0) {
+        source = source.split(missingGameOverAsset).join(availableGameOverAsset);
+        if (source.indexOf(missingGameOverAsset) !== -1) {
+          throw new Error("The new_Gameover asset-path rewrite did not validate.");
+        }
       }
 
       // HaxeFlixel can throw when animation.addByPrefix receives a null prefix.
@@ -296,7 +296,48 @@
         var blobUrl = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
         var engineScript = document.createElement("script");
         engineScript.type = "text/javascript";
-        engineScript.onload = function () { URL.revokeObjectURL(blobUrl); resolve(); };
+        engineScript.onload = function () {
+          URL.revokeObjectURL(blobUrl);
+
+          // Route only the missing game-over sound ID to the existing V4 loop.
+          // This must run after the engine defines Assets, but before lime.embed starts the game.
+          var missingSoundId = "assets/music/new_Gameover.ogg";
+          var fallbackSoundId = "assets/shared/music/gameover_v4_LOOP.ogg";
+          var assetProviders = [];
+          try {
+            if (window.lime && window.lime.utils && window.lime.utils.Assets) assetProviders.push(window.lime.utils.Assets);
+          } catch (_) {}
+          try {
+            if (window.openfl && window.openfl.utils && window.openfl.utils.Assets) assetProviders.push(window.openfl.utils.Assets);
+          } catch (_) {}
+          var patchedProviders = [];
+          assetProviders.forEach(function (assets) {
+            if (!assets || typeof assets.getSound !== "function" ||
+                assets.__neoV4GameOverSoundFallbackInstalled) return;
+            var originalGetSound = assets.getSound;
+            assets.getSound = function (id) {
+              var normalizedId = String(id == null ? "" : id).replace(/\\\\/g, "/").toLowerCase();
+              if (normalizedId === missingSoundId.toLowerCase() ||
+                  normalizedId.slice(-(missingSoundId.length + 1)) === "/" + missingSoundId.toLowerCase()) {
+                return originalGetSound.call(this, fallbackSoundId);
+              }
+              return originalGetSound.apply(this, arguments);
+            };
+            try {
+              Object.defineProperty(assets, "__neoV4GameOverSoundFallbackInstalled", {
+                value: true, configurable: true
+              });
+            } catch (_) {
+              assets.__neoV4GameOverSoundFallbackInstalled = true;
+            }
+            patchedProviders.push("getSound");
+          });
+          window.__neoV4GameOverFallbackInstalled = patchedProviders.length > 0;
+          if (!window.__neoV4GameOverFallbackInstalled) {
+            console.warn("VS Impostor V4: runtime game-over sound fallback API was not available during startup.");
+          }
+          resolve();
+        };
         engineScript.onerror = function () {
           URL.revokeObjectURL(blobUrl);
           reject(new Error("Browser refused to execute the patched game engine."));
