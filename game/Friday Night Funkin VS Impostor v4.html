@@ -311,6 +311,20 @@
         throw new Error("The OpenFL shader-compatibility patch did not validate.");
       }
 
+      // NEO_V4_EJECTED_TEST_SHORTCUT: add a URL-only quick launch for debugging the Ejected sequence.
+      // Normal launches are unchanged. Open this game page with ?testEjected=1 to launch Ejected-Hard.
+      var ejectedTestAnchor = 'this.changeItem()},selectedSomethin:null,canClick:null,usingMouse:null,timerThing:null,update:function(t){';
+      var ejectedTestReplacement = 'this.changeItem();if(window.location.search.indexOf("testEjected=1")!==-1){window.setTimeout(function(){try{G.SONG=uf.loadFromJson("ejected-hard","ejected");G.isStoryMode=!1;G.storyDifficulty=2;G.storyWeek=1;G.campaignScore=0;G.campaignMisses=0;ea.switchState(nd.getNextState(new G,!1));}catch(error){console.error("NEO_V4_EJECTED_TEST_LAUNCH_FAILED",error);}},600);}},selectedSomethin:null,canClick:null,usingMouse:null,timerThing:null,update:function(t){';
+      var ejectedTestAnchorCount = source.split(ejectedTestAnchor).length - 1;
+      if (ejectedTestAnchorCount !== 1) {
+        throw new Error("Could not validate the MainMenuState Ejected test-launch anchor.");
+      }
+      source = source.replace(ejectedTestAnchor, ejectedTestReplacement);
+      if (source.indexOf(ejectedTestAnchor) !== -1 ||
+          source.indexOf("NEO_V4_EJECTED_TEST_LAUNCH_FAILED") === -1) {
+        throw new Error("The Ejected test-launch shortcut did not validate.");
+      }
+
       // HaxeFlixel can throw when animation.addByPrefix receives a null prefix.
       // Guard findByPrefix so an invalid optional animation is skipped instead
       // of aborting the entire state transition (reported during Ejected).
