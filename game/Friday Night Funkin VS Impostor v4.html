@@ -463,8 +463,8 @@
         throw new Error("The Ejected video-time-only cutoff patch did not validate.");
       }
 
-      // NEO_V4_EJECTED_VIDEO_CLOCK_CUTOFF: the cutoff is managed by the song-clock timer installed
-      // in the "Ejected Video" event. Keep "Ejected Start" solely responsible for revealing gameplay.
+      // NEO_V4_EJECTED_VIDEO_CLOCK_CUTOFF: keep the current-time cutoff as a fallback, but stop the video
+      // immediately when the chart reaches "Ejected Start" so its white transition cannot stall gameplay.
       var ejectedStartEvent = 'case"Ejected Start":this.camGame.flash(-1,.35),this.canPause=!0,this.camGame.set_visible(!0),this.camHUD.set_visible(!0);break;';
       var ejectedStartCount = source.split(ejectedStartEvent).length - 1;
       if (ejectedStartCount !== 1 || source.indexOf('case"Ejected Start":if(window.__neoV4FinishEjectedCutscene)') !== -1) {
@@ -475,10 +475,9 @@
       if (source.indexOf(ejectedStartEvent) !== -1 || source.indexOf('case"Ejected Start":if(window.__neoV4FinishEjectedCutscene)window.__neoV4FinishEjectedCutscene("chart-start");') === -1) {
         throw new Error("The Ejected chart-start cutscene finish hook did not validate.");
       }
-      var ejectedStartCount = source.split(ejectedStartEvent).length - 1;
-      if (ejectedStartCount !== 1 ||
-          source.indexOf('case"Ejected Start":window.__neoV4ActiveFlxVideo') !== -1) {
-        throw new Error("The Ejected video-clock cutoff validation failed.");
+      if (source.split(ejectedStartReplacement).length !== 2 ||
+          source.indexOf(ejectedStartEvent) !== -1) {
+        throw new Error("The Ejected chart-start cutoff validation failed.");
       }
 
       var oldVideoCallback = 'new hk(t).finishCallback=function(){e.remove(a),e.endingSong?e.endSong():(0==e.piss&&(Gb.trace("oh  nvm",{fileName:"source/PlayState.hx",lineNumber:5204,className:"PlayState",methodName:"startVideo"}),e.schoolIntro(e.doof)),1==e.piss&&e.startCountdown())}';
