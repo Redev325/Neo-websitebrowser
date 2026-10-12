@@ -324,17 +324,18 @@
         throw new Error("The FlxVideo stall recovery / Ejected finish hook did not validate.");
       }
 
-      // NEO_V4_EJECTED_CLOCKED_CUTOFF: let the chart clock reach "Ejected Start"; that exact event dismisses the video.
-      // This event occurs inside the Ejected chart; the stage's later "Ejected Start" event reveals gameplay.
+      // NEO_V4_EJECTED_CLOCKED_CUTOFF: end the video 3.5 seconds before Boyfriend's first notes.
+      // Ejected-Hard's first player-side note is 28774.193548 ms, so the cutoff is 25274.193548 ms.
       var oldEjectedVideoEvent = 'case"Ejected Video":this.startVideo("ejected");break;';
       // NEO_V4_EJECTED_AUDIO_SYNC_FIX: hold chart audio while the video covers active notes.
-      var newEjectedVideoEvent = 'case"Ejected Video":this.__neoEjectedEventVideo=!0;if(window.__neoV4EjectedCutoffTimer)clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=window.setInterval(function(){var music=m.sound&&m.sound.music;var songTime=music&&Number(music.time);if(Number.isFinite(songTime)&&songTime>=24774){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null;var activeVideo=window.__neoV4ActiveFlxVideo;if(activeVideo&&activeVideo.__neoV4ForceFinish)activeVideo.__neoV4ForceFinish();}},25);this.startVideo("ejected");break;';
+      var newEjectedVideoEvent = 'case"Ejected Video":this.__neoEjectedEventVideo=!0;if(window.__neoV4EjectedCutoffTimer)clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=window.setInterval(function(){var music=m.sound&&m.sound.music;var songTime=music&&Number(music.time);if(Number.isFinite(songTime)&&songTime>=25274.1935483871){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null;var activeVideo=window.__neoV4ActiveFlxVideo;if(activeVideo&&activeVideo.__neoV4ForceFinish)activeVideo.__neoV4ForceFinish();}},25);this.startVideo("ejected");break;';
       var ejectedVideoEventCount = source.split(oldEjectedVideoEvent).length - 1;
       if (ejectedVideoEventCount !== 1) throw new Error("Could not validate the Ejected Video chart-event handler.");
       source = source.replace(oldEjectedVideoEvent, newEjectedVideoEvent);
       if (source.indexOf(oldEjectedVideoEvent) !== -1 ||
-          source.indexOf("__neoEjectedEventVideo=!0") === -1) {
-        throw new Error("The Ejected Video chart-event patch did not validate.");
+          source.indexOf("__neoEjectedEventVideo=!0") === -1 ||
+          source.indexOf("songTime>=25274.1935483871") === -1) {
+        throw new Error("The Ejected Video chart-event / Boyfriend cutoff patch did not validate.");
       }
 
       // NEO_V4_EJECTED_AUDIO_CLOCK_CUTOFF: the cutoff is managed by the song-clock timer installed
