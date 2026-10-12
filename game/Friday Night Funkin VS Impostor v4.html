@@ -314,7 +314,7 @@
       }
 
       var oldFlxVideoFinish = 'i.addEventListener("netStatus",function(t){"NetStream.Play.Complete"==t.info.code&&(n.dispose(),m.game.contains(a)&&m.game.removeChild(a),null!=e.finishCallback&&e.finishCallback())}),n.play(t)';
-      var newFlxVideoFinish = '(function(){var f=!1,w=null,l=-1,c=Date.now(),h=n.__video,d=function(){if(f)return;f=!0;null!=w&&(clearInterval(w),w=null);if(window.__neoV4FinishEjectedVideo===d)window.__neoV4FinishEjectedVideo=null;try{n.dispose()}catch(_){}m.game.contains(a)&&m.game.removeChild(a);null!=e.finishCallback&&e.finishCallback()};i.addEventListener("netStatus",function(t){var q=t&&t.info?t.info.code:"";("NetStream.Play.Complete"==q||"NetStream.Play.error"==q||"NetStream.Play.StreamNotFound"==q)&&d()});if(null!=h){h.addEventListener("error",d,!1);w=setInterval(function(){if(f){clearInterval(w);return}if(h.error){d();return}if(!h.paused&&h.currentTime>l+.02){l=h.currentTime;c=Date.now()}else if(!h.paused&&h.readyState>=2&&Date.now()-c>8000){console.warn("NEO_V4_VIDEO_STALL_RECOVERY: cutscene made no progress for 8 seconds; continuing safely");d()}},1000)}n.play(t);if(null!=h&&String(t).toLowerCase().indexOf("ejected.mp4")!==-1)window.__neoV4FinishEjectedVideo=d;})()';;
+      var newFlxVideoFinish = '(function(){var f=!1,w=null,l=-1,c=Date.now(),h=n.__video,d=function(){if(f)return;f=!0;null!=w&&(clearInterval(w),w=null);if(window.__neoV4ActiveFlxVideo===e)window.__neoV4ActiveFlxVideo=null;e.__neoV4ForceFinish=null;try{n.dispose()}catch(_){}m.game.contains(a)&&m.game.removeChild(a);null!=e.finishCallback&&e.finishCallback()};e.__neoV4ForceFinish=d;window.__neoV4ActiveFlxVideo=e;i.addEventListener("netStatus",function(t){var q=t&&t.info?t.info.code:"";("NetStream.Play.Complete"==q||"NetStream.Play.error"==q||"NetStream.Play.StreamNotFound"==q)&&d()});if(null!=h){h.addEventListener("error",d,!1);w=setInterval(function(){if(f){clearInterval(w);return}if(h.error){d();return}if(!h.paused&&h.currentTime>l+.02){l=h.currentTime;c=Date.now()}else if(!h.paused&&h.readyState>=2&&Date.now()-c>8000){console.warn("NEO_V4_VIDEO_STALL_RECOVERY: cutscene made no progress for 8 seconds; continuing safely");d()}},1000)}n.play(t);})()';
       var flxVideoFinishCount = source.split(oldFlxVideoFinish).length - 1;
       if (flxVideoFinishCount !== 1) throw new Error("Could not validate the FlxVideo completion handler.");
       source = source.replace(oldFlxVideoFinish, newFlxVideoFinish);
@@ -335,6 +335,18 @@
       if (source.indexOf(oldEjectedVideoEvent) !== -1 ||
           source.indexOf("__neoEjectedEventVideo=!0") === -1) {
         throw new Error("The Ejected Video chart-event patch did not validate.");
+      }
+
+      // NEO_V4_EJECTED_FORM_SYNC_CUTOFF: remove the Ejected video at the exact chart event that reveals the green monster and starts the first sung notes.
+      // In ejected-hard, "Ejected Start" is timestamped at 24770 ms and the first chart notes follow immediately.
+      var oldEjectedStartEvent = 'case"Ejected Start":this.camGame.flash(-1,.35),this.canPause=!0,this.camGame.set_visible(!0),this.camHUD.set_visible(!0);break;';
+      var newEjectedStartEvent = 'case"Ejected Start":window.__neoV4ActiveFlxVideo&&window.__neoV4ActiveFlxVideo.__neoV4ForceFinish&&window.__neoV4ActiveFlxVideo.__neoV4ForceFinish(),this.camGame.flash(-1,.35),this.canPause=!0,this.camGame.set_visible(!0),this.camHUD.set_visible(!0);break;';
+      var ejectedStartCount = source.split(oldEjectedStartEvent).length - 1;
+      if (ejectedStartCount !== 1) throw new Error("Could not validate the Ejected Start form-reveal event.");
+      source = source.replace(oldEjectedStartEvent, newEjectedStartEvent);
+      if (source.indexOf(oldEjectedStartEvent) !== -1 ||
+          source.indexOf("window.__neoV4ActiveFlxVideo.__neoV4ForceFinish") === -1) {
+        throw new Error("The Ejected form-synchronized video cutoff did not validate.");
       }
 
       // NEO_V4_EJECTED_EARLY_VIDEO_END: stop the Ejected cutscene at the chart event that reveals the transformed monster and gameplay.
