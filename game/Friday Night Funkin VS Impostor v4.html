@@ -307,7 +307,6 @@
       }
       source = source.replace(oldShaderMethod, replacementShaderMethod);
       if (source.indexOf(oldShaderMethod) !== -1 ||
-          source.indexOf("NEO_V4_VERTEX_SHADER_FALLBACK") !== -1 ||
           source.indexOf("Fallback vertex shader also failed") === -1) {
         throw new Error("The OpenFL shader-compatibility patch did not validate.");
       }
