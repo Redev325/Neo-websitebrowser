@@ -982,7 +982,7 @@
     if (!iframe) {
       iframe = document.createElement('iframe');
       iframe.id = 'neo-impostor-v4-game';
-      iframe.src = './game/Friday Night Funkin VS Impostor v4.html?v=neo-live-ejected-cutoff-23-97-2fd5e2';
+      iframe.src = './game/Friday Night Funkin VS Impostor v4.html?v=neo-memory-safe-video-release-43b4d4';
       iframe.title = 'Friday Night Funkin VS Impostor V4';
       iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map; pointer-lock';
       iframe.setAttribute('allowfullscreen', '');
