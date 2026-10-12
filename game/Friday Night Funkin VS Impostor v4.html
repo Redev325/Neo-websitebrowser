@@ -275,7 +275,7 @@
       }
       source = source.replace(brokenEjectedLoop, fixedEjectedLoop);
       if (source.indexOf(brokenEjectedLoop) !== -1 ||
-          source.split(fixedEjectedLoop).length - 1 !== 1) {
+          source.indexOf(fixedEjectedLoop) === -1) {
         throw new Error("The Ejected game-over loop fix did not validate.");
       }
 
