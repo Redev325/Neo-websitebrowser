@@ -161,6 +161,21 @@
         throw new Error("The Toogus random-index patch did not validate.");
       }
 
+      // HaxeFlixel can throw when animation.addByPrefix receives a null prefix.
+      // Guard findByPrefix so an invalid optional animation is skipped instead
+      // of aborting the entire state transition (reported during Ejected).
+      var nullPrefixGuardCount = 0;
+      var findByPrefixSignature = /((?:\bfindByPrefix\s*:\s*function|\.\s*findByPrefix\s*=\s*function)\s*\()([^)]*)(\)\s*\{)/g;
+      source = source.replace(findByPrefixSignature, function (full, prefix, parameters, end) {
+        var args = parameters.split(",").map(function (item) { return item.trim(); });
+        if (args.length < 2 || !args[1]) return full;
+        nullPrefixGuardCount++;
+        return prefix + parameters + end + "if (" + args[1] + " == null) return;";
+      });
+      if (nullPrefixGuardCount < 1) {
+        throw new Error("Could not validate the HaxeFlixel null-animation-prefix guard.");
+      }
+
       return new Promise(function (resolve, reject) {
         var blobUrl = URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
         var engineScript = document.createElement("script");
