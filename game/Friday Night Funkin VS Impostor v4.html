@@ -420,6 +420,13 @@
 
 	</style>
 	
+<style id="neo-v4-cutscene-clarity-style">
+/* Only video cutscenes get the light sharpen filter; the gameplay canvas is untouched. */
+video[data-neo-v4-cutscene-clarity="true"] {
+  image-rendering: auto;
+  filter: url(#neo-v4-cutscene-sharpen) contrast(1.025) saturate(1.015);
+}
+</style>
 </head>
 <body>
 	
@@ -481,5 +488,72 @@
   })();
   </script>
 
+
+  <!-- NEO_V4_CUTSCENE_CLARITY: mild video-only sharpening; no gameplay/canvas filters. -->
+  <svg aria-hidden="true" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden;pointer-events:none">
+    <defs>
+      <filter id="neo-v4-cutscene-sharpen" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">
+        <feConvolveMatrix order="3" kernelMatrix="0 -0.08 0 -0.08 1.32 -0.08 0 -0.08 0" edgeMode="duplicate" preserveAlpha="true"/>
+      </filter>
+    </defs>
+  </svg>
+  <script>
+  /* NEO_V4_CUTSCENE_CLARITY: mark only video files loaded from assets/videos/. */
+  (function () {
+    "use strict";
+    if (window.__neoV4CutsceneClarityInstalled) return;
+    window.__neoV4CutsceneClarityInstalled = true;
+
+    function isCutscene(video) {
+      var sources = [video.currentSrc, video.getAttribute("src"), video.src];
+      try {
+        video.querySelectorAll("source[src]").forEach(function (source) {
+          sources.push(source.getAttribute("src"), source.src);
+        });
+      } catch (_) {}
+      for (var i = 0; i < sources.length; i++) {
+        if (!sources[i]) continue;
+        var value = String(sources[i]).toLowerCase();
+        if (value.indexOf("assets/videos/") !== -1) return true;
+        try {
+          var path = new URL(value, document.baseURI).pathname.toLowerCase();
+          if (path.indexOf("/assets/videos/") !== -1) return true;
+        } catch (_) {}
+      }
+      return false;
+    }
+
+    function decorate(video) {
+      if (!video || video.tagName !== "VIDEO") return;
+      if (isCutscene(video)) video.setAttribute("data-neo-v4-cutscene-clarity", "true");
+      else video.removeAttribute("data-neo-v4-cutscene-clarity");
+      if (!video.__neoV4ClarityListeners) {
+        video.__neoV4ClarityListeners = true;
+        ["loadstart", "loadedmetadata", "emptied"].forEach(function (eventName) {
+          video.addEventListener(eventName, function () { decorate(video); });
+        });
+      }
+    }
+
+    function scan(node) {
+      if (!node || node.nodeType !== 1) return;
+      if (node.tagName === "VIDEO") decorate(node);
+      if (node.querySelectorAll) node.querySelectorAll("video").forEach(decorate);
+    }
+
+    scan(document.documentElement);
+    new MutationObserver(function (records) {
+      records.forEach(function (record) {
+        if (record.type === "attributes") scan(record.target);
+        if (record.addedNodes) record.addedNodes.forEach(scan);
+      });
+    }).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["src"]
+    });
+  })();
+  </script>
 </body>
 </html>
