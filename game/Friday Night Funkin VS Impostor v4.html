@@ -316,7 +316,7 @@
                 assets.__neoV4GameOverSoundFallbackInstalled) return;
             var originalGetSound = assets.getSound;
             assets.getSound = function (id) {
-              var normalizedId = String(id == null ? "" : id).replace(/\\\\/g, "/").toLowerCase();
+              var normalizedId = String(id == null ? "" : id).replace(/\\/g, "/").toLowerCase();
               if (normalizedId === missingSoundId.toLowerCase() ||
                   normalizedId.slice(-(missingSoundId.length + 1)) === "/" + missingSoundId.toLowerCase()) {
                 return originalGetSound.call(this, fallbackSoundId);
