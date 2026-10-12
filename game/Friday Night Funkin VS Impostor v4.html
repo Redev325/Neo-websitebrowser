@@ -467,6 +467,15 @@
       // in the "Ejected Video" event. Keep "Ejected Start" solely responsible for revealing gameplay.
       var ejectedStartEvent = 'case"Ejected Start":this.camGame.flash(-1,.35),this.canPause=!0,this.camGame.set_visible(!0),this.camHUD.set_visible(!0);break;';
       var ejectedStartCount = source.split(ejectedStartEvent).length - 1;
+      if (ejectedStartCount !== 1 || source.indexOf('case"Ejected Start":if(window.__neoV4FinishEjectedCutscene)') !== -1) {
+        throw new Error("The Ejected Start event target changed; refusing an unsafe cutscene patch.");
+      }
+      var ejectedStartReplacement = 'case"Ejected Start":if(window.__neoV4FinishEjectedCutscene)window.__neoV4FinishEjectedCutscene("chart-start");this.camGame.flash(-1,.35),this.canPause=!0,this.camGame.set_visible(!0),this.camHUD.set_visible(!0);break;';
+      source = source.replace(ejectedStartEvent, ejectedStartReplacement);
+      if (source.indexOf(ejectedStartEvent) !== -1 || source.indexOf('case"Ejected Start":if(window.__neoV4FinishEjectedCutscene)window.__neoV4FinishEjectedCutscene("chart-start");') === -1) {
+        throw new Error("The Ejected chart-start cutscene finish hook did not validate.");
+      }
+      var ejectedStartCount = source.split(ejectedStartEvent).length - 1;
       if (ejectedStartCount !== 1 ||
           source.indexOf('case"Ejected Start":window.__neoV4ActiveFlxVideo') !== -1) {
         throw new Error("The Ejected video-clock cutoff validation failed.");
