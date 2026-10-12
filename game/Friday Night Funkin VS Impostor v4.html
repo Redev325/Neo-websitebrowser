@@ -299,42 +299,67 @@
         engineScript.onload = function () {
           URL.revokeObjectURL(blobUrl);
 
-          // Route only the missing game-over sound ID to the existing V4 loop.
-          // This must run after the engine defines Assets, but before lime.embed starts the game.
+          // Lime may expose/replace the Assets API after the engine script executes.
+          // Keep the narrow fallback installed as the runtime initializes.
           var missingSoundId = "assets/music/new_Gameover.ogg";
           var fallbackSoundId = "assets/shared/music/gameover_v4_LOOP.ogg";
-          var assetProviders = [];
-          try {
-            if (window.lime && window.lime.utils && window.lime.utils.Assets) assetProviders.push(window.lime.utils.Assets);
-          } catch (_) {}
-          try {
-            if (window.openfl && window.openfl.utils && window.openfl.utils.Assets) assetProviders.push(window.openfl.utils.Assets);
-          } catch (_) {}
-          var patchedProviders = [];
-          assetProviders.forEach(function (assets) {
-            if (!assets || typeof assets.getSound !== "function" ||
-                assets.__neoV4GameOverSoundFallbackInstalled) return;
-            var originalGetSound = assets.getSound;
-            assets.getSound = function (id) {
-              var normalizedId = String(id == null ? "" : id).replace(/\\/g, "/").toLowerCase();
-              if (normalizedId === missingSoundId.toLowerCase() ||
-                  normalizedId.slice(-(missingSoundId.length + 1)) === "/" + missingSoundId.toLowerCase()) {
-                return originalGetSound.call(this, fallbackSoundId);
+
+          function normalizeSoundId(id) {
+            return String(id == null ? "" : id)
+              .replace(/\\/g, "/")
+              .replace(/^(?:\.\/)+/, "")
+              .toLowerCase();
+          }
+
+          function installFallbackOn(assets) {
+            if (!assets || typeof assets.getSound !== "function") return false;
+            var current = assets.getSound;
+            if (current.__neoV4GameOverSoundFallback) return true;
+
+            var original = current.__neoV4OriginalGetSound || current;
+            var wrapper = function (id) {
+              var normalizedId = normalizeSoundId(id);
+              var wantedId = normalizeSoundId(missingSoundId);
+              if (normalizedId === wantedId || normalizedId.slice(-(wantedId.length + 1)) === "/" + wantedId) {
+                return original.call(this, fallbackSoundId);
               }
-              return originalGetSound.apply(this, arguments);
+              return original.apply(this, arguments);
             };
+            wrapper.__neoV4GameOverSoundFallback = true;
+            wrapper.__neoV4OriginalGetSound = original;
             try {
-              Object.defineProperty(assets, "__neoV4GameOverSoundFallbackInstalled", {
-                value: true, configurable: true
-              });
+              assets.getSound = wrapper;
+              if (assets.getSound !== wrapper) return false;
+              return true;
             } catch (_) {
-              assets.__neoV4GameOverSoundFallbackInstalled = true;
+              return false;
             }
-            patchedProviders.push("getSound");
-          });
-          window.__neoV4GameOverFallbackInstalled = patchedProviders.length > 0;
-          if (!window.__neoV4GameOverFallbackInstalled) {
-            console.warn("VS Impostor V4: runtime game-over sound fallback API was not available during startup.");
+          }
+
+          function installGameOverFallback() {
+            var candidates = [];
+            try {
+              if (window.lime && window.lime.utils && window.lime.utils.Assets) candidates.push(window.lime.utils.Assets);
+            } catch (_) {}
+            try {
+              if (window.openfl && window.openfl.utils && window.openfl.utils.Assets) candidates.push(window.openfl.utils.Assets);
+            } catch (_) {}
+
+            var installed = false;
+            candidates.forEach(function (assets) {
+              if (installFallbackOn(assets)) installed = true;
+            });
+            if (installed) window.__neoV4GameOverFallbackInstalled = true;
+            return installed;
+          }
+
+          // Try now and retry during initialization. Keep checking in case the
+          // engine replaces the static API after lime.embed starts.
+          installGameOverFallback();
+          if (!window.__neoV4GameOverFallbackTimer) {
+            window.__neoV4GameOverFallbackTimer = window.setInterval(function () {
+              installGameOverFallback();
+            }, 500);
           }
           resolve();
         };
