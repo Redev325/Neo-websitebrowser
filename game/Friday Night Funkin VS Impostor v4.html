@@ -314,7 +314,7 @@
       // NEO_V4_EJECTED_TEST_SHORTCUT: add a URL-only quick launch for debugging the Ejected sequence.
       // Normal launches are unchanged. Open this game page with ?testEjected=1 to launch Ejected-Hard.
       var ejectedTestAnchor = 'this.changeItem()},selectedSomethin:null,canClick:null,usingMouse:null,timerThing:null,update:function(t){';
-      var ejectedTestReplacement = 'this.changeItem();if(window.location.search.indexOf("testEjected=1")!==-1){window.setTimeout(function(){try{G.SONG=uf.loadFromJson("ejected-hard","ejected");G.isStoryMode=!1;G.storyDifficulty=2;G.storyWeek=1;G.campaignScore=0;G.campaignMisses=0;G.cpuControlled=!0;G.usedPractice=!0;G.practiceMode=!0;ea.switchState(nd.getNextState(new G,!1));}catch(error){console.error("NEO_V4_EJECTED_TEST_LAUNCH_FAILED",error);}},600);}},selectedSomethin:null,canClick:null,usingMouse:null,timerThing:null,update:function(t){';
+      var ejectedTestReplacement = 'this.changeItem();if(window.location.search.indexOf("testEjected=1")!==-1&&!window.__neoV4EjectedTestLaunchUsed){window.__neoV4EjectedTestLaunchUsed=true;window.setTimeout(function(){try{G.SONG=uf.loadFromJson("ejected-hard","ejected");G.isStoryMode=!1;G.storyDifficulty=2;G.storyWeek=1;G.campaignScore=0;G.campaignMisses=0;G.cpuControlled=!0;G.usedPractice=!0;G.practiceMode=!0;ea.switchState(nd.getNextState(new G,!1));}catch(error){console.error("NEO_V4_EJECTED_TEST_LAUNCH_FAILED",error);}},600);}},selectedSomethin:null,canClick:null,usingMouse:null,timerThing:null,update:function(t){';
       var ejectedTestAnchorCount = source.split(ejectedTestAnchor).length - 1;
       if (ejectedTestAnchorCount !== 1) {
         throw new Error("Could not validate the MainMenuState Ejected test-launch anchor.");
