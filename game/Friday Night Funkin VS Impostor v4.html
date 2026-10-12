@@ -264,6 +264,19 @@
         throw new Error("The Toogus random-index patch did not validate.");
       }
 
+      // The upstream bundle references a game-over sound that is not included in this build.
+      // Alias the missing path to the existing V4 game-over loop in assets/shared/music.
+      var missingGameOverAsset = "assets/music/new_Gameover.ogg";
+      var availableGameOverAsset = "assets/shared/music/gameover_v4_LOOP.ogg";
+      var missingGameOverCount = source.split(missingGameOverAsset).length - 1;
+      if (missingGameOverCount < 1) {
+        throw new Error("Could not validate the missing new_Gameover sound path in this engine build.");
+      }
+      source = source.split(missingGameOverAsset).join(availableGameOverAsset);
+      if (source.indexOf(missingGameOverAsset) !== -1) {
+        throw new Error("The new_Gameover asset-path fix did not validate.");
+      }
+
       // HaxeFlixel can throw when animation.addByPrefix receives a null prefix.
       // Guard findByPrefix so an invalid optional animation is skipped instead
       // of aborting the entire state transition (reported during Ejected).
