@@ -40,6 +40,85 @@
 })();
 </script>
 <script>
+/* NEO_V4_REACTOR_CAMERA_OPTIMIZATION: skip repeated identical camera-follow events. */
+(function () {
+  "use strict";
+  var proto = window.XMLHttpRequest && XMLHttpRequest.prototype;
+  if (!proto || proto.__neoV4ReactorCameraOptimization) return;
+  proto.__neoV4ReactorCameraOptimization = true;
+  var nativeOpen = proto.open;
+  var responseTextDescriptor = Object.getOwnPropertyDescriptor(proto, "responseText");
+
+  function readResponse(xhr) {
+    try {
+      if (responseTextDescriptor && typeof responseTextDescriptor.get === "function") {
+        return responseTextDescriptor.get.call(xhr);
+      }
+      return xhr.responseText;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function optimizeStage(raw) {
+    if (typeof raw !== "string" || raw.indexOf("Camera Follow Pos") === -1 ||
+        raw.indexOf("function onUpdate") === -1 || raw.indexOf("neoSetCameraTarget") !== -1) return null;
+    var replaced = 0;
+    var optimized = raw.replace(
+      /triggerEvent\(\s*(['"])Camera Follow Pos\1\s*,\s*([^,\r\n]+)\s*,\s*([^)]+)\)/g,
+      function (_, quote, x, y) {
+        replaced++;
+        return "neoSetCameraTarget(" + x.trim() + ", " + y.trim() + ")";
+      }
+    );
+    if (!replaced) return null;
+    var helper = [
+      "local neoLastCameraFollowX = nil",
+      "local neoLastCameraFollowY = nil",
+      "function neoSetCameraTarget(x, y)",
+      "  if x ~= neoLastCameraFollowX or y ~= neoLastCameraFollowY then",
+      "    neoLastCameraFollowX = x",
+      "    neoLastCameraFollowY = y",
+      "    triggerEvent('Camera Follow Pos', x, y)",
+      "  end",
+      "end",
+      ""
+    ].join("\n");
+    optimized = optimized.replace(/function\s+onCreate\s*\(\s*\)/, helper + "function onCreate()");
+    return optimized !== raw && optimized.indexOf("neoSetCameraTarget") !== -1 ? optimized : null;
+  }
+
+  proto.open = function (method, url) {
+    var result = nativeOpen.apply(this, arguments);
+    if (!/\/assets\/stages\/reactor2\.lua(?:[?#]|$)/i.test(String(url || "")) ||
+        this.__neoV4ReactorStageListener) return result;
+    var xhr = this;
+    xhr.__neoV4ReactorStageListener = true;
+    xhr.addEventListener("readystatechange", function () {
+      if (xhr.readyState !== 4 || xhr.__neoV4ReactorStagePatched ||
+          xhr.status < 200 || xhr.status >= 300) return;
+      var responseType = "";
+      try { responseType = xhr.responseType || ""; } catch (_) {}
+      if (responseType !== "" && responseType !== "text") return;
+      var optimized = optimizeStage(readResponse(xhr));
+      if (!optimized) return;
+      try {
+        Object.defineProperty(xhr, "responseText", {
+          configurable: true,
+          get: function () { return optimized; }
+        });
+        Object.defineProperty(xhr, "response", {
+          configurable: true,
+          get: function () { return optimized; }
+        });
+        xhr.__neoV4ReactorStagePatched = true;
+      } catch (_) {}
+    });
+    return result;
+  };
+})();
+</script>
+<script>
 /* NEO_V4_ERROR_DIAGNOSTICS: visible only when the game reports a runtime or asset error. */
 (function () {
   "use strict";
