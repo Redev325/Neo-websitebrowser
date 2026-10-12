@@ -7,93 +7,7 @@
 	
 	<title>Game 22808</title>
 
-  <script>
-  /* NEO_V4_EJECTED_PRELOAD: buffer the small Ejected cutscene during startup without starting a second video decoder. */
-  (function () {
-    "use strict";
-    if (window.__neoV4EjectedPreloadInstalled) return;
-    window.__neoV4EjectedPreloadInstalled = true;
 
-    var video = document.createElement("video");
-    var state = {
-      status: "loading",
-      url: new URL("assets/videos/ejected.mp4", document.baseURI).href,
-      bytesBuffered: 0,
-      error: null,
-      warmedFrame: false
-    };
-    window.__neoV4EjectedPreload = state;
-    video.preload = "auto";
-    video.muted = true;
-    video.defaultMuted = true;
-    video.playsInline = true;
-    video.tabIndex = -1;
-    video.setAttribute("muted", "");
-    video.setAttribute("playsinline", "");
-    video.setAttribute("aria-hidden", "true");
-    video.setAttribute("data-neo-v4-ejected-preload", "true");
-    video.setAttribute("preload", "auto");
-    video.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:.001;pointer-events:none;z-index:2147483646;";
-    video.src = state.url;
-
-    function updateBuffered() {
-      try {
-        var total = 0;
-        for (var i = 0; i < video.buffered.length; i++) {
-          total += Math.max(0, video.buffered.end(i) - video.buffered.start(i));
-        }
-        state.bufferedSeconds = total;
-        state.readyState = video.readyState;
-      } catch (_) {}
-    }
-
-    /* Download and buffer Ejected before play, but do not call video.play() here.
-       A second active decoder during game initialization can starve the game renderer on low-power devices. */
-    function mountAndWarm() {
-      if (document.body && !video.isConnected) {
-        document.body.appendChild(video);
-      }
-      updateBuffered();
-      if (video.readyState >= 2) {
-        state.status = "preloaded";
-      } else if (video.readyState >= 1) {
-        state.status = "metadata-loaded";
-      }
-    }
-
-    video.addEventListener("loadedmetadata", function () {
-      state.status = "metadata-loaded";
-      updateBuffered();
-      mountAndWarm();
-    });
-    video.addEventListener("loadeddata", function () {
-      state.status = "preloaded";
-      state.warmedFrame = false;
-      updateBuffered();
-      mountAndWarm();
-    });
-    video.addEventListener("progress", updateBuffered);
-    video.addEventListener("canplaythrough", function () {
-      updateBuffered();
-      mountAndWarm();
-    });
-    video.addEventListener("error", function () {
-      state.status = "unavailable";
-      state.error = video.error ? "MediaError code " + video.error.code : "Video preload failed";
-      updateBuffered();
-      console.warn("NEO_V4_EJECTED_PRELOAD: preload failed; normal game video loading will still be attempted.", state);
-    });
-
-    if (document.body) mountAndWarm();
-    else document.addEventListener("DOMContentLoaded", mountAndWarm, { once: true });
-
-    /* Trigger network loading immediately even before the body is available. */
-    try { video.load(); } catch (error) {
-      state.status = "unavailable";
-      state.error = String(error && error.message || error);
-    }
-  })();
-  </script>
 	<link rel="canonical" href="https://gamesgo.net/game/fnf-vs-impostor-among-us-v4"/>
 
 	<meta id="viewport" name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -402,13 +316,13 @@
       }
 
       var oldFlxVideoFinish = 'i.addEventListener("netStatus",function(t){"NetStream.Play.Complete"==t.info.code&&(n.dispose(),m.game.contains(a)&&m.game.removeChild(a),null!=e.finishCallback&&e.finishCallback())}),n.play(t)';
-      var newFlxVideoFinish = '(function(){var f=!1,w=null,l=-1,c=Date.now(),h=n.__video,d=function(){if(f)return;f=!0;null!=w&&(clearInterval(w),w=null);if(window.__neoV4EjectedCutoffTimer){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null}if(window.__neoV4ActiveFlxVideo===e)window.__neoV4ActiveFlxVideo=null;e.__neoV4ForceFinish=null;try{n.dispose()}catch(_){}m.game.contains(a)&&m.game.removeChild(a);null!=e.finishCallback&&e.finishCallback()};e.__neoV4ForceFinish=d;e.__neoV4HtmlVideo=h;window.__neoV4ActiveFlxVideo=e;i.addEventListener("netStatus",function(t){var q=t&&t.info?t.info.code:"";("NetStream.Play.Complete"==q||"NetStream.Play.error"==q||"NetStream.Play.StreamNotFound"==q)&&d()});if(null!=h){h.addEventListener("error",d,!1);w=setInterval(function(){if(f){clearInterval(w);return}if(h.error){d();return}if(!h.paused&&h.currentTime>l+.02){l=h.currentTime;c=Date.now()}else if(!h.paused&&h.readyState>=2&&Date.now()-c>8000){console.warn("NEO_V4_VIDEO_STALL_RECOVERY: cutscene made no progress for 8 seconds; continuing safely");d()}},1000)}n.play(t);})()';
+      var newFlxVideoFinish = '(function(){var f=!1,w=null,l=-1,c=Date.now(),h=n.__video,d=function(){if(f)return;f=!0;null!=w&&(clearInterval(w),w=null);if(window.__neoV4EjectedCutoffTimer){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null}if(window.__neoV4ActiveFlxVideo===e)window.__neoV4ActiveFlxVideo=null;e.__neoV4ForceFinish=null;try{n.dispose()}catch(_){}if(h){try{h.pause()}catch(_){}try{h.removeEventListener("error",d,!1)}catch(_){}try{if(h.srcObject)h.srcObject=null}catch(_){}try{h.removeAttribute("src");h.load()}catch(_){}}e.__neoV4HtmlVideo=null;h=null;m.game.contains(a)&&m.game.removeChild(a);null!=e.finishCallback&&e.finishCallback()};e.__neoV4ForceFinish=d;e.__neoV4HtmlVideo=h;window.__neoV4ActiveFlxVideo=e;i.addEventListener("netStatus",function(t){var q=t&&t.info?t.info.code:"";("NetStream.Play.Complete"==q||"NetStream.Play.error"==q||"NetStream.Play.StreamNotFound"==q)&&d()});if(null!=h){h.addEventListener("error",d,!1);w=setInterval(function(){if(f){clearInterval(w);return}if(h.error){d();return}if(!h.paused&&h.currentTime>l+.02){l=h.currentTime;c=Date.now()}else if(!h.paused&&h.readyState>=2&&Date.now()-c>8000){console.warn("NEO_V4_VIDEO_STALL_RECOVERY: cutscene made no progress for 8 seconds; continuing safely");d()}},1000)}n.play(t);})()';
       var flxVideoFinishCount = source.split(oldFlxVideoFinish).length - 1;
       if (flxVideoFinishCount !== 1) throw new Error("Could not validate the FlxVideo completion handler.");
       source = source.replace(oldFlxVideoFinish, newFlxVideoFinish);
       if (source.indexOf(oldFlxVideoFinish) !== -1 ||
           source.indexOf("NEO_V4_VIDEO_STALL_RECOVERY") === -1 ||
-          source.indexOf("e.__neoV4ForceFinish=d") === -1) {
+          source.indexOf("e.__neoV4ForceFinish=d") === -1 || source.indexOf('h.removeAttribute("src");h.load()') === -1 || source.indexOf("e.__neoV4HtmlVideo=null;h=null") === -1) {
         throw new Error("The FlxVideo stall recovery / Ejected finish hook did not validate.");
       }
 
