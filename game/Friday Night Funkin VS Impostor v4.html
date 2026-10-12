@@ -32,6 +32,7 @@
     video.setAttribute("muted", "");
     video.setAttribute("playsinline", "");
     video.setAttribute("aria-hidden", "true");
+    video.setAttribute("data-neo-v4-ejected-preload", "true");
     video.setAttribute("preload", "auto");
     video.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:.001;pointer-events:none;z-index:2147483646;";
     video.src = state.url;
@@ -436,7 +437,7 @@
       }
 
       var oldFlxVideoFinish = 'i.addEventListener("netStatus",function(t){"NetStream.Play.Complete"==t.info.code&&(n.dispose(),m.game.contains(a)&&m.game.removeChild(a),null!=e.finishCallback&&e.finishCallback())}),n.play(t)';
-      var newFlxVideoFinish = '(function(){var f=!1,w=null,l=-1,c=Date.now(),h=n.__video,d=function(){if(f)return;f=!0;null!=w&&(clearInterval(w),w=null);if(window.__neoV4EjectedCutoffTimer){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null}if(window.__neoV4ActiveFlxVideo===e)window.__neoV4ActiveFlxVideo=null;e.__neoV4ForceFinish=null;try{n.dispose()}catch(_){}m.game.contains(a)&&m.game.removeChild(a);null!=e.finishCallback&&e.finishCallback()};e.__neoV4ForceFinish=d;window.__neoV4ActiveFlxVideo=e;i.addEventListener("netStatus",function(t){var q=t&&t.info?t.info.code:"";("NetStream.Play.Complete"==q||"NetStream.Play.error"==q||"NetStream.Play.StreamNotFound"==q)&&d()});if(null!=h){h.addEventListener("error",d,!1);w=setInterval(function(){if(f){clearInterval(w);return}if(h.error){d();return}if(!h.paused&&h.currentTime>l+.02){l=h.currentTime;c=Date.now()}else if(!h.paused&&h.readyState>=2&&Date.now()-c>8000){console.warn("NEO_V4_VIDEO_STALL_RECOVERY: cutscene made no progress for 8 seconds; continuing safely");d()}},1000)}n.play(t);})()';
+      var newFlxVideoFinish = '(function(){var f=!1,w=null,l=-1,c=Date.now(),h=n.__video,d=function(){if(f)return;f=!0;null!=w&&(clearInterval(w),w=null);if(window.__neoV4EjectedCutoffTimer){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null}if(window.__neoV4ActiveFlxVideo===e)window.__neoV4ActiveFlxVideo=null;e.__neoV4ForceFinish=null;try{n.dispose()}catch(_){}m.game.contains(a)&&m.game.removeChild(a);null!=e.finishCallback&&e.finishCallback()};e.__neoV4ForceFinish=d;e.__neoV4HtmlVideo=h;window.__neoV4ActiveFlxVideo=e;i.addEventListener("netStatus",function(t){var q=t&&t.info?t.info.code:"";("NetStream.Play.Complete"==q||"NetStream.Play.error"==q||"NetStream.Play.StreamNotFound"==q)&&d()});if(null!=h){h.addEventListener("error",d,!1);w=setInterval(function(){if(f){clearInterval(w);return}if(h.error){d();return}if(!h.paused&&h.currentTime>l+.02){l=h.currentTime;c=Date.now()}else if(!h.paused&&h.readyState>=2&&Date.now()-c>8000){console.warn("NEO_V4_VIDEO_STALL_RECOVERY: cutscene made no progress for 8 seconds; continuing safely");d()}},1000)}n.play(t);})()';
       var flxVideoFinishCount = source.split(oldFlxVideoFinish).length - 1;
       if (flxVideoFinishCount !== 1) throw new Error("Could not validate the FlxVideo completion handler.");
       source = source.replace(oldFlxVideoFinish, newFlxVideoFinish);
@@ -450,25 +451,25 @@
       // Ejected-Hard's first player-side note is 28774.193548 ms, so the cutoff is 25274.193548 ms.
       var oldEjectedVideoEvent = 'case"Ejected Video":this.startVideo("ejected");break;';
       // NEO_V4_EJECTED_AUDIO_SYNC_FIX: hold chart audio while the video covers active notes.
-      var newEjectedVideoEvent = 'case"Ejected Video":this.__neoEjectedEventVideo=!0;var state=this,music=m.sound&&m.sound.music,vocals=this.vocals,cutoff=25274.1935483871,startedAt=Date.now(),finished=!1;function holdTracks(){var currentMusic=m.sound&&m.sound.music;if(currentMusic)music=currentMusic;var currentVocals=state.vocals;if(currentVocals)vocals=currentVocals;if(music&&typeof music.pause==="function")try{music.pause()}catch(_){}if(vocals&&typeof vocals.pause==="function")try{vocals.pause()}catch(_){}}function seekAndResume(track){if(!track)return;try{if(typeof track.pause==="function")track.pause();if(typeof track.play==="function"){track.play(!0,cutoff);return}if(typeof track.set_time==="function")track.set_time(cutoff);else if(typeof track.setTime==="function")track.setTime(cutoff);else if("time"in track)track.time=cutoff;else console.warn("NEO_V4_EJECTED_CLOCK: no writable sound-time accessor",track);if(typeof track.resume==="function")track.resume()}catch(error){console.warn("NEO_V4_EJECTED_CLOCK: audio seek/resume failed",error)}}function finishEjectedCutscene(reason){if(finished)return;finished=!0;if(window.__neoV4EjectedCutoffTimer){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null}var activeVideo=window.__neoV4ActiveFlxVideo;if(activeVideo&&typeof activeVideo.__neoV4ForceFinish==="function")try{activeVideo.__neoV4ForceFinish()}catch(error){console.warn("NEO_V4_EJECTED_CLOCK: video finish failed",error)}state.__neoEjectedEventVideo=!1;try{state.inCutscene=!1;state.canPause=!0;state.camGame.set_visible(!0);state.camHUD.set_visible(!0)}catch(error){console.warn("NEO_V4_EJECTED_CLOCK: could not reveal gameplay",error)}var finalMusic=m.sound&&m.sound.music?m.sound.music:music;var finalVocals=state.vocals||vocals;seekAndResume(finalMusic);seekAndResume(finalVocals);window.__neoV4FinishEjectedCutscene=null;console.warn("NEO_V4_EJECTED_CLOCK: resumed gameplay at "+cutoff+" ms ("+reason+")")}window.__neoV4FinishEjectedCutscene=finishEjectedCutscene;holdTracks();if(window.__neoV4EjectedCutoffTimer)clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=window.setInterval(function(){if(finished){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null;return}holdTracks();if(Date.now()-startedAt>=cutoff)finishEjectedCutscene("target-time")},25);this.startVideo("ejected");break;';
+      var newEjectedVideoEvent = 'case"Ejected Video":this.__neoEjectedEventVideo=!0;var state=this,cutoff=25.2741935483871,finished=!1;function finishEjectedCutscene(reason){if(finished)return;finished=!0;if(window.__neoV4EjectedCutoffTimer){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null}var activeVideo=window.__neoV4ActiveFlxVideo;if(activeVideo&&typeof activeVideo.__neoV4ForceFinish==="function")try{activeVideo.__neoV4ForceFinish()}catch(error){console.warn("NEO_V4_EJECTED_CUTOFF: could not close video",error)}state.__neoEjectedEventVideo=!1;try{state.inCutscene=!1;state.canPause=!0;state.camGame.set_visible(!0);state.camHUD.set_visible(!0)}catch(error){console.warn("NEO_V4_EJECTED_CUTOFF: could not reveal gameplay",error)}window.__neoV4FinishEjectedCutscene=null;console.info("NEO_V4_EJECTED_CUTOFF: closed cutscene without seeking the song clock ("+reason+")")}window.__neoV4FinishEjectedCutscene=finishEjectedCutscene;if(window.__neoV4EjectedCutoffTimer)clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=window.setInterval(function(){if(finished)return;var active=window.__neoV4ActiveFlxVideo;var video=active&&active.__neoV4HtmlVideo;if(video&&isFinite(video.currentTime)&&video.currentTime>=cutoff)finishEjectedCutscene("video-time")},100);this.startVideo("ejected");break;';;
       var ejectedVideoEventCount = source.split(oldEjectedVideoEvent).length - 1;
       if (ejectedVideoEventCount !== 1) throw new Error("Could not validate the Ejected Video chart-event handler.");
       source = source.replace(oldEjectedVideoEvent, newEjectedVideoEvent);
       if (source.indexOf(oldEjectedVideoEvent) !== -1 ||
           source.indexOf("__neoEjectedEventVideo=!0") === -1 ||
           source.indexOf("window.__neoV4FinishEjectedCutscene=finishEjectedCutscene") === -1 ||
-          source.indexOf("track.play(!0,cutoff)") === -1 ||
-          source.indexOf("Date.now()-startedAt>=cutoff") === -1) {
-        throw new Error("The Ejected pause/seek/resume cutscene patch did not validate.");
+          source.indexOf("video.currentTime>=cutoff") === -1 ||
+          source.indexOf("window.__neoV4EjectedCutoffTimer=window.setInterval") === -1) {
+        throw new Error("The Ejected video-time-only cutoff patch did not validate.");
       }
 
-      // NEO_V4_EJECTED_AUDIO_CLOCK_CUTOFF: the cutoff is managed by the song-clock timer installed
+      // NEO_V4_EJECTED_VIDEO_CLOCK_CUTOFF: the cutoff is managed by the song-clock timer installed
       // in the "Ejected Video" event. Keep "Ejected Start" solely responsible for revealing gameplay.
       var ejectedStartEvent = 'case"Ejected Start":this.camGame.flash(-1,.35),this.canPause=!0,this.camGame.set_visible(!0),this.camHUD.set_visible(!0);break;';
       var ejectedStartCount = source.split(ejectedStartEvent).length - 1;
       if (ejectedStartCount !== 1 ||
           source.indexOf('case"Ejected Start":window.__neoV4ActiveFlxVideo') !== -1) {
-        throw new Error("The Ejected audio-clock cutoff validation failed.");
+        throw new Error("The Ejected video-clock cutoff validation failed.");
       }
 
       var oldVideoCallback = 'new hk(t).finishCallback=function(){e.remove(a),e.endingSong?e.endSong():(0==e.piss&&(Gb.trace("oh  nvm",{fileName:"source/PlayState.hx",lineNumber:5204,className:"PlayState",methodName:"startVideo"}),e.schoolIntro(e.doof)),1==e.piss&&e.startCountdown())}';
@@ -478,7 +479,7 @@
       source = source.replace(oldVideoCallback, newVideoCallback);
       if (source.indexOf(oldVideoCallback) !== -1 ||
           source.indexOf('e.__neoEjectedEventVideo=!1;e.inCutscene=!1;if(window.__neoV4FinishEjectedCutscene)window.__neoV4FinishEjectedCutscene("video-finished");return;') === -1) {
-        throw new Error("The Ejected video-finish audio-resume callback did not validate.");
+        throw new Error("The Ejected video-finish handoff did not validate.");
       }
 
       // NEO_V4_EJECTED_TEST_SHORTCUT: add a URL-only quick launch for debugging the Ejected sequence.
@@ -749,6 +750,8 @@ video[data-neo-v4-cutscene-clarity="true"] {
     window.__neoV4CutsceneClarityInstalled = true;
 
     function isCutscene(video) {
+      /* The muted preloader is not the live cutscene; never attach the stall recovery to it. */
+      if (video.hasAttribute("data-neo-v4-ejected-preload")) return false;
       var sources = [video.currentSrc, video.getAttribute("src"), video.src];
       try {
         video.querySelectorAll("source[src]").forEach(function (source) {
