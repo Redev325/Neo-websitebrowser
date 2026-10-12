@@ -6,6 +6,128 @@
 	<meta charset="utf-8"> 
 	
 	<title>Game 22808</title>
+
+  <script>
+  /* NEO_V4_EJECTED_PRELOAD: download the small Ejected cutscene during game startup
+     and warm one muted video frame before the player selects the song. */
+  (function () {
+    "use strict";
+    if (window.__neoV4EjectedPreloadInstalled) return;
+    window.__neoV4EjectedPreloadInstalled = true;
+
+    var video = document.createElement("video");
+    var state = {
+      status: "loading",
+      url: new URL("assets/videos/ejected.mp4", document.baseURI).href,
+      bytesBuffered: 0,
+      error: null,
+      warmedFrame: false
+    };
+    window.__neoV4EjectedPreload = state;
+    video.preload = "auto";
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    video.tabIndex = -1;
+    video.setAttribute("muted", "");
+    video.setAttribute("playsinline", "");
+    video.setAttribute("aria-hidden", "true");
+    video.setAttribute("preload", "auto");
+    video.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:.001;pointer-events:none;z-index:2147483646;";
+    video.src = state.url;
+
+    var warmStarted = false;
+    var warmTimeout = 0;
+
+    function updateBuffered() {
+      try {
+        var total = 0;
+        for (var i = 0; i < video.buffered.length; i++) {
+          total += Math.max(0, video.buffered.end(i) - video.buffered.start(i));
+        }
+        state.bufferedSeconds = total;
+        state.readyState = video.readyState;
+      } catch (_) {}
+    }
+
+    function finishWarmup(success) {
+      if (warmTimeout) {
+        clearTimeout(warmTimeout);
+        warmTimeout = 0;
+      }
+      try { video.pause(); } catch (_) {}
+      try {
+        if (Number(video.currentTime) > 0.05) video.currentTime = 0;
+      } catch (_) {}
+      state.warmedFrame = !!success;
+      state.status = success ? "ready" : (video.readyState >= 2 ? "decoded" : "loaded");
+      updateBuffered();
+      console.info("NEO_V4_EJECTED_PRELOAD:", state.status, state);
+    }
+
+    function warmDecoder() {
+      if (warmStarted || !video.isConnected || video.readyState < 2) return;
+      warmStarted = true;
+      state.status = "warming-decoder";
+      warmTimeout = setTimeout(function () { finishWarmup(false); }, 1600);
+      if (typeof video.requestVideoFrameCallback === "function") {
+        try {
+          video.requestVideoFrameCallback(function () { finishWarmup(true); });
+        } catch (_) {}
+      }
+      try {
+        var result = video.play();
+        if (result && typeof result.catch === "function") {
+          result.catch(function (error) {
+            state.error = String(error && error.message || error);
+            finishWarmup(false);
+          });
+        }
+      } catch (error) {
+        state.error = String(error && error.message || error);
+        finishWarmup(false);
+      }
+    }
+
+    function mountAndWarm() {
+      if (document.body && !video.isConnected) {
+        document.body.appendChild(video);
+      }
+      warmDecoder();
+    }
+
+    video.addEventListener("loadedmetadata", function () {
+      state.status = "metadata-loaded";
+      updateBuffered();
+      mountAndWarm();
+    });
+    video.addEventListener("loadeddata", function () {
+      state.status = "decoded";
+      updateBuffered();
+      mountAndWarm();
+    });
+    video.addEventListener("progress", updateBuffered);
+    video.addEventListener("canplaythrough", function () {
+      updateBuffered();
+      if (!warmStarted && video.readyState >= 2) mountAndWarm();
+    });
+    video.addEventListener("error", function () {
+      state.status = "unavailable";
+      state.error = video.error ? "MediaError code " + video.error.code : "Video preload failed";
+      updateBuffered();
+      console.warn("NEO_V4_EJECTED_PRELOAD: preload failed; normal game video loading will still be attempted.", state);
+    });
+
+    if (document.body) mountAndWarm();
+    else document.addEventListener("DOMContentLoaded", mountAndWarm, { once: true });
+
+    /* Trigger network loading immediately even before the body is available. */
+    try { video.load(); } catch (error) {
+      state.status = "unavailable";
+      state.error = String(error && error.message || error);
+    }
+  })();
+  </script>
 	<link rel="canonical" href="https://gamesgo.net/game/fnf-vs-impostor-among-us-v4"/>
 
 	<meta id="viewport" name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
