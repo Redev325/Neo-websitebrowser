@@ -328,15 +328,16 @@
       // Ejected-Hard's first player-side note is 28774.193548 ms, so the cutoff is 25274.193548 ms.
       var oldEjectedVideoEvent = 'case"Ejected Video":this.startVideo("ejected");break;';
       // NEO_V4_EJECTED_AUDIO_SYNC_FIX: hold chart audio while the video covers active notes.
-      var newEjectedVideoEvent = 'case"Ejected Video":this.__neoEjectedEventVideo=!0;if(window.__neoV4EjectedCutoffTimer)clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=window.setInterval(function(){var music=m.sound&&m.sound.music;var songTime=music&&Number(music.time);if(Number.isFinite(songTime)&&songTime>=25274.1935483871){var activeVideo=window.__neoV4ActiveFlxVideo;if(activeVideo&&typeof activeVideo.__neoV4ForceFinish==="function"){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null;activeVideo.__neoV4ForceFinish();}}},25);this.startVideo("ejected");break;';
+      var newEjectedVideoEvent = 'case"Ejected Video":this.__neoEjectedEventVideo=!0;var state=this,music=m.sound&&m.sound.music,vocals=this.vocals,cutoff=25274.1935483871,startedAt=Date.now(),finished=!1;function holdTracks(){var currentMusic=m.sound&&m.sound.music;if(currentMusic)music=currentMusic;var currentVocals=state.vocals;if(currentVocals)vocals=currentVocals;if(music&&typeof music.pause==="function")try{music.pause()}catch(_){}if(vocals&&typeof vocals.pause==="function")try{vocals.pause()}catch(_){}}function seekAndResume(track){if(!track)return;try{if(typeof track.pause==="function")track.pause();if(typeof track.play==="function"){track.play(!0,cutoff);return}if(typeof track.set_time==="function")track.set_time(cutoff);else if(typeof track.setTime==="function")track.setTime(cutoff);else if("time"in track)track.time=cutoff;else console.warn("NEO_V4_EJECTED_CLOCK: no writable sound-time accessor",track);if(typeof track.resume==="function")track.resume()}catch(error){console.warn("NEO_V4_EJECTED_CLOCK: audio seek/resume failed",error)}}function finishEjectedCutscene(reason){if(finished)return;finished=!0;if(window.__neoV4EjectedCutoffTimer){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null}var activeVideo=window.__neoV4ActiveFlxVideo;if(activeVideo&&typeof activeVideo.__neoV4ForceFinish==="function")try{activeVideo.__neoV4ForceFinish()}catch(error){console.warn("NEO_V4_EJECTED_CLOCK: video finish failed",error)}state.__neoEjectedEventVideo=!1;try{state.inCutscene=!1;state.canPause=!0;state.camGame.set_visible(!0);state.camHUD.set_visible(!0)}catch(error){console.warn("NEO_V4_EJECTED_CLOCK: could not reveal gameplay",error)}var finalMusic=m.sound&&m.sound.music?m.sound.music:music;var finalVocals=state.vocals||vocals;seekAndResume(finalMusic);seekAndResume(finalVocals);window.__neoV4FinishEjectedCutscene=null;console.warn("NEO_V4_EJECTED_CLOCK: resumed gameplay at "+cutoff+" ms ("+reason+")")}window.__neoV4FinishEjectedCutscene=finishEjectedCutscene;holdTracks();if(window.__neoV4EjectedCutoffTimer)clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=window.setInterval(function(){if(finished){clearInterval(window.__neoV4EjectedCutoffTimer);window.__neoV4EjectedCutoffTimer=null;return}holdTracks();if(Date.now()-startedAt>=cutoff)finishEjectedCutscene("target-time")},25);this.startVideo("ejected");break;';
       var ejectedVideoEventCount = source.split(oldEjectedVideoEvent).length - 1;
       if (ejectedVideoEventCount !== 1) throw new Error("Could not validate the Ejected Video chart-event handler.");
       source = source.replace(oldEjectedVideoEvent, newEjectedVideoEvent);
       if (source.indexOf(oldEjectedVideoEvent) !== -1 ||
           source.indexOf("__neoEjectedEventVideo=!0") === -1 ||
-          source.indexOf("songTime>=25274.1935483871") === -1 ||
-          source.indexOf('typeof activeVideo.__neoV4ForceFinish==="function"') === -1) {
-        throw new Error("The Ejected Video chart-event / retry-until-ready cutoff patch did not validate.");
+          source.indexOf("window.__neoV4FinishEjectedCutscene=finishEjectedCutscene") === -1 ||
+          source.indexOf("track.play(!0,cutoff)") === -1 ||
+          source.indexOf("Date.now()-startedAt>=cutoff") === -1) {
+        throw new Error("The Ejected pause/seek/resume cutscene patch did not validate.");
       }
 
       // NEO_V4_EJECTED_AUDIO_CLOCK_CUTOFF: the cutoff is managed by the song-clock timer installed
@@ -349,13 +350,13 @@
       }
 
       var oldVideoCallback = 'new hk(t).finishCallback=function(){e.remove(a),e.endingSong?e.endSong():(0==e.piss&&(Gb.trace("oh  nvm",{fileName:"source/PlayState.hx",lineNumber:5204,className:"PlayState",methodName:"startVideo"}),e.schoolIntro(e.doof)),1==e.piss&&e.startCountdown())}';
-      var newVideoCallback = 'new hk(t).finishCallback=function(){e.remove(a);if(e.__neoEjectedEventVideo){e.__neoEjectedEventVideo=!1;e.inCutscene=!1;return;}e.endingSong?e.endSong():(0==e.piss&&(Gb.trace("oh  nvm",{fileName:"source/PlayState.hx",lineNumber:5204,className:"PlayState",methodName:"startVideo"}),e.schoolIntro(e.doof)),1==e.piss&&e.startCountdown())}';
+      var newVideoCallback = 'new hk(t).finishCallback=function(){e.remove(a);if(e.__neoEjectedEventVideo){e.__neoEjectedEventVideo=!1;e.inCutscene=!1;if(window.__neoV4FinishEjectedCutscene)window.__neoV4FinishEjectedCutscene("video-finished");return;}e.endingSong?e.endSong():(0==e.piss&&(Gb.trace("oh  nvm",{fileName:"source/PlayState.hx",lineNumber:5204,className:"PlayState",methodName:"startVideo"}),e.schoolIntro(e.doof)),1==e.piss&&e.startCountdown())}';
       var oldVideoCallbackCount = source.split(oldVideoCallback).length - 1;
       if (oldVideoCallbackCount !== 1) throw new Error("Could not validate the PlayState video completion callback.");
       source = source.replace(oldVideoCallback, newVideoCallback);
       if (source.indexOf(oldVideoCallback) !== -1 ||
-          source.indexOf("e.__neoEjectedEventVideo=!1;e.inCutscene=!1;return;") === -1) {
-        throw new Error("The Ejected event video callback fix did not validate.");
+          source.indexOf('e.__neoEjectedEventVideo=!1;e.inCutscene=!1;if(window.__neoV4FinishEjectedCutscene)window.__neoV4FinishEjectedCutscene("video-finished");return;') === -1) {
+        throw new Error("The Ejected video-finish audio-resume callback did not validate.");
       }
 
       // NEO_V4_EJECTED_TEST_SHORTCUT: add a URL-only quick launch for debugging the Ejected sequence.
@@ -669,14 +670,13 @@ video[data-neo-v4-cutscene-clarity="true"] {
   })();
   </script>
 
-  <!-- NEO_V4_VISIBLE_FRAME_RECOVERY: recover a frozen cutscene renderer without disabling the video. -->
+  <!-- NEO_V4_VISIBLE_FRAME_RECOVERY: fail open to playable gameplay if the browser stops presenting frames. -->
   <script>
   (function () {
     "use strict";
     if (window.__neoV4VisibleFrameRecoveryInstalled) return;
     window.__neoV4VisibleFrameRecoveryInstalled = true;
-
-    var MAX_RECOVERIES = 3;
+    var STALL_LIMIT_MS = 2200;
 
     function attach(video) {
       if (!video || video.tagName !== "VIDEO" ||
@@ -684,28 +684,15 @@ video[data-neo-v4-cutscene-clarity="true"] {
           video.__neoV4VisibleFrameRecovery ||
           typeof video.requestVideoFrameCallback !== "function") return;
 
-      var state = {
-        destroyed: false,
-        lastPresentedAt: Date.now(),
-        lastPresentedMediaTime: -1,
-        lastObservedTime: Number(video.currentTime) || 0,
-        recoveries: 0,
-        lastRecoveryAt: 0
-      };
+      var state = { destroyed: false, lastPresentedAt: Date.now() };
       video.__neoV4VisibleFrameRecovery = state;
 
       function watchPresentedFrames() {
         if (state.destroyed) return;
         try {
-          video.requestVideoFrameCallback(function (_now, metadata) {
+          video.requestVideoFrameCallback(function () {
             if (state.destroyed) return;
-            var mediaTime = metadata && typeof metadata.mediaTime === "number"
-              ? metadata.mediaTime : Number(video.currentTime) || 0;
-            if (state.lastPresentedMediaTime < 0 ||
-                mediaTime > state.lastPresentedMediaTime + 0.001) {
-              state.lastPresentedMediaTime = mediaTime;
-              state.lastPresentedAt = Date.now();
-            }
+            state.lastPresentedAt = Date.now();
             watchPresentedFrames();
           });
         } catch (_) {}
@@ -718,71 +705,20 @@ video[data-neo-v4-cutscene-clarity="true"] {
           window.clearInterval(timer);
           return;
         }
-
-        if (document.visibilityState !== "visible" || video.paused ||
-            video.ended || video.readyState < 2) {
-          state.lastObservedTime = Number(video.currentTime) || 0;
+        if (document.visibilityState !== "visible") {
           state.lastPresentedAt = Date.now();
           return;
         }
-
-        var now = Date.now();
-        var currentTime = Number(video.currentTime) || 0;
-        var timeAdvanced = currentTime > state.lastObservedTime + 0.04;
-        state.lastObservedTime = currentTime;
-
-        // This is specifically for the case where playback/audio time advances
-        // but the browser stops presenting new video frames (the white-frame stall).
-        if (!timeAdvanced || now - state.lastPresentedAt < 1800 ||
-            state.recoveries >= MAX_RECOVERIES || now - state.lastRecoveryAt < 1800) return;
-
-        state.recoveries++;
-        state.lastRecoveryAt = now;
-        state.lastPresentedAt = now;
-        console.warn(
-          "NEO_V4_VISIBLE_FRAME_RECOVERY: playback advanced without new cutscene frames; refreshing decoder",
-          state.recoveries
-        );
-
-        // Seek only 1/60 second to refresh the decoder while retaining the cutscene.
-        var target = currentTime + (1 / 60);
-        var duration = Number(video.duration);
-        if (Number.isFinite(duration) && duration > 0) {
-          target = Math.min(target, Math.max(0, duration - 0.001));
+        if (Date.now() - state.lastPresentedAt < STALL_LIMIT_MS) return;
+        if (typeof window.__neoV4FinishEjectedCutscene !== "function") {
+          state.lastPresentedAt = Date.now();
+          return;
         }
-
-        var resumeWhenReady = function () {
-          if (state.destroyed || video.ended) return;
-          try {
-            var result = video.play();
-            if (result && typeof result.catch === "function") {
-              result.catch(function (error) {
-                console.warn("NEO_V4_VISIBLE_FRAME_RECOVERY: video resume was rejected", error);
-              });
-            }
-          } catch (error) {
-            console.warn("NEO_V4_VISIBLE_FRAME_RECOVERY: video resume failed", error);
-          }
-        };
-
-        video.pause();
-        video.addEventListener("seeked", resumeWhenReady, { once: true });
-        try {
-          video.currentTime = target;
-        } catch (_) {
-          video.removeEventListener("seeked", resumeWhenReady);
-          resumeWhenReady();
-        }
-
-        window.setTimeout(function () {
-          video.removeEventListener("seeked", resumeWhenReady);
-          if (video.paused && !video.ended && document.visibilityState === "visible") {
-            resumeWhenReady();
-          }
-        }, 350);
-
-        state.lastObservedTime = target;
-      }, 500);
+        state.destroyed = true;
+        window.clearInterval(timer);
+        console.warn("NEO_V4_VIDEO_FRAME_STALL: skipping the stuck Ejected cutscene and resuming synchronized gameplay");
+        window.__neoV4FinishEjectedCutscene("video-frame-stall");
+      }, 250);
     }
 
     function scan(node) {
