@@ -347,7 +347,7 @@
       // NEO_V4_EJECTED_TEST_SHORTCUT: add a URL-only quick launch for debugging the Ejected sequence.
       // Normal launches are unchanged. Open this game page with ?testEjected=1 to launch Ejected-Hard.
       var ejectedTestAnchor = 'this.changeItem()},selectedSomethin:null,canClick:null,usingMouse:null,timerThing:null,update:function(t){';
-      var ejectedTestReplacement = 'this.changeItem();if(window.location.search.indexOf("testEjected=1")!==-1&&!window.__neoV4EjectedTestLaunchUsed){window.__neoV4EjectedTestLaunchUsed=true;window.setTimeout(function(){try{G.SONG=uf.loadFromJson("ejected-hard","ejected");G.isStoryMode=!1;G.storyDifficulty=2;G.storyWeek=1;G.campaignScore=0;G.campaignMisses=0;G.cpuControlled=!0;G.usedPractice=!0;G.practiceMode=!0;ea.switchState(nd.getNextState(new G,!1));}catch(error){console.error("NEO_V4_EJECTED_TEST_LAUNCH_FAILED",error);}},600);}},selectedSomethin:null,canClick:null,usingMouse:null,timerThing:null,update:function(t){';
+      var ejectedTestReplacement = 'this.changeItem();if(window.location.search.indexOf("testEjected=1")!==-1&&!window.__neoV4EjectedTestLaunchUsed){window.__neoV4EjectedTestLaunchUsed=true;window.setTimeout(function(){try{G.SONG=uf.loadFromJson("ejected-hard","ejected");G.isStoryMode=!1;G.storyDifficulty=2;G.storyWeek=1;G.campaignScore=0;G.campaignMisses=0;G.cpuControlled=!1;G.usedPractice=!1;G.practiceMode=!1;ea.switchState(nd.getNextState(new G,!1));}catch(error){console.error("NEO_V4_EJECTED_TEST_LAUNCH_FAILED",error);}},600);}},selectedSomethin:null,canClick:null,usingMouse:null,timerThing:null,update:function(t){';
       var ejectedTestAnchorCount = source.split(ejectedTestAnchor).length - 1;
       if (ejectedTestAnchorCount !== 1) {
         throw new Error("Could not validate the MainMenuState Ejected test-launch anchor.");
@@ -654,5 +654,143 @@ video[data-neo-v4-cutscene-clarity="true"] {
     }).observe(document.documentElement, {childList:true,subtree:true,attributes:true,attributeFilter:["src"]});
   })();
   </script>
+
+  <!-- NEO_V4_VISIBLE_FRAME_RECOVERY: recover a frozen cutscene renderer without disabling the video. -->
+  <script>
+  (function () {
+    "use strict";
+    if (window.__neoV4VisibleFrameRecoveryInstalled) return;
+    window.__neoV4VisibleFrameRecoveryInstalled = true;
+
+    var MAX_RECOVERIES = 3;
+
+    function attach(video) {
+      if (!video || video.tagName !== "VIDEO" ||
+          video.getAttribute("data-neo-v4-cutscene-clarity") !== "true" ||
+          video.__neoV4VisibleFrameRecovery ||
+          typeof video.requestVideoFrameCallback !== "function") return;
+
+      var state = {
+        destroyed: false,
+        lastPresentedAt: Date.now(),
+        lastPresentedMediaTime: -1,
+        lastObservedTime: Number(video.currentTime) || 0,
+        recoveries: 0,
+        lastRecoveryAt: 0
+      };
+      video.__neoV4VisibleFrameRecovery = state;
+
+      function watchPresentedFrames() {
+        if (state.destroyed) return;
+        try {
+          video.requestVideoFrameCallback(function (_now, metadata) {
+            if (state.destroyed) return;
+            var mediaTime = metadata && typeof metadata.mediaTime === "number"
+              ? metadata.mediaTime : Number(video.currentTime) || 0;
+            if (state.lastPresentedMediaTime < 0 ||
+                mediaTime > state.lastPresentedMediaTime + 0.001) {
+              state.lastPresentedMediaTime = mediaTime;
+              state.lastPresentedAt = Date.now();
+            }
+            watchPresentedFrames();
+          });
+        } catch (_) {}
+      }
+      watchPresentedFrames();
+
+      var timer = window.setInterval(function () {
+        if (state.destroyed || !video.isConnected) {
+          state.destroyed = true;
+          window.clearInterval(timer);
+          return;
+        }
+
+        if (document.visibilityState !== "visible" || video.paused ||
+            video.ended || video.readyState < 2) {
+          state.lastObservedTime = Number(video.currentTime) || 0;
+          state.lastPresentedAt = Date.now();
+          return;
+        }
+
+        var now = Date.now();
+        var currentTime = Number(video.currentTime) || 0;
+        var timeAdvanced = currentTime > state.lastObservedTime + 0.04;
+        state.lastObservedTime = currentTime;
+
+        // This is specifically for the case where playback/audio time advances
+        // but the browser stops presenting new video frames (the white-frame stall).
+        if (!timeAdvanced || now - state.lastPresentedAt < 1800 ||
+            state.recoveries >= MAX_RECOVERIES || now - state.lastRecoveryAt < 1800) return;
+
+        state.recoveries++;
+        state.lastRecoveryAt = now;
+        state.lastPresentedAt = now;
+        console.warn(
+          "NEO_V4_VISIBLE_FRAME_RECOVERY: playback advanced without new cutscene frames; refreshing decoder",
+          state.recoveries
+        );
+
+        // Seek only 1/60 second to refresh the decoder while retaining the cutscene.
+        var target = currentTime + (1 / 60);
+        var duration = Number(video.duration);
+        if (Number.isFinite(duration) && duration > 0) {
+          target = Math.min(target, Math.max(0, duration - 0.001));
+        }
+
+        var resumeWhenReady = function () {
+          if (state.destroyed || video.ended) return;
+          try {
+            var result = video.play();
+            if (result && typeof result.catch === "function") {
+              result.catch(function (error) {
+                console.warn("NEO_V4_VISIBLE_FRAME_RECOVERY: video resume was rejected", error);
+              });
+            }
+          } catch (error) {
+            console.warn("NEO_V4_VISIBLE_FRAME_RECOVERY: video resume failed", error);
+          }
+        };
+
+        video.pause();
+        video.addEventListener("seeked", resumeWhenReady, { once: true });
+        try {
+          video.currentTime = target;
+        } catch (_) {
+          video.removeEventListener("seeked", resumeWhenReady);
+          resumeWhenReady();
+        }
+
+        window.setTimeout(function () {
+          video.removeEventListener("seeked", resumeWhenReady);
+          if (video.paused && !video.ended && document.visibilityState === "visible") {
+            resumeWhenReady();
+          }
+        }, 350);
+
+        state.lastObservedTime = target;
+      }, 500);
+    }
+
+    function scan(node) {
+      if (!node || node.nodeType !== 1) return;
+      if (node.tagName === "VIDEO") attach(node);
+      if (node.querySelectorAll) node.querySelectorAll("video").forEach(attach);
+    }
+
+    scan(document.documentElement);
+    new MutationObserver(function (records) {
+      records.forEach(function (record) {
+        if (record.type === "attributes") scan(record.target);
+        if (record.addedNodes) record.addedNodes.forEach(scan);
+      });
+    }).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["src", "data-neo-v4-cutscene-clarity"]
+    });
+  })();
+  </script>
+
 </body>
 </html>
