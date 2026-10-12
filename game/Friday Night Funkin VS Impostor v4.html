@@ -16,6 +16,30 @@
 	
 	
 	<script>
+/* NEO_V4_BALANCED_RENDERING: reduce high-DPI GPU work without lowering game timing or FPS. */
+(function () {
+  "use strict";
+  if (window.__neoV4BalancedRenderingInstalled) return;
+  window.__neoV4BalancedRenderingInstalled = true;
+  var nativeDpr = Number(window.devicePixelRatio) || 1;
+  var renderDpr = Math.min(nativeDpr, 1.5);
+  window.__neoV4OriginalDevicePixelRatio = nativeDpr;
+  window.__neoV4RenderDevicePixelRatio = renderDpr;
+  if (renderDpr < nativeDpr) {
+    try {
+      Object.defineProperty(window, "devicePixelRatio", {
+        configurable: true,
+        enumerable: true,
+        get: function () { return renderDpr; }
+      });
+    } catch (error) {
+      // If the browser protects this property, leave the native ratio alone.
+      window.__neoV4RenderDevicePixelRatio = nativeDpr;
+    }
+  }
+})();
+</script>
+<script>
 /* NEO_V4_ERROR_DIAGNOSTICS: visible only when the game reports a runtime or asset error. */
 (function () {
   "use strict";
