@@ -110,7 +110,7 @@
   if (window.__neoV4BalancedRenderingInstalled) return;
   window.__neoV4BalancedRenderingInstalled = true;
   var nativeDpr = Number(window.devicePixelRatio) || 1;
-  var renderDpr = Math.min(nativeDpr, 0.7)
+  var renderDpr = Math.min(nativeDpr, 0.7);
   window.__neoV4OriginalDevicePixelRatio = nativeDpr;
   window.__neoV4RenderDevicePixelRatio = renderDpr;
   if (renderDpr < nativeDpr) {
