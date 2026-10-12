@@ -322,6 +322,28 @@
         throw new Error("The FlxVideo stall recovery patch did not validate.");
       }
 
+      // NEO_V4_EJECTED_EVENT_VIDEO_FIX: don't restart the countdown when the chart's Ejected Video event finishes.
+      // This event occurs inside the Ejected chart; the stage's later "Ejected Start" event reveals gameplay.
+      var oldEjectedVideoEvent = 'case"Ejected Video":this.startVideo("ejected");break;';
+      var newEjectedVideoEvent = 'case"Ejected Video":this.__neoEjectedEventVideo=!0,this.startVideo("ejected");break;';
+      var ejectedVideoEventCount = source.split(oldEjectedVideoEvent).length - 1;
+      if (ejectedVideoEventCount !== 1) throw new Error("Could not validate the Ejected Video chart-event handler.");
+      source = source.replace(oldEjectedVideoEvent, newEjectedVideoEvent);
+      if (source.indexOf(oldEjectedVideoEvent) !== -1 ||
+          source.indexOf("__neoEjectedEventVideo=!0") === -1) {
+        throw new Error("The Ejected Video chart-event patch did not validate.");
+      }
+
+      var oldVideoCallback = 'new hk(t).finishCallback=function(){e.remove(a),e.endingSong?e.endSong():(0==e.piss&&(Gb.trace("oh  nvm",{fileName:"source/PlayState.hx",lineNumber:5204,className:"PlayState",methodName:"startVideo"}),e.schoolIntro(e.doof)),1==e.piss&&e.startCountdown())}';
+      var newVideoCallback = 'new hk(t).finishCallback=function(){e.remove(a);if(e.__neoEjectedEventVideo){e.__neoEjectedEventVideo=!1;e.inCutscene=!1;return;}e.endingSong?e.endSong():(0==e.piss&&(Gb.trace("oh  nvm",{fileName:"source/PlayState.hx",lineNumber:5204,className:"PlayState",methodName:"startVideo"}),e.schoolIntro(e.doof)),1==e.piss&&e.startCountdown())}';
+      var oldVideoCallbackCount = source.split(oldVideoCallback).length - 1;
+      if (oldVideoCallbackCount !== 1) throw new Error("Could not validate the PlayState video completion callback.");
+      source = source.replace(oldVideoCallback, newVideoCallback);
+      if (source.indexOf(oldVideoCallback) !== -1 ||
+          source.indexOf("e.__neoEjectedEventVideo=!1;e.inCutscene=!1;return;") === -1) {
+        throw new Error("The Ejected event video callback fix did not validate.");
+      }
+
       // NEO_V4_EJECTED_TEST_SHORTCUT: add a URL-only quick launch for debugging the Ejected sequence.
       // Normal launches are unchanged. Open this game page with ?testEjected=1 to launch Ejected-Hard.
       var ejectedTestAnchor = 'this.changeItem()},selectedSomethin:null,canClick:null,usingMouse:null,timerThing:null,update:function(t){';
