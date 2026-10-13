@@ -178,6 +178,7 @@
       function spawnClickBurst(x,y){if(gameOptimizationActive())return;var frag=document.createDocumentFragment(),elements=[],center=document.createElement('div');center.className='click-burst-center';center.style.cssText='left:'+x+'px;top:'+y+'px';frag.appendChild(center);elements.push(center);var rayCount=8;for(var i=0;i<rayCount;i++){var ray=document.createElement('div');ray.className='click-burst-ray';var angle=(360/rayCount)*i+(Math.random()*10-5),len=12+Math.random()*16;ray.style.cssText='left:'+x+'px;top:'+y+'px;height:'+len+'px;--rot:'+angle+'deg';frag.appendChild(ray);elements.push(ray);}for(var j=0;j<4;j++){var p=document.createElement('div');p.className='click-burst-particle';var angleP=Math.random()*360,dist=10+Math.random()*14,px=x+Math.cos(angleP*Math.PI/180)*dist,py=y+Math.sin(angleP*Math.PI/180)*dist;p.style.cssText='left:'+px+'px;top:'+py+'px';frag.appendChild(p);elements.push(p);}document.body.appendChild(frag);setTimeout(function(){for(var k=0;k<elements.length;k++){var el=elements[k];if(el.parentNode)el.parentNode.removeChild(el);}},380);}
       window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-cursor')return;if(typeof d.x!=='number'||typeof d.y!=='number')return;if(gameOptimizationActive())return;mouseX=d.x;mouseY=d.y;lastMoveTime=Date.now();syncAccentIfNeeded();cursor.style.left=mouseX+'px';cursor.style.top=mouseY+'px';cursor.style.display='block';moved=true;if(d.click)spawnClickBurst(mouseX,mouseY);},{passive:true});
       window.addEventListener('mousedown',function(e){if(!gameOptimizationActive())spawnClickBurst(e.clientX,e.clientY);},{passive:true});
+      window.addEventListener('neo-game-optimization-changed',function(event){var enabled=!!(event&&event.detail&&event.detail.enabled);if(enabled){cursor.style.setProperty('display','none','important');cursor.style.setProperty('visibility','hidden','important');return;}cursor.style.removeProperty('display');cursor.style.removeProperty('visibility');if(moved){cursor.style.left=mouseX+'px';cursor.style.top=mouseY+'px';cursor.style.display='block';cursor.style.visibility='visible';}});
     })();
   </script>
   <script>
@@ -685,6 +686,7 @@
       'use strict';
       var STORAGE_KEY = 'neo-game-optimization';
       var STYLE_ID = 'neo-game-optimization-style';
+      var FRAME_STYLE_ID = 'neo-game-optimization-frame-cursor-style';
       var SETTING_ATTR = 'data-neo-game-optimization-setting';
       var ACTION_ATTR = 'data-neo-game-optimization-action';
 
@@ -702,14 +704,99 @@
         }
       }
 
+      function purgeCursorEffects(doc) {
+        doc = doc || document;
+        try {
+          var cursor = doc.getElementById('custom-cursor');
+          if (cursor) {
+            cursor.style.setProperty('display', 'none', 'important');
+            cursor.style.setProperty('visibility', 'hidden', 'important');
+          }
+          var effects = doc.querySelectorAll('.cursor-trail-dot,.cursor-particle,.click-burst-center,.click-burst-ray,.click-burst-particle');
+          for (var i = 0; i < effects.length; i++) {
+            if (effects[i] && effects[i].parentNode) effects[i].parentNode.removeChild(effects[i]);
+          }
+        } catch (_) {}
+      }
+
+      function applyFrameCursorMode(frame, enabled) {
+        if (!frame || frame.tagName !== 'IFRAME') return;
+        if (!frame.__neoGameOptimizationCursorLoadBound) {
+          frame.__neoGameOptimizationCursorLoadBound = true;
+          frame.addEventListener('load', function () {
+            frame.__neoGameOptimizationCursorMode = null;
+            applyFrameCursorMode(frame, document.documentElement.hasAttribute('data-neo-game-optimization'));
+          });
+        }
+
+        // Local game HTML files are same-origin, so reliably enable the browser
+        // cursor inside their document as well as in Neo's outer viewer.
+        try {
+          var doc = frame.contentDocument;
+          if (doc && doc.documentElement) {
+            var html = doc.documentElement;
+            var style = doc.getElementById(FRAME_STYLE_ID);
+            if (enabled) {
+              html.setAttribute('data-neo-game-native-cursor', '');
+              if (!style) {
+                style = doc.createElement('style');
+                style.id = FRAME_STYLE_ID;
+                style.textContent =
+                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor],' +
+                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor] body,' +
+                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor] *,' +
+                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor] *::before,' +
+                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor] *::after{' +
+                  'cursor:auto!important}';
+                (doc.head || html).appendChild(style);
+              }
+              purgeCursorEffects(doc);
+            } else {
+              html.removeAttribute('data-neo-game-native-cursor');
+              if (style) style.remove();
+            }
+          }
+        } catch (_) {
+          // Cross-origin frames cannot be styled by the parent; they keep their own cursor.
+        }
+
+        if (frame.__neoGameOptimizationCursorMode !== enabled) {
+          frame.__neoGameOptimizationCursorMode = enabled;
+          try {
+            frame.contentWindow.postMessage({
+              source: 'neo-browser-shell',
+              nativeCursor: enabled,
+              gameOptimization: enabled
+            }, '*');
+          } catch (_) {}
+        }
+      }
+
+      function syncFrameCursorModes(enabled) {
+        var frames = document.querySelectorAll('iframe');
+        for (var i = 0; i < frames.length; i++) applyFrameCursorMode(frames[i], enabled);
+      }
+
       function syncActiveState() {
-        var active = isEnabled() && isGameOpen();
-        var wasActive = document.documentElement.hasAttribute('data-neo-game-optimization');
-        if (active === wasActive) return;
-        document.documentElement.toggleAttribute('data-neo-game-optimization', active);
-        window.dispatchEvent(new CustomEvent('neo-game-optimization-changed', {
-          detail: { enabled: isEnabled(), active: active }
-        }));
+        // Enabling the setting immediately removes Neo's cursor effects, even
+        // before a game is opened. Game-viewer-only effects remain scoped below.
+        var enabled = isEnabled();
+        var viewerActive = enabled && isGameOpen();
+        var root = document.documentElement;
+        var wasEnabled = root.hasAttribute('data-neo-game-optimization');
+        var wasViewerActive = root.hasAttribute('data-neo-game-viewer-optimization');
+
+        root.toggleAttribute('data-neo-game-optimization', enabled);
+        root.toggleAttribute('data-neo-game-viewer-optimization', viewerActive);
+
+        if (enabled) purgeCursorEffects(document);
+        syncFrameCursorModes(enabled);
+
+        if (enabled !== wasEnabled || viewerActive !== wasViewerActive) {
+          window.dispatchEvent(new CustomEvent('neo-game-optimization-changed', {
+            detail: { enabled: enabled, active: viewerActive }
+          }));
+        }
       }
 
       function updateButtons() {
@@ -752,7 +839,7 @@
         title.style.cssText = 'margin:0 0 4px;font-size:14px;font-weight:600;color:hsl(var(--foreground));';
 
         var description = document.createElement('p');
-        description.textContent = 'When a game viewer is open, shows your normal system cursor and disables Neo click bursts, cursor trails, particles and extra visual effects. It cannot change a game engine’s own FPS or memory use.';
+        description.textContent = 'Immediately shows your normal system cursor and removes Neo click bursts, cursor trails and particles. When a game is open, it also reduces extra viewer effects; it cannot change the game engine’s own FPS or memory use.';
         description.style.cssText = 'margin:0 0 10px;font-size:12px;line-height:1.4;color:hsl(var(--muted-foreground));';
 
         var buttons = document.createElement('div');
@@ -794,12 +881,12 @@
         style = document.createElement('style');
         style.id = STYLE_ID;
         style.textContent = [
-          'html[data-neo-game-optimization],html[data-neo-game-optimization] body,html[data-neo-game-optimization] *{cursor:auto!important}',
-          'html[data-neo-game-optimization] body::before{display:none!important;background:none!important}',
+          'html[data-neo-game-optimization],html[data-neo-game-optimization] body,html[data-neo-game-optimization] *,html[data-neo-game-optimization].neo-native-cursor,html[data-neo-game-optimization].neo-native-cursor *{cursor:auto!important}',
           'html[data-neo-game-optimization] #custom-cursor,html[data-neo-game-optimization] .cursor-halo-ring,html[data-neo-game-optimization] .cursor-trail-dot,html[data-neo-game-optimization] .cursor-particle,html[data-neo-game-optimization] .click-burst-center,html[data-neo-game-optimization] .click-burst-ray,html[data-neo-game-optimization] .click-burst-particle{display:none!important;visibility:hidden!important;animation:none!important;filter:none!important;box-shadow:none!important}',
-          'html[data-neo-game-optimization] .neo-browser-rain-canvas{display:none!important;opacity:0!important;filter:none!important}',
-          'html[data-neo-game-optimization] [data-neo-game-viewer]{animation:none!important;transition:none!important;filter:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}',
-          'html[data-neo-game-optimization] [data-neo-game-viewer] *:not(iframe):not(canvas):not(video){animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;text-shadow:none!important}'
+          'html[data-neo-game-viewer-optimization] body::before{display:none!important;background:none!important}',
+          'html[data-neo-game-viewer-optimization] .neo-browser-rain-canvas{display:none!important;opacity:0!important;filter:none!important}',
+          'html[data-neo-game-viewer-optimization] [data-neo-game-viewer]{animation:none!important;transition:none!important;filter:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}',
+          'html[data-neo-game-viewer-optimization] [data-neo-game-viewer] *:not(iframe):not(canvas):not(video){animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;text-shadow:none!important}'
         ].join('');
         document.head.appendChild(style);
       }
