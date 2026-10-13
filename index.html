@@ -551,4 +551,131 @@
     })();
   </script>
 
+  <script>
+    (function () {
+      'use strict';
+
+      var STORAGE_KEY = 'neo-low-end-optimization';
+      var STYLE_ID = 'neo-low-end-optimization-style';
+
+      function isEnabled() {
+        try { return localStorage.getItem(STORAGE_KEY) === '1'; }
+        catch (_) { return false; }
+      }
+
+      function applyMode(enabled) {
+        document.documentElement.toggleAttribute('data-neo-low-end', enabled);
+        var oldStyle = document.getElementById(STYLE_ID);
+        if (oldStyle) oldStyle.remove();
+        if (enabled) {
+          var style = document.createElement('style');
+          style.id = STYLE_ID;
+          style.textContent = [
+            'html[data-neo-low-end] body::before{display:none!important}',
+            'html[data-neo-low-end] #custom-cursor,html[data-neo-low-end] .cursor-halo-ring,html[data-neo-low-end] .cursor-trail-dot,html[data-neo-low-end] .cursor-particle,html[data-neo-low-end] .click-burst-center,html[data-neo-low-end] .click-burst-ray,html[data-neo-low-end] .click-burst-particle{display:none!important;animation:none!important;filter:none!important;box-shadow:none!important}',
+            'html[data-neo-low-end] .neo-browser-rain-canvas{display:none!important;opacity:0!important;filter:none!important}',
+            'html[data-neo-low-end] *,html[data-neo-low-end] *::before,html[data-neo-low-end] *::after{scroll-behavior:auto!important;animation-duration:0.001ms!important;animation-iteration-count:1!important;transition-duration:0.001ms!important;transition-delay:0ms!important}',
+            'html[data-neo-low-end] *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;text-shadow:none!important}'
+          ].join('');
+          document.head.appendChild(style);
+        }
+        updateButtons();
+        window.dispatchEvent(new CustomEvent('neo-low-end-optimization-changed', { detail: { enabled: enabled } }));
+      }
+
+      function findSettingsHeader() {
+        var nodes = document.querySelectorAll('p,span,div');
+        for (var i = 0; i < nodes.length; i++) {
+          if (String(nodes[i].textContent || '').trim() === 'Customize accent, tab name, icon and more.') {
+            return nodes[i].parentElement;
+          }
+        }
+        return null;
+      }
+
+      function updateButtons() {
+        var row = document.querySelector('[data-neo-low-end-setting="true"]');
+        if (!row) return;
+        var enabled = isEnabled();
+        ['enable', 'disable'].forEach(function (action) {
+          var button = row.querySelector('[data-neo-low-end-action="' + action + '"]');
+          if (!button) return;
+          var active = (action === 'enable' && enabled) || (action === 'disable' && !enabled);
+          button.style.color = active ? 'hsl(var(--accent))' : 'hsl(var(--foreground))';
+          button.style.borderColor = active ? 'hsl(var(--accent)/.5)' : 'hsl(var(--border)/.5)';
+          button.style.background = active ? 'hsl(var(--accent)/.13)' : 'hsl(var(--background)/.6)';
+          button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+      }
+
+      function addSetting() {
+        var header = findSettingsHeader();
+        if (!header) return;
+        var existing = header.querySelector('[data-neo-low-end-setting="true"]');
+        if (existing) { updateButtons(); return; }
+
+        var row = document.createElement('div');
+        row.setAttribute('data-neo-low-end-setting', 'true');
+        row.style.cssText = 'margin-top:14px;padding-top:14px;border-top:1px solid hsl(var(--border)/.4);';
+
+        var title = document.createElement('p');
+        title.textContent = 'Low-end device optimization';
+        title.style.cssText = 'margin:0 0 4px;font-size:14px;font-weight:600;color:hsl(var(--foreground));';
+
+        var description = document.createElement('p');
+        description.textContent = 'Reduces Neo visual effects and animations to help the site run more smoothly on slower devices. Game performance may still depend on the game itself.';
+        description.style.cssText = 'margin:0 0 10px;font-size:12px;line-height:1.4;color:hsl(var(--muted-foreground));';
+
+        var buttons = document.createElement('div');
+        buttons.style.cssText = 'display:flex;gap:8px;width:100%;';
+
+        function makeButton(label, action, value) {
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = label;
+          button.setAttribute('data-neo-low-end-action', action);
+          button.style.cssText = 'flex:1;min-width:0;padding:8px 10px;border-radius:10px;border:1px solid hsl(var(--border)/.5);background:hsl(var(--background)/.6);font-size:12px;font-weight:600;cursor:pointer;';
+          button.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            try { localStorage.setItem(STORAGE_KEY, value ? '1' : '0'); } catch (_) {}
+            applyMode(value);
+          });
+          return button;
+        }
+
+        buttons.appendChild(makeButton('Enable', 'enable', true));
+        buttons.appendChild(makeButton('Disable', 'disable', false));
+        row.appendChild(title);
+        row.appendChild(description);
+        row.appendChild(buttons);
+        header.appendChild(row);
+        updateButtons();
+      }
+
+      function queueAdd() {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(addSetting);
+        });
+      }
+
+      applyMode(isEnabled());
+      window.addEventListener('neo-open-settings', queueAdd);
+      document.addEventListener('click', function (event) {
+        var button = event.target && event.target.closest ? event.target.closest('button[aria-label="Settings"]') : null;
+        if (button) queueAdd();
+      }, true);
+
+      try {
+        var root = document.getElementById('root');
+        if (root) {
+          new MutationObserver(function () {
+            if (!document.querySelector('[data-neo-low-end-setting="true"]')) addSetting();
+          }).observe(root, { childList: true, subtree: true });
+        }
+      } catch (_) {}
+      queueAdd();
+    })();
+  </script>
+
 </body></html>
