@@ -1262,7 +1262,8 @@
     var root = document.documentElement;
     if (!root) return;
 
-    var next = !!active;
+    var optimizationEnabled = root.hasAttribute('data-neo-game-optimization');
+    var next = !!active && optimizationEnabled;
     if (root.__neoNativeCursorState === next) return;
     root.__neoNativeCursorState = next;
 
@@ -1455,6 +1456,7 @@
     window.addEventListener('resize', schedule, {passive:true});
     document.addEventListener('fullscreenchange', keepNativeCursorInViewer);
     document.addEventListener('webkitfullscreenchange', keepNativeCursorInViewer);
+    window.addEventListener('neo-game-optimization-changed', keepNativeCursorInViewer);
     document.addEventListener('mousemove', function (event) {
       window.__neoCursorMouseX = event.clientX;
       window.__neoCursorMouseY = event.clientY;
