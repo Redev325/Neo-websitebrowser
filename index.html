@@ -103,7 +103,37 @@
       opacity: 1 !important;
       filter: brightness(1.35) contrast(1.15) saturate(1.2);
     }
-  
+
+    /* Game optimization: hide the glow layer, custom cursor, and every Neo click/trail effect. */
+    html[data-neo-game-optimization], html[data-neo-game-optimization] body,
+    html[data-neo-game-optimization] * { cursor: auto !important; }
+    html[data-neo-game-optimization] body::before,
+    html[data-neo-game-optimization] body::after {
+      content: none !important;
+      display: none !important;
+      visibility: hidden !important;
+      background: none !important;
+      filter: none !important;
+      box-shadow: none !important;
+    }
+    html[data-neo-game-optimization] #custom-cursor,
+    html[data-neo-game-optimization] #custom-cursor *,
+    html[data-neo-game-optimization] .cursor-halo-ring,
+    html[data-neo-game-optimization] .cursor-trail-dot,
+    html[data-neo-game-optimization] .cursor-particle,
+    html[data-neo-game-optimization] .click-burst-center,
+    html[data-neo-game-optimization] .click-burst-ray,
+    html[data-neo-game-optimization] .click-burst-particle {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      background: none !important;
+      background-image: none !important;
+      filter: none !important;
+      box-shadow: none !important;
+      animation: none !important;
+    }
+
   </style>
 </head><body class="has-top-ad">
   <div id="root"></div>
@@ -719,6 +749,54 @@
         } catch (_) {}
       }
 
+      var NEO_CURSOR_EFFECT_SELECTOR =
+        '.cursor-trail-dot,.cursor-particle,.click-burst-center,.click-burst-ray,.click-burst-particle';
+
+      function installEffectCleanupObserver(doc) {
+        if (!doc || !doc.documentElement || !doc.defaultView || !doc.defaultView.MutationObserver) return;
+        var html = doc.documentElement;
+        if (html.__neoGameOptimizationEffectObserver) return;
+
+        function optimized() {
+          return html.hasAttribute('data-neo-game-optimization') ||
+                 html.hasAttribute('data-neo-game-native-cursor');
+        }
+
+        function cleanAddedNode(node) {
+          if (!node || node.nodeType !== 1 || !optimized()) return;
+          try {
+            if (node.matches && node.matches(NEO_CURSOR_EFFECT_SELECTOR)) {
+              node.remove();
+              return;
+            }
+            if (node.id === 'custom-cursor') {
+              node.style.setProperty('display', 'none', 'important');
+              node.style.setProperty('visibility', 'hidden', 'important');
+              node.style.setProperty('opacity', '0', 'important');
+            }
+            if (node.querySelectorAll) {
+              var effects = node.querySelectorAll(NEO_CURSOR_EFFECT_SELECTOR);
+              for (var i = 0; i < effects.length; i++) {
+                if (effects[i] && effects[i].parentNode) effects[i].parentNode.removeChild(effects[i]);
+              }
+            }
+          } catch (_) {}
+        }
+
+        try {
+          var observer = new doc.defaultView.MutationObserver(function (records) {
+            if (!optimized()) return;
+            for (var i = 0; i < records.length; i++) {
+              var added = records[i].addedNodes;
+              if (!added) continue;
+              for (var j = 0; j < added.length; j++) cleanAddedNode(added[j]);
+            }
+          });
+          observer.observe(html, { childList: true, subtree: true });
+          html.__neoGameOptimizationEffectObserver = observer;
+        } catch (_) {}
+      }
+
       function applyFrameCursorMode(frame, enabled) {
         if (!frame || frame.tagName !== 'IFRAME') return;
         if (!frame.__neoGameOptimizationCursorLoadBound) {
@@ -742,15 +820,26 @@
                 style = doc.createElement('style');
                 style.id = FRAME_STYLE_ID;
                 style.textContent =
-                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor],' +
-                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor] body,' +
-                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor] *,' +
-                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor] *::before,' +
-                  'html[data-neo-game-native-cursor][data-neo-game-native-cursor] *::after{' +
-                  'cursor:auto!important}';
+                  'html[data-neo-game-native-cursor] body,' +
+                  'html[data-neo-game-native-cursor] *,' +
+                  'html[data-neo-game-native-cursor] *::before,' +
+                  'html[data-neo-game-native-cursor] *::after{' +
+                  'cursor:auto!important}' +
+                  'html[data-neo-game-native-cursor] body::before,' +
+                  'html[data-neo-game-native-cursor] body::after{' +
+                  'content:none!important;display:none!important;visibility:hidden!important;background:none!important;filter:none!important;box-shadow:none!important}' +
+                  'html[data-neo-game-native-cursor] #custom-cursor,' +
+                  'html[data-neo-game-native-cursor] #custom-cursor *,' +
+                  'html[data-neo-game-native-cursor] .cursor-halo-ring,' +
+                  'html[data-neo-game-native-cursor] .cursor-trail-dot,' +
+                  'html[data-neo-game-native-cursor] .cursor-particle,' +
+                  'html[data-neo-game-native-cursor] .click-burst-center,' +
+                  'html[data-neo-game-native-cursor] .click-burst-ray,' +
+                  'html[data-neo-game-native-cursor] .click-burst-particle{' +
+                  'display:none!important;visibility:hidden!important;opacity:0!important;background:none!important;background-image:none!important;filter:none!important;box-shadow:none!important;animation:none!important}';
                 (doc.head || html).appendChild(style);
               }
-              purgeCursorEffects(doc);
+              purgeCursorEffects(doc);\n              installEffectCleanupObserver(doc);
             } else {
               html.removeAttribute('data-neo-game-native-cursor');
               if (style) style.remove();
@@ -789,7 +878,7 @@
         root.toggleAttribute('data-neo-game-optimization', enabled);
         root.toggleAttribute('data-neo-game-viewer-optimization', viewerActive);
 
-        if (enabled) purgeCursorEffects(document);
+        if (enabled) {\n          purgeCursorEffects(document);\n          installEffectCleanupObserver(document);\n        }
         syncFrameCursorModes(enabled);
 
         if (enabled !== wasEnabled || viewerActive !== wasViewerActive) {
@@ -882,8 +971,8 @@
         style.id = STYLE_ID;
         style.textContent = [
           'html[data-neo-game-optimization],html[data-neo-game-optimization] body,html[data-neo-game-optimization] *,html[data-neo-game-optimization].neo-native-cursor,html[data-neo-game-optimization].neo-native-cursor *{cursor:auto!important}',
-          'html[data-neo-game-optimization] #custom-cursor,html[data-neo-game-optimization] .cursor-halo-ring,html[data-neo-game-optimization] .cursor-trail-dot,html[data-neo-game-optimization] .cursor-particle,html[data-neo-game-optimization] .click-burst-center,html[data-neo-game-optimization] .click-burst-ray,html[data-neo-game-optimization] .click-burst-particle{display:none!important;visibility:hidden!important;animation:none!important;filter:none!important;box-shadow:none!important}',
-          'html[data-neo-game-optimization] body::before{display:none!important;background:none!important}',
+          'html[data-neo-game-optimization] #custom-cursor,html[data-neo-game-optimization] #custom-cursor *,html[data-neo-game-optimization] .cursor-halo-ring,html[data-neo-game-optimization] .cursor-trail-dot,html[data-neo-game-optimization] .cursor-particle,html[data-neo-game-optimization] .click-burst-center,html[data-neo-game-optimization] .click-burst-ray,html[data-neo-game-optimization] .click-burst-particle{display:none!important;visibility:hidden!important;opacity:0!important;background:none!important;background-image:none!important;animation:none!important;filter:none!important;box-shadow:none!important}',
+          'html[data-neo-game-optimization] body::before,html[data-neo-game-optimization] body::after{content:none!important;display:none!important;visibility:hidden!important;background:none!important;filter:none!important;box-shadow:none!important}',
           'html[data-neo-game-optimization] .neo-browser-rain-canvas{display:none!important;opacity:0!important;filter:none!important}',
           'html[data-neo-game-viewer-optimization] [data-neo-game-viewer]{animation:none!important;transition:none!important;filter:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}',
           'html[data-neo-game-viewer-optimization] [data-neo-game-viewer] *:not(iframe):not(canvas):not(video){animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;text-shadow:none!important}'
