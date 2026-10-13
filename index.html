@@ -839,7 +839,8 @@
                   'display:none!important;visibility:hidden!important;opacity:0!important;background:none!important;background-image:none!important;filter:none!important;box-shadow:none!important;animation:none!important}';
                 (doc.head || html).appendChild(style);
               }
-              purgeCursorEffects(doc);\n              installEffectCleanupObserver(doc);
+              purgeCursorEffects(doc);
+              installEffectCleanupObserver(doc);
             } else {
               html.removeAttribute('data-neo-game-native-cursor');
               if (style) style.remove();
@@ -878,7 +879,10 @@
         root.toggleAttribute('data-neo-game-optimization', enabled);
         root.toggleAttribute('data-neo-game-viewer-optimization', viewerActive);
 
-        if (enabled) {\n          purgeCursorEffects(document);\n          installEffectCleanupObserver(document);\n        }
+        if (enabled) {
+          purgeCursorEffects(document);
+          installEffectCleanupObserver(document);
+        }
         syncFrameCursorModes(enabled);
 
         if (enabled !== wasEnabled || viewerActive !== wasViewerActive) {
