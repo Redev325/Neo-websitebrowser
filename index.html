@@ -163,20 +163,21 @@
       var cursor=document.getElementById('custom-cursor'); if(!cursor)return;
       var moved=false,lastTrailTime=0,activeTrailDots=[],MAX_TRAIL_DOTS=10,TRAIL_SPAWN_MS=65,TRAIL_LIFETIME_MS=450;
       var mouseX=0,mouseY=0,lastMoveTime=0,IDLE_AFTER_MS=200,IDLE_PARTICLE_MS=140;
+      function gameOptimizationActive(){return document.documentElement.hasAttribute('data-neo-game-optimization');}
       function getAccentHsl(){var s=getComputedStyle(document.documentElement),raw=(s.getPropertyValue('--accent')||'0 80% 55%').trim(),parts=raw.split(/\s+/);if(parts.length>=3)return{h:parseFloat(parts[0])||0,s:parseFloat(parts[1])||80,l:parseFloat(parts[2])||55};return{h:0,s:80,l:55};}
       function hslToHex(h,s,l){s/=100;l/=100;var a=s*Math.min(l,1-l);function f(n){var k=(n+h/30)%12,c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(255*c).toString(16).padStart(2,'0');}return'#'+f(0)+f(8)+f(4);}
       function buildCursorSvg(){var a=getAccentHsl(),bright=hslToHex(a.h,Math.min(a.s+5,100),Math.min(a.l+15,75)),mid=hslToHex(a.h,a.s,Math.max(Math.min(a.l,55),40)),deep=hslToHex(a.h,Math.min(a.s+10,100),Math.max(a.l-25,18));var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><defs><radialGradient id="g" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffffff"/><stop offset="25%" stop-color="'+bright+'"/><stop offset="60%" stop-color="'+mid+'"/><stop offset="100%" stop-color="'+deep+'"/></radialGradient></defs><circle cx="40" cy="40" r="36" fill="'+mid+'" fill-opacity="0.25"/><path d="M40 4 L50 30 L76 40 L50 50 L40 76 L30 50 L4 40 L30 30 Z" fill="url(#g)"/><path d="M40 4 L50 30 L76 40 L50 50 L40 76 L30 50 L4 40 L30 30 Z" fill="none" stroke="'+deep+'" stroke-width="1.8"/><circle cx="40" cy="40" r="8" fill="#ffffff"/></svg>';return'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")';}
       function applyAccentToCursor(){var a=getAccentHsl(),glow1='hsla('+a.h+', '+a.s+'%, '+a.l+'%, 0.95)',glow2='hsla('+a.h+', '+a.s+'%, '+Math.max(a.l-10,20)+'%, 0.6)',glow3='hsla('+a.h+', '+a.s+'%, '+Math.max(a.l-20,15)+'%, 0.35)';cursor.style.backgroundImage=buildCursorSvg();cursor.style.filter='drop-shadow(0 0 5px '+glow1+') drop-shadow(0 0 12px '+glow2+') drop-shadow(0 0 20px '+glow3+')';}
-      var lastAccentKey='';function syncAccentIfNeeded(){var a=getAccentHsl(),key=a.h+'|'+a.s+'|'+a.l;if(key!==lastAccentKey){lastAccentKey=key;applyAccentToCursor();}}
-      applyAccentToCursor();lastAccentKey=(function(){var a=getAccentHsl();return a.h+'|'+a.s+'|'+a.l;})();setInterval(syncAccentIfNeeded,50);
+      var lastAccentKey='';function syncAccentIfNeeded(){if(gameOptimizationActive())return;var a=getAccentHsl(),key=a.h+'|'+a.s+'|'+a.l;if(key!==lastAccentKey){lastAccentKey=key;applyAccentToCursor();}}
+      applyAccentToCursor();lastAccentKey=(function(){var a=getAccentHsl();return a.h+'|'+a.s+'|'+a.l;})();setInterval(function(){if(!gameOptimizationActive())syncAccentIfNeeded();},50);
       try{var observer=new MutationObserver(function(){syncAccentIfNeeded();});observer.observe(document.documentElement,{attributes:true,attributeFilter:['style','class'],subtree:false});if(document.body)observer.observe(document.body,{attributes:true,attributeFilter:['style','class'],subtree:false});}catch(e){}
-      window.addEventListener('mousemove',function(e){mouseX=e.clientX;mouseY=e.clientY;lastMoveTime=Date.now();syncAccentIfNeeded();cursor.style.left=mouseX+'px';cursor.style.top=mouseY+'px';if(!moved){cursor.style.display='block';moved=true;}var now=Date.now();if(now-lastTrailTime>TRAIL_SPAWN_MS){lastTrailTime=now;spawnTrailDot(mouseX,mouseY);}},{passive:true});
-      cursor.style.display='none';setInterval(function(){if(!moved)return;var now=Date.now();if(now-lastMoveTime>=IDLE_AFTER_MS){spawnCursorParticle(mouseX,mouseY);if(Math.random()>0.5)spawnCursorParticle(mouseX,mouseY);}},IDLE_PARTICLE_MS);
-      function spawnTrailDot(x,y){while(activeTrailDots.length>=MAX_TRAIL_DOTS){var oldest=activeTrailDots.shift();if(oldest&&oldest.parentNode)oldest.remove();}var t=document.createElement('div');t.className='cursor-trail-dot';t.style.left=(x+(Math.random()-.5)*6)+'px';t.style.top=(y+(Math.random()-.5)*6)+'px';var size=3+Math.random()*3;t.style.width=size+'px';t.style.height=size+'px';document.body.appendChild(t);activeTrailDots.push(t);setTimeout(function(){if(t.parentNode)t.remove();var idx=activeTrailDots.indexOf(t);if(idx!==-1)activeTrailDots.splice(idx,1);},TRAIL_LIFETIME_MS);}
-      function spawnCursorParticle(x,y){var a=getAccentHsl(),p=document.createElement('div');p.className='cursor-particle';var size=3+Math.random()*5;p.style.width=size+'px';p.style.height=size+'px';var angle=Math.random()*Math.PI*2,dist=8+Math.random()*22;p.style.left=(x+Math.cos(angle)*dist)+'px';p.style.top=(y+Math.sin(angle)*dist)+'px';var l=a.l+(Math.random()*20-8);p.style.background='hsl('+a.h+' '+a.s+'% '+Math.max(20,Math.min(75,l))+'%)';p.style.boxShadow='0 0 8px hsla('+a.h+', '+a.s+'%, '+a.l+'%, 0.9)';document.body.appendChild(p);setTimeout(function(){if(p.parentNode)p.remove();},1000);}
-      function spawnClickBurst(x,y){var frag=document.createDocumentFragment(),elements=[],center=document.createElement('div');center.className='click-burst-center';center.style.cssText='left:'+x+'px;top:'+y+'px';frag.appendChild(center);elements.push(center);var rayCount=8;for(var i=0;i<rayCount;i++){var ray=document.createElement('div');ray.className='click-burst-ray';var angle=(360/rayCount)*i+(Math.random()*10-5),len=12+Math.random()*16;ray.style.cssText='left:'+x+'px;top:'+y+'px;height:'+len+'px;--rot:'+angle+'deg';frag.appendChild(ray);elements.push(ray);}for(var j=0;j<4;j++){var p=document.createElement('div');p.className='click-burst-particle';var angleP=Math.random()*360,dist=10+Math.random()*14,px=x+Math.cos(angleP*Math.PI/180)*dist,py=y+Math.sin(angleP*Math.PI/180)*dist;p.style.cssText='left:'+px+'px;top:'+py+'px';frag.appendChild(p);elements.push(p);}document.body.appendChild(frag);setTimeout(function(){for(var k=0;k<elements.length;k++){var el=elements[k];if(el.parentNode)el.parentNode.removeChild(el);}},380);}
-      window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-cursor')return;if(typeof d.x!=='number'||typeof d.y!=='number')return;mouseX=d.x;mouseY=d.y;lastMoveTime=Date.now();syncAccentIfNeeded();cursor.style.left=mouseX+'px';cursor.style.top=mouseY+'px';cursor.style.display='block';moved=true;if(d.click)spawnClickBurst(mouseX,mouseY);},{passive:true});
-      window.addEventListener('mousedown',function(e){spawnClickBurst(e.clientX,e.clientY);},{passive:true});
+      window.addEventListener('mousemove',function(e){if(gameOptimizationActive()){cursor.style.display='none';return;}mouseX=e.clientX;mouseY=e.clientY;lastMoveTime=Date.now();syncAccentIfNeeded();cursor.style.left=mouseX+'px';cursor.style.top=mouseY+'px';if(!moved){cursor.style.display='block';moved=true;}var now=Date.now();if(now-lastTrailTime>TRAIL_SPAWN_MS){lastTrailTime=now;spawnTrailDot(mouseX,mouseY);}},{passive:true});
+      cursor.style.display='none';setInterval(function(){if(!moved||gameOptimizationActive())return;var now=Date.now();if(now-lastMoveTime>=IDLE_AFTER_MS){spawnCursorParticle(mouseX,mouseY);if(Math.random()>0.5)spawnCursorParticle(mouseX,mouseY);}},IDLE_PARTICLE_MS);
+      function spawnTrailDot(x,y){if(gameOptimizationActive())return;while(activeTrailDots.length>=MAX_TRAIL_DOTS){var oldest=activeTrailDots.shift();if(oldest&&oldest.parentNode)oldest.remove();}var t=document.createElement('div');t.className='cursor-trail-dot';t.style.left=(x+(Math.random()-.5)*6)+'px';t.style.top=(y+(Math.random()-.5)*6)+'px';var size=3+Math.random()*3;t.style.width=size+'px';t.style.height=size+'px';document.body.appendChild(t);activeTrailDots.push(t);setTimeout(function(){if(t.parentNode)t.remove();var idx=activeTrailDots.indexOf(t);if(idx!==-1)activeTrailDots.splice(idx,1);},TRAIL_LIFETIME_MS);}
+      function spawnCursorParticle(x,y){if(gameOptimizationActive())return;var a=getAccentHsl(),p=document.createElement('div');p.className='cursor-particle';var size=3+Math.random()*5;p.style.width=size+'px';p.style.height=size+'px';var angle=Math.random()*Math.PI*2,dist=8+Math.random()*22;p.style.left=(x+Math.cos(angle)*dist)+'px';p.style.top=(y+Math.sin(angle)*dist)+'px';var l=a.l+(Math.random()*20-8);p.style.background='hsl('+a.h+' '+a.s+'% '+Math.max(20,Math.min(75,l))+'%)';p.style.boxShadow='0 0 8px hsla('+a.h+', '+a.s+'%, '+a.l+'%, 0.9)';document.body.appendChild(p);setTimeout(function(){if(p.parentNode)p.remove();},1000);}
+      function spawnClickBurst(x,y){if(gameOptimizationActive())return;var frag=document.createDocumentFragment(),elements=[],center=document.createElement('div');center.className='click-burst-center';center.style.cssText='left:'+x+'px;top:'+y+'px';frag.appendChild(center);elements.push(center);var rayCount=8;for(var i=0;i<rayCount;i++){var ray=document.createElement('div');ray.className='click-burst-ray';var angle=(360/rayCount)*i+(Math.random()*10-5),len=12+Math.random()*16;ray.style.cssText='left:'+x+'px;top:'+y+'px;height:'+len+'px;--rot:'+angle+'deg';frag.appendChild(ray);elements.push(ray);}for(var j=0;j<4;j++){var p=document.createElement('div');p.className='click-burst-particle';var angleP=Math.random()*360,dist=10+Math.random()*14,px=x+Math.cos(angleP*Math.PI/180)*dist,py=y+Math.sin(angleP*Math.PI/180)*dist;p.style.cssText='left:'+px+'px;top:'+py+'px';frag.appendChild(p);elements.push(p);}document.body.appendChild(frag);setTimeout(function(){for(var k=0;k<elements.length;k++){var el=elements[k];if(el.parentNode)el.parentNode.removeChild(el);}},380);}
+      window.addEventListener('message',function(e){var d=e&&e.data;if(!d||d.source!=='neo-browser-cursor')return;if(typeof d.x!=='number'||typeof d.y!=='number')return;if(gameOptimizationActive())return;mouseX=d.x;mouseY=d.y;lastMoveTime=Date.now();syncAccentIfNeeded();cursor.style.left=mouseX+'px';cursor.style.top=mouseY+'px';cursor.style.display='block';moved=true;if(d.click)spawnClickBurst(mouseX,mouseY);},{passive:true});
+      window.addEventListener('mousedown',function(e){if(!gameOptimizationActive())spawnClickBurst(e.clientX,e.clientY);},{passive:true});
     })();
   </script>
   <script>
@@ -674,6 +675,155 @@
           }).observe(root, { childList: true, subtree: true });
         }
       } catch (_) {}
+      queueAdd();
+    })();
+  </script>
+
+
+  <script>
+    (function () {
+      'use strict';
+      var STORAGE_KEY = 'neo-game-optimization';
+      var STYLE_ID = 'neo-game-optimization-style';
+      var SETTING_ATTR = 'data-neo-game-optimization-setting';
+      var ACTION_ATTR = 'data-neo-game-optimization-action';
+
+      function isEnabled() {
+        try { return localStorage.getItem(STORAGE_KEY) === '1'; }
+        catch (_) { return false; }
+      }
+
+      function isGameOpen() {
+        if (document.querySelector('[data-neo-game-viewer]')) return true;
+        try {
+          return !!(window.__neoSelectedGame || sessionStorage.getItem('neo-selected-game'));
+        } catch (_) {
+          return !!window.__neoSelectedGame;
+        }
+      }
+
+      function syncActiveState() {
+        var active = isEnabled() && isGameOpen();
+        var wasActive = document.documentElement.hasAttribute('data-neo-game-optimization');
+        if (active === wasActive) return;
+        document.documentElement.toggleAttribute('data-neo-game-optimization', active);
+        window.dispatchEvent(new CustomEvent('neo-game-optimization-changed', {
+          detail: { enabled: isEnabled(), active: active }
+        }));
+      }
+
+      function updateButtons() {
+        var row = document.querySelector('[' + SETTING_ATTR + '="true"]');
+        if (!row) return;
+        var enabled = isEnabled();
+        ['enable', 'disable'].forEach(function (action) {
+          var button = row.querySelector('[' + ACTION_ATTR + '="' + action + '"]');
+          if (!button) return;
+          var active = (action === 'enable' && enabled) || (action === 'disable' && !enabled);
+          button.style.color = active ? 'hsl(var(--accent))' : 'hsl(var(--foreground))';
+          button.style.borderColor = active ? 'hsl(var(--accent)/.5)' : 'hsl(var(--border)/.5)';
+          button.style.background = active ? 'hsl(var(--accent)/.13)' : 'hsl(var(--background)/.6)';
+          button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+      }
+
+      function findSettingsHeader() {
+        var nodes = document.querySelectorAll('p,span,div');
+        for (var i = 0; i < nodes.length; i++) {
+          if (String(nodes[i].textContent || '').trim() === 'Customize accent, tab name, icon and more.') {
+            return nodes[i].parentElement;
+          }
+        }
+        return null;
+      }
+
+      function addSetting() {
+        var header = findSettingsHeader();
+        if (!header) return;
+        var existing = header.querySelector('[' + SETTING_ATTR + '="true"]');
+        if (existing) { updateButtons(); return; }
+
+        var row = document.createElement('div');
+        row.setAttribute(SETTING_ATTR, 'true');
+        row.style.cssText = 'margin-top:14px;padding-top:14px;border-top:1px solid hsl(var(--border)/.4);';
+
+        var title = document.createElement('p');
+        title.textContent = 'Game optimization';
+        title.style.cssText = 'margin:0 0 4px;font-size:14px;font-weight:600;color:hsl(var(--foreground));';
+
+        var description = document.createElement('p');
+        description.textContent = 'When a game viewer is open, reduces Neo cursor particles, background glow and extra viewer effects. It cannot change a game engine’s own FPS, graphics quality or memory use.';
+        description.style.cssText = 'margin:0 0 10px;font-size:12px;line-height:1.4;color:hsl(var(--muted-foreground));';
+
+        var buttons = document.createElement('div');
+        buttons.style.cssText = 'display:flex;gap:8px;width:100%;';
+
+        function makeButton(label, action, value) {
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = label;
+          button.setAttribute(ACTION_ATTR, action);
+          button.style.cssText = 'flex:1;min-width:0;padding:8px 10px;border-radius:10px;border:1px solid hsl(var(--border)/.5);background:hsl(var(--background)/.6);font-size:12px;font-weight:600;cursor:pointer;';
+          button.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            try { localStorage.setItem(STORAGE_KEY, value ? '1' : '0'); } catch (_) {}
+            syncActiveState();
+            updateButtons();
+          });
+          return button;
+        }
+
+        buttons.appendChild(makeButton('Enable', 'enable', true));
+        buttons.appendChild(makeButton('Disable', 'disable', false));
+        row.appendChild(title);
+        row.appendChild(description);
+        row.appendChild(buttons);
+        header.appendChild(row);
+        updateButtons();
+      }
+
+      function queueAdd() {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(addSetting);
+        });
+      }
+
+      var style = document.getElementById(STYLE_ID);
+      if (!style) {
+        style = document.createElement('style');
+        style.id = STYLE_ID;
+        style.textContent = [
+          'html[data-neo-game-optimization] body::before{display:none!important;background:none!important}',
+          'html[data-neo-game-optimization] #custom-cursor,html[data-neo-game-optimization] .cursor-halo-ring,html[data-neo-game-optimization] .cursor-trail-dot,html[data-neo-game-optimization] .cursor-particle,html[data-neo-game-optimization] .click-burst-center,html[data-neo-game-optimization] .click-burst-ray,html[data-neo-game-optimization] .click-burst-particle{display:none!important;animation:none!important;filter:none!important;box-shadow:none!important}',
+          'html[data-neo-game-optimization] .neo-browser-rain-canvas{display:none!important;opacity:0!important;filter:none!important}',
+          'html[data-neo-game-optimization] [data-neo-game-viewer]{animation:none!important;transition:none!important;filter:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}',
+          'html[data-neo-game-optimization] [data-neo-game-viewer] *:not(iframe):not(canvas):not(video){animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;text-shadow:none!important}'
+        ].join('');
+        document.head.appendChild(style);
+      }
+
+      syncActiveState();
+      window.addEventListener('neo-open-settings', queueAdd);
+      document.addEventListener('click', function (event) {
+        var button = event.target && event.target.closest
+          ? event.target.closest('button[aria-label="Settings"]')
+          : null;
+        if (button) queueAdd();
+      }, true);
+
+      try {
+        var root = document.getElementById('root');
+        if (root) {
+          new MutationObserver(function () {
+            syncActiveState();
+            if (!document.querySelector('[' + SETTING_ATTR + '="true"]')) addSetting();
+          }).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-neo-game-viewer'] });
+        }
+      } catch (_) {}
+
+      // A slow fallback also handles viewer state changes not represented by DOM attributes.
+      setInterval(syncActiveState, 1000);
       queueAdd();
     })();
   </script>
