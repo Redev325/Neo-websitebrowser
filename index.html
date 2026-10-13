@@ -752,7 +752,7 @@
         title.style.cssText = 'margin:0 0 4px;font-size:14px;font-weight:600;color:hsl(var(--foreground));';
 
         var description = document.createElement('p');
-        description.textContent = 'When a game viewer is open, reduces Neo cursor particles, background glow and extra viewer effects. It cannot change a game engine’s own FPS, graphics quality or memory use.';
+        description.textContent = 'When a game viewer is open, shows your normal system cursor and disables Neo click bursts, cursor trails, particles and extra visual effects. It cannot change a game engine’s own FPS or memory use.';
         description.style.cssText = 'margin:0 0 10px;font-size:12px;line-height:1.4;color:hsl(var(--muted-foreground));';
 
         var buttons = document.createElement('div');
@@ -794,8 +794,9 @@
         style = document.createElement('style');
         style.id = STYLE_ID;
         style.textContent = [
+          'html[data-neo-game-optimization],html[data-neo-game-optimization] body,html[data-neo-game-optimization] *{cursor:auto!important}',
           'html[data-neo-game-optimization] body::before{display:none!important;background:none!important}',
-          'html[data-neo-game-optimization] #custom-cursor,html[data-neo-game-optimization] .cursor-halo-ring,html[data-neo-game-optimization] .cursor-trail-dot,html[data-neo-game-optimization] .cursor-particle,html[data-neo-game-optimization] .click-burst-center,html[data-neo-game-optimization] .click-burst-ray,html[data-neo-game-optimization] .click-burst-particle{display:none!important;animation:none!important;filter:none!important;box-shadow:none!important}',
+          'html[data-neo-game-optimization] #custom-cursor,html[data-neo-game-optimization] .cursor-halo-ring,html[data-neo-game-optimization] .cursor-trail-dot,html[data-neo-game-optimization] .cursor-particle,html[data-neo-game-optimization] .click-burst-center,html[data-neo-game-optimization] .click-burst-ray,html[data-neo-game-optimization] .click-burst-particle{display:none!important;visibility:hidden!important;animation:none!important;filter:none!important;box-shadow:none!important}',
           'html[data-neo-game-optimization] .neo-browser-rain-canvas{display:none!important;opacity:0!important;filter:none!important}',
           'html[data-neo-game-optimization] [data-neo-game-viewer]{animation:none!important;transition:none!important;filter:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}',
           'html[data-neo-game-optimization] [data-neo-game-viewer] *:not(iframe):not(canvas):not(video){animation:none!important;transition:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;text-shadow:none!important}'
