@@ -21,7 +21,7 @@
     if (isHome(url)) return '';
     try {
       var u = new URL(url, location.href);
-      if (u.pathname === '/api/proxy') return decodeURIComponent(u.searchParams.get('url') || url);
+      if (u.pathname === '/api/proxy') return u.searchParams.get('url') || url;
       return u.href;
     } catch (_) { return url; }
   }
