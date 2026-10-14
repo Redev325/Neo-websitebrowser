@@ -3,6 +3,23 @@
   if (window.__neoBrowserEnhancer) return;
   window.__neoBrowserEnhancer = true;
 
+  // Capture the address-bar Enter key before the site's React/app handlers.
+  // This prevents those handlers from navigating the outer app to /api/proxy.
+  if (!document.__neoAddressCaptureInstalled) {
+    document.__neoAddressCaptureInstalled = true;
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || e.isComposing || !isBrowserPage()) return;
+      var target = e.target;
+      var input = target && target.closest ? target.closest('.neo-browser-input') : null;
+      if (!input) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      address = input;
+      navigate(input.value);
+    }, true);
+  }
+
   var tabs = [];
   var active = 0;
   var tabStrip = null;
@@ -431,15 +448,6 @@
     if (!frame.__neoTabLoad) {
       frame.addEventListener('load', onFrameLoad, false);
       frame.__neoTabLoad = true;
-    }
-
-    if (address && !address.__neoAddress) {
-      address.__neoAddress = true;
-      address.addEventListener('keydown', function (e) {
-        if (e.key !== 'Enter') return;
-        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-        navigate(address.value);
-      }, true);
     }
 
     if (tabStrip && !tabStrip.__neoClicks) {
