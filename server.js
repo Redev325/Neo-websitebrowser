@@ -50,10 +50,14 @@ function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
     if (err) return next(err);
-    const scripts = '<script src="/browser-freeze-fix.js?v=3"></script><script src="/browser-enhancer.js?v=6"></script><script src="/explore-card-override.js?v=108"></script>';
-    const injected = html.includes('/explore-card-override.js')
-      ? html.replace(/<script[^>]+explore-card-override\.js[^>]*><\/script>/gi, '<script src="/explore-card-override.js?v=108"></script>')
-      : html.replace(/<\/body>/i, scripts + '</body>');
+    const scripts = '<script src="/browser-freeze-fix.js?v=4"></script><script src="/browser-enhancer.js?v=7"></script><script src="/explore-card-override.js?v=137"></script>';
+    // Always inject every browser helper. Previously, finding an existing
+    // explore-card-override script caused the other two scripts to be skipped.
+    let injected = html
+      .replace(/<script[^>]+browser-freeze-fix\.js[^>]*><\/script>/gi, '')
+      .replace(/<script[^>]+browser-enhancer\.js[^>]*><\/script>/gi, '')
+      .replace(/<script[^>]+explore-card-override\.js[^>]*><\/script>/gi, '');
+    injected = injected.replace(/<\/body>/i, scripts + '</body>');
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     return res.type("html").send(injected);
   });
