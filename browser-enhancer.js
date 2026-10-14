@@ -28,7 +28,7 @@
   var HOME_TOKEN = 'neo://home';
   // The frontend may be deployed on a static host without server/API routes.
   // Keep proxy requests pointed at the Express backend that actually serves /api/proxy.
-  var PROXY_ORIGIN = 'https://neo-websitebrowser-production.up.railway.app';
+  var PROXY_ORIGIN = 'https://neo-websitebrowser.vercel.app';
   var lastFrameSrc = '';
   var controlBar = null;
 
