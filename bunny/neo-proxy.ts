@@ -126,8 +126,6 @@ BunnySDK.net.http.serve(async (request: Request): Promise<Response> => {
         if (value) headers.set(key, value);
       }
       headers.set("User-Agent", "Mozilla/5.0 (compatible; NeoBrowser/1.0)");
-      const cookie = request.headers.get("cookie") || "";
-      if (cookie) headers.set("Cookie", cookie);
       response = await fetch(target.href, { method: request.method, headers, redirect: "manual" });
       if (response.status < 300 || response.status >= 400) break;
       const location = response.headers.get("location");
