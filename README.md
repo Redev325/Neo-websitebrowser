@@ -3,37 +3,18 @@
 Neo Browser officially built in using NEO search™ you can now search up about anything in the neo browser (coulldn't use duckduck go or microsoft bing so i resorted to my own browser)
 enjoy playing games watching youtube or whatever might comfort you using the new browser The games section will be next to come.
 
-Neo Browser is a static web UI with a proxy backend. The repository now supports **both Vercel and Railway** without changing the Browser frontend.
+Neo Browser's frontend is static. Its proxy backend is designed for **Bunny.net Edge Scripting**, so it does not depend on Vercel, Railway, Render, Netlify, or Cloudflare.
 
-## Deploy on Vercel
+## Frontend and Bunny proxy setup
 
-1. Put the project in a GitHub repository.
-2. Import that repository into Vercel.
-3. Deploy the project root containing `index.html`, `assets/`, `static/`, `api/proxy.js`, and `vercel.json`.
-4. Vercel runs `api/proxy.js` and `api/search.js` as serverless functions.
-5. The Browser page uses `/api/proxy?url=...` automatically.
+1. GitHub Pages can serve the existing static frontend at `neosite.devs.surf`, but it cannot execute `/api/proxy` itself.
+2. In Bunny.net, create a **Standalone Edge Script** and use `bunny/neo-proxy.ts` as its source.
+3. Add a script variable named `ALLOWED_PROXY_HOSTS` containing only hostnames you are authorized and permitted to access, separated by commas. Leave the list small; redirect targets must also be included.
+4. Deploy the script and copy the Default Hostname that Bunny provides.
+5. Put that hostname in `bunny-proxy-config.js` as `window.NEO_PROXY_ORIGIN = "https://YOUR-BUNNY-SCRIPT-HOSTNAME";` without a trailing slash.
+6. Commit the config change and refresh the frontend. Test first with a permitted site you control or a simple public test page.
 
-## Deploy on Railway
-
-Railway runs the same repository as a normal Node server.
-
-1. Create a new Railway project.
-2. Choose **Deploy from GitHub repo**.
-3. Select `Redev325/Neo-websitebrowser`.
-4. Railway detects `package.json` and runs `npm start`.
-5. Open the generated Railway public domain.
-
-`server.js` serves the static frontend and routes `/api/proxy` and `/api/search` to the existing handlers. Railway supplies the `PORT` environment variable automatically, and the server listens on `0.0.0.0`.
-
-You do **not** need to change the Browser's frontend URL when using Railway because the frontend and proxy are served by the same Railway service.
-
-## GitHub Pages
-
-GitHub Pages can host the static frontend, but it cannot execute the proxy backend. For the proxy to work, use Vercel, Railway, or another backend that can run the API.
-
-## Public use
-
-The proxy is intended for normal web fetching. It blocks local/private network targets and checks redirect destinations. It does not bypass CAPTCHAs, authentication, paywalls, or other access controls.
+The proxy is intentionally allow-list based. Do not use it to bypass school/network filtering, authentication, paywalls, or a site's access controls. Static hosts alone cannot run the proxy; the Bunny Edge Script must be deployed and reachable before external-site navigation will work.
 
 ## Cursor
 
@@ -50,7 +31,7 @@ Typing normal words in the Neo Browser search bar uses the browser's built-in se
 
 ## Performance
 
-Built assets are cacheable for one year on Vercel, browser logo assets use WebP, duplicate font loading was removed, and the Base44 editor badge script is not loaded.
+Browser proxy routing is configured in `bunny-proxy-config.js`. Proxy responses use `no-store` so dynamic site content is not cached incorrectly.
 
 ## Text Randomizer
 List of text:
