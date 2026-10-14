@@ -10,6 +10,7 @@
   var address = null;
   var HOME_TOKEN = 'neo://home';
   var lastFrameSrc = '';
+  var controlBar = null;
 
   function isBrowserPage() { return /^\/browser\/?$/i.test(location.pathname); }
   function findFrame() { return document.querySelector('iframe.neo-browser-frame'); }
@@ -45,7 +46,77 @@
   }
 
   function makeTab(url, title) {
-    return { url: isHome(url) ? HOME_TOKEN : url, title: title || titleFor(url) };
+    var initial = isHome(url) ? HOME_TOKEN : url;
+    return { url: initial, title: title || titleFor(url), history: isHome(initial) ? [] : [initial], historyIndex: isHome(initial) ? -1 : 0 };
+  }
+
+  function rememberUrl(tab, url) {
+    if (!tab || !url || isHome(url)) return;
+    if (!Array.isArray(tab.history)) tab.history = [];
+    if (tab.historyIndex == null) tab.historyIndex = tab.history.length - 1;
+    if (tab.history[tab.historyIndex] === url) return;
+    tab.history = tab.history.slice(0, tab.historyIndex + 1);
+    tab.history.push(url);
+    if (tab.history.length > 100) tab.history.shift();
+    tab.historyIndex = tab.history.length - 1;
+  }
+
+  function goHistory(delta) {
+    var tab = tabs[active];
+    if (!tab || !Array.isArray(tab.history)) return;
+    var next = tab.historyIndex + delta;
+    if (next < 0 || next >= tab.history.length || !tab.history[next]) return;
+    tab.historyIndex = next;
+    tab.url = tab.history[next];
+    frame = findFrame();
+    address = findAddress();
+    if (frame) {
+      frame.removeAttribute('srcdoc');
+      frame.src = tab.url;
+    }
+    if (address) address.value = originalUrl(tab.url);
+    tab.title = titleFor(tab.url);
+    renderTabs();
+  }
+
+  function toggleBrowserFullscreen() {
+    frame = findFrame();
+    if (!frame) return;
+    var target = frame.closest('.neo-browser-frame-wrap') || frame.parentElement || frame;
+    var current = document.fullscreenElement || document.webkitFullscreenElement;
+    if (current) {
+      try {
+        if (document.exitFullscreen) document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } catch (_) {}
+      return;
+    }
+    try {
+      if (target.requestFullscreen) target.requestFullscreen();
+      else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+      else if (frame.requestFullscreen) frame.requestFullscreen();
+    } catch (err) { console.warn('Neo Browser fullscreen unavailable:', err); }
+  }
+
+  function ensureControlBar() {
+    if (!ensureStrip()) return;
+    if (controlBar && controlBar.isConnected) return;
+    controlBar = document.createElement('div');
+    controlBar.className = 'neo-browser-controls';
+    function addControl(label, title, action) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'neo-browser-control';
+      b.textContent = label;
+      b.title = title;
+      b.setAttribute('aria-label', title);
+      b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); action(); });
+      controlBar.appendChild(b);
+    }
+    addControl('←', 'Back', function () { goHistory(-1); });
+    addControl('→', 'Forward', function () { goHistory(1); });
+    addControl('⛶', 'Fullscreen', toggleBrowserFullscreen);
+    tabStrip.parentElement.insertBefore(controlBar, tabStrip);
   }
 
   function clickNativeHome() {
@@ -165,6 +236,7 @@
     if (!looksLikeUrl) {
       var searchUrl = location.origin + '/api/search?q=' + encodeURIComponent(value);
       tabs[active].url = searchUrl;
+      rememberUrl(tabs[active], searchUrl);
       tabs[active].title = 'NEO Search';
       frame = findFrame();
       address = findAddress();
@@ -176,6 +248,7 @@
 
     var target = /^https?:\/\//i.test(value) ? value : 'https://' + value;
     tabs[active].url = proxyFor(target);
+    rememberUrl(tabs[active], tabs[active].url);
     tabs[active].title = titleFor(tabs[active].url);
     frame = findFrame();
     address = findAddress();
@@ -190,6 +263,7 @@
     if (!url || !frame || !tabs[active]) return;
     var proxied = proxyFor(url);
     tabs[active].url = proxied;
+    rememberUrl(tabs[active], proxied);
     tabs[active].title = titleFor(proxied);
     frame.removeAttribute('srcdoc');
     frame.src = proxied;
@@ -307,7 +381,7 @@
     if (document.getElementById('neo-browser-tab-styles')) return;
     var s = document.createElement('style');
     s.id = 'neo-browser-tab-styles';
-    s.textContent = '.neo-browser-tabs{display:flex!important;align-items:center!important;gap:6px!important;width:100%!important;margin:8px auto!important;padding:0 8px!important;overflow-x:auto!important;position:relative!important;z-index:2147483000!important;pointer-events:auto!important;min-height:38px!important}.neo-browser-tabs::-webkit-scrollbar{display:none}.neo-tab,.neo-tab-new{appearance:none!important;height:34px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(8,9,14,.96)!important;color:rgba(255,255,255,.75)!important;border-radius:9px!important;padding:0 10px!important;display:flex!important;align-items:center!important;gap:9px!important;white-space:nowrap!important;cursor:pointer!important;pointer-events:auto!important;position:relative!important;z-index:2147483001!important}.neo-tab{min-width:125px!important;max-width:220px!important;justify-content:space-between!important}.neo-tab:hover,.neo-tab-new:hover{color:#fff!important;background:rgba(255,255,255,.1)!important}.neo-tab.active{color:#fff!important;border-color:hsl(var(--accent)/.65)!important;box-shadow:0 0 16px hsl(var(--accent)/.14)!important}.neo-tab-title{overflow:hidden;text-overflow:ellipsis}.neo-tab-close{font-size:18px!important;line-height:1!important;opacity:.7!important}.neo-tab-close:hover{opacity:1!important;color:hsl(var(--accent))!important}.neo-tab-new{width:36px!important;min-width:36px!important;justify-content:center!important;font-size:21px!important;padding:0!important;flex:none!important}';
+    s.textContent = '.neo-browser-controls{display:flex!important;align-items:center!important;gap:6px!important;width:100%!important;padding:0 8px!important;margin:8px auto 0!important;position:relative!important;z-index:2147483000!important}.neo-browser-control{appearance:none!important;width:36px!important;height:34px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(8,9,14,.96)!important;color:rgba(255,255,255,.82)!important;border-radius:9px!important;cursor:pointer!important;pointer-events:auto!important;font-size:18px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}.neo-browser-control:hover{color:#fff!important;background:rgba(255,255,255,.12)!important;border-color:hsl(var(--accent)/.65)!important}.neo-browser-tabs{display:flex!important;align-items:center!important;gap:6px!important;width:100%!important;margin:8px auto!important;padding:0 8px!important;overflow-x:auto!important;position:relative!important;z-index:2147483000!important;pointer-events:auto!important;min-height:38px!important}.neo-browser-tabs::-webkit-scrollbar{display:none}.neo-tab,.neo-tab-new{appearance:none!important;height:34px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(8,9,14,.96)!important;color:rgba(255,255,255,.75)!important;border-radius:9px!important;padding:0 10px!important;display:flex!important;align-items:center!important;gap:9px!important;white-space:nowrap!important;cursor:pointer!important;pointer-events:auto!important;position:relative!important;z-index:2147483001!important}.neo-tab{min-width:125px!important;max-width:220px!important;justify-content:space-between!important}.neo-tab:hover,.neo-tab-new:hover{color:#fff!important;background:rgba(255,255,255,.1)!important}.neo-tab.active{color:#fff!important;border-color:hsl(var(--accent)/.65)!important;box-shadow:0 0 16px hsl(var(--accent)/.14)!important}.neo-tab-title{overflow:hidden;text-overflow:ellipsis}.neo-tab-close{font-size:18px!important;line-height:1!important;opacity:.7!important}.neo-tab-close:hover{opacity:1!important;color:hsl(var(--accent))!important}.neo-tab-new{width:36px!important;min-width:36px!important;justify-content:center!important;font-size:21px!important;padding:0!important;flex:none!important}';
     document.head.appendChild(s);
   }
 
@@ -334,6 +408,7 @@
     }
 
     ensureStrip();
+    ensureControlBar();
     renderTabs();
 
     if (!frame.__neoTabLoad) {
