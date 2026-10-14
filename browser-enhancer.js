@@ -3,6 +3,43 @@
   if (window.__neoBrowserEnhancer) return;
   window.__neoBrowserEnhancer = true;
 
+  // Intercept both Enter-key navigation and form/button submits for the browser
+  // address field. Some frontend builds submit the form without relying on Enter.
+  function interceptAddressSubmission(e) {
+    if (!isBrowserPage()) return false;
+    var form = e.target && e.target.closest ? e.target.closest('form') : null;
+    if (!form) return false;
+    var input = form.querySelector('.neo-browser-input');
+    if (!input) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    address = input;
+    navigate(input.value);
+    return true;
+  }
+
+  if (!document.__neoAddressSubmitCaptureInstalled) {
+    document.__neoAddressSubmitCaptureInstalled = true;
+    document.addEventListener('submit', function (e) {
+      interceptAddressSubmission(e);
+    }, true);
+    document.addEventListener('click', function (e) {
+      if (!isBrowserPage()) return;
+      var button = e.target && e.target.closest
+        ? e.target.closest('button[type="submit"], input[type="submit"], [role="button"]')
+        : null;
+      if (!button) return;
+      var form = button.closest ? button.closest('form') : null;
+      if (!form || !form.querySelector('.neo-browser-input')) return;
+      interceptAddressSubmission({ target: form, preventDefault: function () {},
+        stopPropagation: function () {}, stopImmediatePropagation: function () {} });
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }, true);
+  }
+
   // Capture the address-bar Enter key before the site's React/app handlers.
   // This prevents those handlers from navigating the outer app to /api/proxy.
   if (!document.__neoAddressCaptureInstalled) {
