@@ -65,7 +65,7 @@
   var HOME_TOKEN = 'neo://home';
   // The frontend may be deployed on a static host without server/API routes.
   // Keep proxy requests pointed at the Express backend that actually serves /api/proxy.
-  var PROXY_ORIGIN = location.origin;
+  var PROXY_ORIGIN = (window.NEO_PROXY_ORIGIN || location.origin);
   var lastFrameSrc = '';
   var controlBar = null;
 
@@ -98,7 +98,7 @@
       var u = new URL(url, location.href);
       if (!/^https?:$/i.test(u.protocol)) return url;
       if (u.origin === location.origin) return u.href;
-      var proxyOrigin = PROXY_ORIGIN || location.origin;
+      var proxyOrigin = window.NEO_PROXY_ORIGIN || PROXY_ORIGIN || location.origin;
       return proxyOrigin + '/api/proxy?url=' + encodeURIComponent(u.href);
     } catch (_) { return url; }
   }
