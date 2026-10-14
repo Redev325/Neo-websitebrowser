@@ -65,7 +65,7 @@
   var HOME_TOKEN = 'neo://home';
   // The frontend may be deployed on a static host without server/API routes.
   // Keep proxy requests pointed at the Express backend that actually serves /api/proxy.
-  var PROXY_ORIGIN = 'https://neo-websitebrowser.vercel.app';
+  var PROXY_ORIGIN = location.origin;
   var lastFrameSrc = '';
   var controlBar = null;
 
@@ -292,18 +292,19 @@
 
     var looksLikeUrl = /^https?:\/\//i.test(value) || /^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(value);
     if (!looksLikeUrl) {
-      // Keep NEO search inside the browser, but send its request to the
-      // deployed API backend rather than the static neosite.devs.surf host.
-      var searchTarget = 'https://www.bing.com/search?q=' + encodeURIComponent(value);
-      var searchUrl = proxyFor(searchTarget);
-      tabs[active].url = searchUrl;
-      rememberUrl(tabs[active], searchUrl);
-      tabs[active].title = 'NEO Search';
-      frame = findFrame();
-      address = findAddress();
-      if (frame) { frame.removeAttribute('srcdoc'); frame.src = searchUrl; }
+      // Plain text searches open a normal tab so external search policies
+      // remain enforced by the browser/network; only explicit URLs use Neo's proxy.
+      var searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(value);
+      try {
+        var searchTab = window.open(searchUrl, '_blank');
+        if (searchTab) {
+          try { searchTab.opener = null; } catch (_) {}
+          if (address) address.value = value;
+          return;
+        }
+      } catch (_) {}
       if (address) address.value = value;
-      renderTabs();
+      console.warn('Neo Browser search was blocked by the browser pop-up setting.');
       return;
     }
 
