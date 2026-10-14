@@ -238,16 +238,22 @@
 
     var looksLikeUrl = /^https?:\/\//i.test(value) || /^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(value);
     if (!looksLikeUrl) {
-      // Search is an internal Neo route, not an external URL to proxy.
-      var searchUrl = location.origin + '/Explore?q=' + encodeURIComponent(value);
-      tabs[active].url = searchUrl;
-      rememberUrl(tabs[active], searchUrl);
-      tabs[active].title = 'NEO Search';
-      frame = findFrame();
-      address = findAddress();
-      if (frame) { frame.removeAttribute('srcdoc'); frame.src = searchUrl; }
+      // Plain text is a web search, not a Neo /Explore route. Open the
+      // search directly in a normal browser tab so the site's own network
+      // rules still apply and the app does not send it to a missing proxy path.
+      var searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(value);
+      try {
+        var searchTab = window.open(searchUrl, '_blank');
+        if (searchTab) {
+          try { searchTab.opener = null; } catch (_) {}
+          if (address) address.value = value;
+          return;
+        }
+      } catch (_) {}
+      // If pop-ups are blocked, leave the current Neo tab untouched rather
+      // than navigating it back to the app homepage or /api/proxy.
       if (address) address.value = value;
-      renderTabs();
+      console.warn('Neo Browser search was blocked by the browser pop-up setting.');
       return;
     }
 
