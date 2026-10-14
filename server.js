@@ -50,7 +50,7 @@ function sendIndexWithBrowserEnhancer(req, res, next) {
   const indexPath = path.join(__dirname, "index.html");
   fs.readFile(indexPath, "utf8", (err, html) => {
     if (err) return next(err);
-    const scripts = '<script src="/browser-freeze-fix.js?v=4"></script><script src="/browser-enhancer.js?v=11"></script><script src="/explore-card-override.js?v=137"></script>';
+    const scripts = '<script src="/browser-freeze-fix.js?v=4"></script><script src="/browser-enhancer.js?v=12"></script><script src="/explore-card-override.js?v=137"></script>';
     // Always inject every browser helper. Previously, finding an existing
     // explore-card-override script caused the other two scripts to be skipped.
     let injected = html
