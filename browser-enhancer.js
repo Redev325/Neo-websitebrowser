@@ -366,10 +366,16 @@
       if (address) address.value = '';
       return;
     }
-    var src = frame.getAttribute('src') || frame.src || '';
-    if (tabs[active]) {
-      tabs[active].url = src || tabs[active].url;
-      tabs[active].title = titleFor(tabs[active].url);
+    // The iframe's src attribute stays at its first URL even when a site
+    // navigates internally. Read the live location (the proxy is same-origin)
+    // so Back/Forward also follows links clicked inside the page.
+    var src = '';
+    try { src = frame.contentWindow.location.href || ''; } catch (_) {}
+    if (!src) src = frame.getAttribute('src') || frame.src || '';
+    if (tabs[active] && src && !/^about:blank$/i.test(src)) {
+      tabs[active].url = src;
+      rememberUrl(tabs[active], src);
+      tabs[active].title = titleFor(src);
     }
     if (address) address.value = src ? originalUrl(src) : address.value;
     renderTabs();
