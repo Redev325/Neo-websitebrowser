@@ -394,11 +394,11 @@ function neoBrowserPage(){
  const go=f=>{const h=f.trim();if(!h)return;
 if(!/^https?:\/\//i.test(h)&&!(h.includes(".")&&!h.includes(" "))){
   const q=encodeURIComponent(h);
-  const m=`/api/proxy?url=${encodeURIComponent(`https://www.bing.com/search?q=${q}`)}`;
+  const m=`https://neo-websitebrowser.vercel.app/api/proxy?url=${encodeURIComponent(`https://www.bing.com/search?q=${q}`)}`;
   s(m);l(v=>{const x=v.slice(0,c+1);return[...x,m]}),u(v=>v+1);return;
 }
 let m=/^https?:\/\//i.test(h)?h:"https://"+h;
-m=`/api/proxy?url=${encodeURIComponent(m)}`;s(m);l(v=>{const x=v.slice(0,c+1);return[...x,m]}),u(v=>v+1)};
+m=`https://neo-websitebrowser.vercel.app/api/proxy?url=${encodeURIComponent(m)}`;s(m);l(v=>{const x=v.slice(0,c+1);return[...x,m]}),u(v=>v+1)};
  const back=()=>{if(c>0){const v=c-1;u(v),s(i[v])}};
  const forward=()=>{if(c<i.length-1){const v=c+1;u(v),s(i[v])}};
  const home=()=>{s(""),t("")};
