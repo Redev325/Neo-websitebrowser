@@ -9,6 +9,9 @@
   var frame = null;
   var address = null;
   var HOME_TOKEN = 'neo://home';
+  // The frontend may be deployed on a static host without server/API routes.
+  // Keep proxy requests pointed at the Express backend that actually serves /api/proxy.
+  var PROXY_ORIGIN = 'https://neo-websitebrowser-production.up.railway.app';
   var lastFrameSrc = '';
   var controlBar = null;
 
@@ -41,7 +44,8 @@
       var u = new URL(url, location.href);
       if (!/^https?:$/i.test(u.protocol)) return url;
       if (u.origin === location.origin) return u.href;
-      return location.origin + '/api/proxy?url=' + encodeURIComponent(u.href);
+      var proxyOrigin = PROXY_ORIGIN || location.origin;
+      return proxyOrigin + '/api/proxy?url=' + encodeURIComponent(u.href);
     } catch (_) { return url; }
   }
 
@@ -234,7 +238,8 @@
 
     var looksLikeUrl = /^https?:\/\//i.test(value) || /^[\w.-]+\.[a-z]{2,}(?:[/:?#]|$)/i.test(value);
     if (!looksLikeUrl) {
-      var searchUrl = location.origin + '/api/search?q=' + encodeURIComponent(value);
+      // Search is an internal Neo route, not an external URL to proxy.
+      var searchUrl = location.origin + '/Explore?q=' + encodeURIComponent(value);
       tabs[active].url = searchUrl;
       rememberUrl(tabs[active], searchUrl);
       tabs[active].title = 'NEO Search';
@@ -387,7 +392,7 @@
     if (document.getElementById('neo-browser-tab-styles')) return;
     var s = document.createElement('style');
     s.id = 'neo-browser-tab-styles';
-    s.textContent = '.neo-browser-controls{display:flex!important;align-items:center!important;gap:6px!important;width:100%!important;padding:0 8px!important;margin:8px auto 0!important;position:relative!important;z-index:2147483000!important}.neo-browser-control{appearance:none!important;width:36px!important;height:34px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(8,9,14,.96)!important;color:rgba(255,255,255,.82)!important;border-radius:9px!important;cursor:pointer!important;pointer-events:auto!important;font-size:18px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}.neo-browser-control:hover{color:#fff!important;background:rgba(255,255,255,.12)!important;border-color:hsl(var(--accent)/.65)!important}.neo-browser-tabs{display:flex!important;align-items:center!important;gap:6px!important;width:100%!important;margin:8px auto!important;padding:0 8px!important;overflow-x:auto!important;position:relative!important;z-index:2147483000!important;pointer-events:auto!important;min-height:38px!important}.neo-browser-tabs::-webkit-scrollbar{display:none}.neo-tab,.neo-tab-new{appearance:none!important;height:34px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(8,9,14,.96)!important;color:rgba(255,255,255,.75)!important;border-radius:9px!important;padding:0 10px!important;display:flex!important;align-items:center!important;gap:9px!important;white-space:nowrap!important;cursor:pointer!important;pointer-events:auto!important;position:relative!important;z-index:2147483001!important}.neo-tab{min-width:125px!important;max-width:220px!important;justify-content:space-between!important}.neo-tab:hover,.neo-tab-new:hover{color:#fff!important;background:rgba(255,255,255,.1)!important}.neo-tab.active{color:#fff!important;border-color:hsl(var(--accent)/.65)!important;box-shadow:0 0 16px hsl(var(--accent)/.14)!important}.neo-tab-title{overflow:hidden;text-overflow:ellipsis}.neo-tab-close{font-size:18px!important;line-height:1!important;opacity:.7!important}.neo-tab-close:hover{opacity:1!important;color:hsl(var(--accent))!important}.neo-tab-new{width:36px!important;min-width:36px!important;justify-content:center!important;font-size:21px!important;padding:0!important;flex:none!important}';
+    s.textContent = '.neo-browser-tabs{flex-shrink:0!important;background:rgba(4,5,9,.96)!important;border:1px solid rgba(255,255,255,.10)!important;border-radius:12px!important;min-height:42px!important;box-sizing:border-box!important}.neo-browser-controls{display:flex!important;align-items:center!important;gap:6px!important;width:100%!important;padding:0 8px!important;margin:8px auto 0!important;position:relative!important;z-index:2147483000!important}.neo-browser-control{appearance:none!important;width:36px!important;height:34px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(8,9,14,.96)!important;color:rgba(255,255,255,.82)!important;border-radius:9px!important;cursor:pointer!important;pointer-events:auto!important;font-size:18px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}.neo-browser-control:hover{color:#fff!important;background:rgba(255,255,255,.12)!important;border-color:hsl(var(--accent)/.65)!important}.neo-browser-tabs{display:flex!important;align-items:center!important;gap:6px!important;width:100%!important;margin:8px auto!important;padding:0 8px!important;overflow-x:auto!important;position:relative!important;z-index:2147483000!important;pointer-events:auto!important;min-height:38px!important}.neo-browser-tabs::-webkit-scrollbar{display:none}.neo-tab,.neo-tab-new{appearance:none!important;height:34px!important;border:1px solid rgba(255,255,255,.14)!important;background:rgba(8,9,14,.96)!important;color:rgba(255,255,255,.75)!important;border-radius:9px!important;padding:0 10px!important;display:flex!important;align-items:center!important;gap:9px!important;white-space:nowrap!important;cursor:pointer!important;pointer-events:auto!important;position:relative!important;z-index:2147483001!important}.neo-tab{min-width:125px!important;max-width:220px!important;justify-content:space-between!important}.neo-tab:hover,.neo-tab-new:hover{color:#fff!important;background:rgba(255,255,255,.1)!important}.neo-tab.active{color:#fff!important;border-color:hsl(var(--accent)/.65)!important;box-shadow:0 0 16px hsl(var(--accent)/.14)!important}.neo-tab-title{overflow:hidden;text-overflow:ellipsis}.neo-tab-close{font-size:18px!important;line-height:1!important;opacity:.7!important}.neo-tab-close:hover{opacity:1!important;color:hsl(var(--accent))!important}.neo-tab-new{width:36px!important;min-width:36px!important;justify-content:center!important;font-size:21px!important;padding:0!important;flex:none!important}';
     document.head.appendChild(s);
   }
 
@@ -426,7 +431,7 @@
       address.__neoAddress = true;
       address.addEventListener('keydown', function (e) {
         if (e.key !== 'Enter') return;
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
         navigate(address.value);
       }, true);
     }
