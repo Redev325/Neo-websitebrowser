@@ -24,13 +24,13 @@ The existing Neo cursor effects remain part of the parent website. Static-only m
 Some complex websites and games may still not work because they can use WebSockets, service workers, custom networking, restrictive security policies, or APIs that need additional proxy-aware handling.
 
 
-## Search
+## Search and navigation
 
-Typing normal words in the Neo Browser search bar uses the browser's built-in search flow. Direct website URLs continue to use the proxy. The proxy also injects a same-origin cursor bridge into proxied HTML so the Neo cursor can remain visible while the pointer is inside the iframe.
+Typing plain text in the browser address field opens a normal browser search tab. Explicit website URLs are loaded directly in the browser frame. Because there is no server-side proxy in static-only mode, pages that prohibit iframe embedding must be opened separately, and pages may navigate internally without Neo being able to read their cross-origin URL.
 
 ## Performance
 
-Browser proxy routing is configured in `bunny-proxy-config.js`. Proxy responses use `no-store` so dynamic site content is not cached incorrectly.
+This version sends requests directly from the user's browser to the requested website. It does not relay responses through Neo or cache other sites' responses.
 
 ## Text Randomizer
 List of text:
