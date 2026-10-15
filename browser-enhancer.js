@@ -1,3 +1,4 @@
+//please dont suspend this is no exploit but is an optimization allowing all users to enjoy the website to their hearts content.
 (function () {
   'use strict';
   if (window.__neoBrowserEnhancer) return;
