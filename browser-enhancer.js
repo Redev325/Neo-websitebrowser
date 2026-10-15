@@ -230,7 +230,40 @@
 
   function renderTabs() {
     if (!ensureStrip()) return;
-    tabStrip.replaceChildren();
+
+    // The installer runs periodically to recover if the app replaces its iframe.
+    // Do not rebuild the whole tab bar on every pass: repeated replaceChildren()
+    // creates needless mutation bursts and can trigger DOM-observer feedback loops.
+    var expectedCount = tabs.length + 1; // one button per tab plus the New Tab button
+    var children = tabStrip.children;
+    var alreadyCurrent = children.length === expectedCount;
+
+    if (alreadyCurrent) {
+      for (var i = 0; i < tabs.length; i++) {
+        var button = children[i];
+        var tab = tabs[i];
+        var label = button && button.querySelector('.neo-tab-title');
+        var expectedTitle = tab.title || 'Home';
+        var expectedTooltip = isHome(tab.url) ? 'Neo Browser home' : originalUrl(tab.url);
+        if (!button ||
+            !button.classList.contains('neo-tab') ||
+            button.dataset.index !== String(i) ||
+            button.classList.contains('active') !== (i === active) ||
+            !label ||
+            label.textContent !== expectedTitle ||
+            button.title !== expectedTooltip) {
+          alreadyCurrent = false;
+          break;
+        }
+      }
+      var plus = children[children.length - 1];
+      if (!plus || !plus.classList.contains('neo-tab-new')) alreadyCurrent = false;
+    }
+
+    // If the DOM already matches our state, leave it untouched.
+    if (alreadyCurrent) return;
+
+    var fragment = document.createDocumentFragment();
     tabs.forEach(function (tab, index) {
       var button = document.createElement('button');
       button.type = 'button';
@@ -246,7 +279,7 @@
       close.setAttribute('aria-label', 'Close tab');
       button.appendChild(label);
       button.appendChild(close);
-      tabStrip.appendChild(button);
+      fragment.appendChild(button);
     });
     var plus = document.createElement('button');
     plus.type = 'button';
@@ -254,7 +287,9 @@
     plus.textContent = '+';
     plus.title = 'New tab';
     plus.setAttribute('aria-label', 'New tab');
-    tabStrip.appendChild(plus);
+    fragment.appendChild(plus);
+
+    tabStrip.replaceChildren(fragment);
   }
 
   function switchTab(index) {
