@@ -1,0 +1,21 @@
+name: Check Neo proxy backend
+
+on:
+  push:
+    branches:
+      - proxy-rebuild-render
+  workflow_dispatch:
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check backend syntax
+        working-directory: backend
+        run: node --check server.js
