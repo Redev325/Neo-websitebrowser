@@ -3,35 +3,34 @@
 Neo Browser officially built in using NEO search™ you can now search up about anything in the neo browser (coulldn't use duckduck go or microsoft bing so i resorted to my own browser)
 enjoy playing games watching youtube or whatever might comfort you using the new browser The games section will be next to come.
 
-Neo Browser's frontend is static. Its proxy backend is designed for **Bunny.net Edge Scripting**, so it does not depend on Vercel, Railway, Render, Netlify, or Cloudflare.
+Neo Browser can be served as a static website at your existing `.devs.surf` address. **Devs.Surf supplies the subdomain and DNS; it does not execute a server-side proxy by itself.** This static-only browser mode does not require Bunny Edge Scripting, Render, Railway, or another proxy backend.
 
-## Frontend and Bunny proxy setup
+## Static-only browser navigation
 
-1. GitHub Pages can serve the existing static frontend at `neosite.devs.surf`, but it cannot execute `/api/proxy` itself.
-2. In Bunny.net, create a **Standalone Edge Script** and use `bunny/neo-proxy.ts` as its source.
-3. Add a script variable named `ALLOWED_PROXY_HOSTS` containing only hostnames you are authorized and permitted to access, separated by commas. Leave the list small; redirect targets must also be included.
-4. Deploy the script and copy the Default Hostname that Bunny provides.
-5. Put that hostname in `bunny-proxy-config.js` as `window.NEO_PROXY_ORIGIN = "https://YOUR-BUNNY-SCRIPT-HOSTNAME";` without a trailing slash.
-6. Commit the config change and refresh the frontend. Test first with a permitted site you control or a simple public test page.
+- Typing a website URL loads that address directly in Neo's browser frame.
+- The browser toolbar includes an **Open current site in a new tab** control for websites that refuse to render inside an iframe.
+- Sites that block framing, require special authentication, rely on unsupported browser features, or restrict network access may not work inside the frame. Opening a page separately may help with ordinary embed restrictions, but it does not bypass network or site access controls.
+- This mode does not proxy or rewrite requests. Cross-origin browser security also prevents Neo from reading every site's internal URL and title, so the Back/Forward controls can only track navigation Neo itself observes.
+- Plain text searches continue to open a normal browser tab.
 
-The proxy is intentionally allow-list based. Do not use it to bypass school/network filtering, authentication, paywalls, or a site's access controls. Static hosts alone cannot run the proxy; the Bunny Edge Script must be deployed and reachable before external-site navigation will work.
+To keep this version static-only, `bunny-proxy-config.js` is no longer loaded by the page. The older server-side proxy code in the repository is not used by this static mode.
 
 ## Cursor
 
-The browser injects a Neo cursor/flare into proxied HTML so the visual cursor continues inside the Browser frame. The parent cursor is hidden while the pointer is over the frame.
+The existing Neo cursor effects remain part of the parent website. Static-only mode does not inject cursor code into external pages.
 
 ## Notes
 
 Some complex websites and games may still not work because they can use WebSockets, service workers, custom networking, restrictive security policies, or APIs that need additional proxy-aware handling.
 
 
-## Search
+## Search and navigation
 
-Typing normal words in the Neo Browser search bar uses the browser's built-in search flow. Direct website URLs continue to use the proxy. The proxy also injects a same-origin cursor bridge into proxied HTML so the Neo cursor can remain visible while the pointer is inside the iframe.
+Typing plain text in the browser address field opens a normal browser search tab. Explicit website URLs are loaded directly in the browser frame. Because there is no server-side proxy in static-only mode, pages that prohibit iframe embedding must be opened separately, and pages may navigate internally without Neo being able to read their cross-origin URL.
 
 ## Performance
 
-Browser proxy routing is configured in `bunny-proxy-config.js`. Proxy responses use `no-store` so dynamic site content is not cached incorrectly.
+This version sends requests directly from the user's browser to the requested website. It does not relay responses through Neo or cache other sites' responses.
 
 ## Text Randomizer
 List of text:

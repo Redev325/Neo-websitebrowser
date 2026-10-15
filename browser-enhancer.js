@@ -63,9 +63,8 @@
   var frame = null;
   var address = null;
   var HOME_TOKEN = 'neo://home';
-  // The frontend may be deployed on a static host without server/API routes.
-  // Keep proxy requests pointed at the Express backend that actually serves /api/proxy.
-  var PROXY_ORIGIN = (window.NEO_PROXY_ORIGIN || location.origin);
+  // Static-only mode: Devs.Surf provides DNS, not server-side proxy execution.
+  // Keep URLs direct; sites that block iframe embedding must be opened in a new tab.
   var lastFrameSrc = '';
   var controlBar = null;
 
@@ -94,12 +93,12 @@
   }
 
   function proxyFor(url) {
+    // No backend proxy is configured. Navigate straight to the requested
+    // HTTP(S) URL; the browser/site may refuse to display it inside an iframe.
     try {
       var u = new URL(url, location.href);
       if (!/^https?:$/i.test(u.protocol)) return url;
-      if (u.origin === location.origin) return u.href;
-      var proxyOrigin = window.NEO_PROXY_ORIGIN || PROXY_ORIGIN || location.origin;
-      return proxyOrigin + '/api/proxy?url=' + encodeURIComponent(u.href);
+      return u.href;
     } catch (_) { return url; }
   }
 
@@ -173,6 +172,16 @@
     }
     addControl('←', 'Back', function () { goHistory(-1); });
     addControl('→', 'Forward', function () { goHistory(1); });
+    addControl('↗', 'Open current site in a new tab', function () {
+      var target = '';
+      try {
+        if (frame && frame.contentWindow) target = frame.contentWindow.location.href || '';
+      } catch (_) {}
+      var tab = tabs[active];
+      if (!target || /^about:blank$/i.test(target)) target = originalUrl(tab && tab.url);
+      if (!target || isHome(target)) return;
+      try { window.open(target, '_blank', 'noopener,noreferrer'); } catch (_) {}
+    });
     addControl('⛶', 'Fullscreen', toggleBrowserFullscreen);
     tabStrip.parentElement.insertBefore(controlBar, tabStrip);
   }

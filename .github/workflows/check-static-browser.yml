@@ -1,0 +1,31 @@
+name: Check static Neo browser
+
+on:
+  push:
+    branches:
+      - static-only-devs-surf
+    paths:
+      - "browser-enhancer.js"
+      - "index.html"
+      - ".github/workflows/check-static-browser.yml"
+  workflow_dispatch:
+
+jobs:
+  static-browser-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check browser helper syntax
+        run: node --check browser-enhancer.js
+      - name: Confirm the page does not load the proxy config
+        run: |
+          if grep -q 'bunny-proxy-config.js' index.html; then
+            echo "The static page still loads bunny-proxy-config.js"
+            exit 1
+          fi
+          grep -q 'browser-enhancer.js?v=15' index.html
