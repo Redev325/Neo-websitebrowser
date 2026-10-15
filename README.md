@@ -39,4 +39,4 @@ List of text:
 Keep in mind if you want to remove this fork it and remove it manually or disable the setting in neo website
 
 Redev325-
-also if a person/agent at devs.surf can see this please don't suspend my account I'm just trying to optimize my site so all people can enjoy it
+also if a person/agent at devs.surf can see this please don't suspend my account I'm just trying to optimize my site so all people can enjoy it Thanks.
