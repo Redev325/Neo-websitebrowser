@@ -22,7 +22,7 @@
   var GAME_URL = 'https://impostorlegacy.runs-on.dev/';
   var HANK_GAME_URL = 'https://accelerant.nxtdev.xyz/';
   var SONIC_OLD_BUILD_URL = 'https://sonicexeold.pntr.dev/';
-  var SONIC_RESTORED_BUILD_URL = 'https://sonicexerealrestored.devs.surf/';
+  var SONIC_RESTORED_BUILD_URL = 'https://sonicexerestored.pntr.dev/';
   var SELECTED_GAME_KEY = 'neo-selected-game';
 
   function leaf(el) { return el && !el.children.length ? String(el.textContent || '').trim() : ''; }
