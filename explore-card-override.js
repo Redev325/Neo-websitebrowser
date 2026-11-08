@@ -21,7 +21,7 @@
   var ICON_URL = 'https://plain-enam-prod-public.komododecks.com/202609/17/Ap8nvejCSQjcy3kMXAbE/image.png';
   var GAME_URL = 'https://impostorlegacy.runs-on.dev/';
   var HANK_GAME_URL = 'https://accelerant.nxtdev.xyz/';
-  var SONIC_OLD_BUILD_URL = 'https://sonicrestored30.devs.surf/';
+  var SONIC_OLD_BUILD_URL = 'https://sonicexeold.pntr.dev/';
   var SONIC_RESTORED_BUILD_URL = 'https://sonicexerealrestored.devs.surf/';
   var SELECTED_GAME_KEY = 'neo-selected-game';
 
