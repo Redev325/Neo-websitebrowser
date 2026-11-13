@@ -10,9 +10,9 @@
     *{box-sizing:border-box}
     body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -10%,hsl(var(--accent)/.17),transparent 48%),var(--bg);color:#f5f5f6;font-family:Quicksand,Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     a{color:inherit;text-decoration:none}
-    .topbar{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(24px,calc((100vw - 1080px)/2));background:rgba(11,11,13,.72);backdrop-filter:blur(16px);position:sticky;top:0;z-index:5}
-    .brand{font-size:25px;font-weight:900;letter-spacing:-1.5px}.brand span{color:hsl(var(--accent))}
-    .topnav{display:flex;gap:22px;color:#b7b7bd;font-size:13px;font-weight:700}.topnav a:hover,.topnav a.active{color:hsl(var(--accent))}
+    .topbar{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:flex-start;padding:0 max(24px,calc((100vw - 1080px)/2));background:rgba(11,11,13,.72);backdrop-filter:blur(16px);position:sticky;top:0;z-index:5}
+    .brand{display:inline-flex;align-items:center;width:46px;height:46px}
+    .brand img{display:block;width:46px;height:46px;object-fit:contain;filter:drop-shadow(0 0 12px hsl(var(--accent)/.22))}
     main{width:min(100% - 40px,920px);margin:0 auto;padding:76px 0 90px}
     .eyebrow{display:inline-flex;align-items:center;gap:8px;color:hsl(var(--accent));font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
     .eyebrow:before{content:"";width:7px;height:7px;border-radius:50%;background:hsl(var(--accent));box-shadow:0 0 12px hsl(var(--accent)/.8)}
@@ -28,24 +28,17 @@
     .arrow{color:#777780;font-size:19px;transition:transform .2s,color .2s}.link-card:hover .arrow{color:hsl(var(--accent));transform:translate(2px,-2px)}
     .note{border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:12px;padding:15px 17px;color:#9999a1;font-size:12px;line-height:1.6;margin-top:18px}
     footer{border-top:1px solid var(--line);padding:22px 20px;text-align:center;color:#74747c;font-size:11px}
-    @media(max-width:620px){.topbar{padding:0 18px}.topnav{gap:13px;font-size:11px}main{padding-top:56px}.links{grid-template-columns:1fr}.section-title{margin-top:38px}.link-card{min-height:100px}}
-    @media(max-width:380px){.topnav{gap:9px}.topnav a:nth-child(3){display:none}}
+    @media(max-width:620px){.topbar{padding:0 18px}main{padding-top:56px}.links{grid-template-columns:1fr}.section-title{margin-top:38px}.link-card{min-height:100px}}
   </style>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="neo home">neo<span>.</span></a>
-    <nav class="topnav" aria-label="Main navigation">
-      <a href="/">Home</a>
-      <a href="/Explore">Explore</a>
-      <a href="/Community">Community</a>
-      <a href="/OfficialLinks/" class="active" aria-current="page">Official Links</a>
-    </nav>
+    <a class="brand" href="/" aria-label="Neo home">
+      <img src="/assets/neo-logo-diamond.png" alt="Neo">
+    </a>
   </header>
   <main>
-    <div class="eyebrow">Neo directory</div>
     <h1>Official Links</h1>
-    <p class="intro">The official places to find Neo, explore its games and features, and join the community. Use these links to make sure you're visiting the right destinations.</p>
 
     <div class="section-title"><h2>Explore Neo</h2><span>INTERNAL LINKS</span></div>
     <div class="links">
@@ -74,7 +67,6 @@
         <span class="link-copy"><strong>Neo Discord</strong><small>Join the official Discord community.</small></span><span class="arrow">↗</span>
       </a>
     </div>
-    <p class="note">This page only lists destinations that are currently confirmed. Official YouTube, TikTok, Twitch and other social URLs can be added when their exact channel links are available.</p>
   </main>
   <footer>© <span id="year"></span> neo. All rights reserved.</footer>
   <script>document.getElementById('year').textContent = String(new Date().getFullYear());</script>
