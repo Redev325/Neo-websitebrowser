@@ -210,6 +210,80 @@
       button.style.setProperty('pointer-events', 'auto', 'important');
     }
   }
+  function installNewExploreCardTemplateStyle() {
+    var style = document.getElementById('neo-explore-card-template-v2');
+    if (style) return;
+    style = document.createElement('style');
+    style.id = 'neo-explore-card-template-v2';
+    style.textContent = [
+      '.neo-explore-card[data-neo-card-template="v2"]{display:flex!important;flex-direction:column!important;overflow:hidden!important;border-radius:12px!important;border:1px solid rgba(255,255,255,.10)!important;background:#151515!important;box-shadow:0 5px 18px rgba(0,0,0,.22)!important;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease!important}',
+      '.neo-explore-card[data-neo-card-template="v2"]:hover{transform:translateY(-3px)!important;border-color:rgba(255,255,255,.22)!important;box-shadow:0 12px 26px rgba(0,0,0,.30)!important}',
+      '.neo-explore-card[data-neo-card-template="v2"] .aspect-video{width:100%!important;aspect-ratio:16/9!important;min-height:0!important;overflow:hidden!important;border-radius:0!important}',
+      '.neo-explore-card[data-neo-card-template="v2"] .neo-explore-card-content{display:flex!important;flex-direction:column!important;gap:8px!important;padding:14px!important;background:#151515!important}',
+      '.neo-explore-card[data-neo-card-template="v2"] .neo-explore-card-title{display:block!important;margin:0!important;padding:0!important;color:#fff!important;font-size:15px!important;font-weight:800!important;line-height:1.2!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}',
+      '.neo-explore-card[data-neo-card-template="v2"] .neo-explore-card-description{display:-webkit-box!important;margin:0!important;padding:0!important;color:#aaa!important;font-size:12px!important;font-weight:500!important;line-height:1.45!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;overflow:hidden!important}',
+      '.neo-explore-card[data-neo-card-template="v2"] [data-neo-old-card-metadata="true"]{display:none!important}'
+    ].join('');
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function applyNewExploreCardTemplate(card) {
+    if (!card || !card.matches || !card.matches('.neo-explore-card')) return;
+    var preview = card.querySelector('.aspect-video');
+    if (!preview) return;
+
+    installNewExploreCardTemplateStyle();
+    card.setAttribute('data-neo-card-template', 'v2');
+    card.style.overflow = 'hidden';
+    card.style.height = 'auto';
+    card.style.minHeight = '0';
+    card.style.paddingBottom = '0';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.style.borderRadius = '12px';
+    card.style.background = '#151515';
+    card.style.border = '1px solid rgba(255,255,255,.10)';
+    card.style.boxShadow = '0 5px 18px rgba(0,0,0,.22)';
+    card.style.transition = 'transform .22s ease,border-color .22s ease,box-shadow .22s ease';
+
+    preview.style.position = 'relative';
+    preview.style.width = '100%';
+    preview.style.height = 'auto';
+    preview.style.minHeight = '0';
+    preview.style.aspectRatio = '16 / 9';
+    preview.style.flex = '0 0 auto';
+    preview.style.overflow = 'hidden';
+
+    var content = preview.nextElementSibling;
+    if (content && content.querySelector) {
+      content.classList.add('neo-explore-card-content');
+      var paragraphs = content.querySelectorAll('p');
+      if (paragraphs.length > 0) paragraphs[0].classList.add('neo-explore-card-title');
+      if (paragraphs.length > 1) paragraphs[1].classList.add('neo-explore-card-description');
+    }
+
+    // Remove the previous template's views row and red Featured badge.
+    var metadataRows = card.querySelectorAll('.flex.items-center.justify-between');
+    for (var mi = 0; mi < metadataRows.length; mi++) {
+      var rowText = exactText(metadataRows[mi]);
+      if (/\bfeatured\b/i.test(rowText) || /\bviews?\b/i.test(rowText)) {
+        metadataRows[mi].setAttribute('data-neo-old-card-metadata', 'true');
+        metadataRows[mi].style.display = 'none';
+      }
+    }
+
+    // Also remove standalone legacy labels without changing card content.
+    var oldNodes = card.querySelectorAll('p,span,div');
+    for (var oi = 0; oi < oldNodes.length; oi++) {
+      var value = leaf(oldNodes[oi]);
+      if (value === 'Featured' || /^\d+\s*Views?$/i.test(value) ||
+          value === 'lorem ipsum dolor sit amet, consectetur adipiscing elit') {
+        oldNodes[oi].style.display = 'none';
+      }
+    }
+    repairFavoriteButtons(card);
+  }
+
   function simplifyCard(card, index) {
     var title = getCardTitle(card, index), preview = card.querySelector('.aspect-video');
     if (!title || !preview) return;
@@ -474,6 +548,14 @@
     // Once a game viewer is active, leave the React card tree alone.
     // The viewer can remain mounted under the clicked card while it is open.
     if (getSelectedGame()) return;
+
+    // Apply one shared current template to every Explore card. Keep this
+    // independent from game mapping so ordinary cards retain their own data.
+    var everyExploreCard = document.querySelectorAll('.neo-explore-card');
+    for (var ec = 0; ec < everyExploreCard.length; ec++) {
+      applyNewExploreCardTemplate(everyExploreCard[ec]);
+    }
+
     var cards = findCards();
     var suggestionsCard = findSuggestionsCard();
     if (suggestionsCard) {
