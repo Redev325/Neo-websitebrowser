@@ -272,7 +272,7 @@
         var suggestionNode = suggestionTextNodes[sdi];
         if (suggestionNode === title) continue;
         var suggestionText = exactText(suggestionNode);
-        if (/^Placeholder\\s*007\\s*[—–-]\\s*featured\\s+game$/i.test(suggestionText)) {
+        if (/^Placeholder\s*007\s*[—–-]\s*featured\s+game$/i.test(suggestionText)) {
           suggestionNode.textContent = 'Suggest a game or share feedback with Neo.';
           suggestionNode.classList.add('neo-suggestions-description');
           suggestionNode.style.display = 'block';
