@@ -10,6 +10,8 @@
   var FIFTH_TITLE = 'Vs Tricky';
   var SIXTH_TITLE = 'Vs Tricky:Clowned Out';
   var SEVENTH_TITLE = 'Suggestions?';
+  var SUGGESTIONS_TITLE = 'Suggestions';
+  var SUGGESTIONS_IMAGE = '/assets/suggestions.png';
   var TRICKY_ICON_URL = '/assets/Vstrickylogo.png?v=1';
   var SECOND_IMAGE = '/assets/Vs.exe.png?v=1';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
@@ -237,6 +239,29 @@
       // Card 007 is the suggestions entry; retain its existing thumbnail and card layout.
       title.textContent = SEVENTH_TITLE;
     }
+    if (index === 6) {
+      // Suggestions uses the supplied repository artwork for its card thumbnail.
+      title.textContent = SEVENTH_TITLE;
+      preview.style.background = '#000';
+      preview.style.backgroundColor = '#000';
+      preview.style.backgroundImage = 'none';
+      var suggestionsImage = preview.querySelector('.neo-suggestions-card-image');
+      if (!suggestionsImage) {
+        suggestionsImage = document.createElement('img');
+        suggestionsImage.className = 'neo-suggestions-card-image';
+        preview.appendChild(suggestionsImage);
+      }
+      suggestionsImage.src = SUGGESTIONS_IMAGE;
+      suggestionsImage.alt = SUGGESTIONS_TITLE;
+      suggestionsImage.draggable = false;
+      suggestionsImage.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;display:block;z-index:1;background:#000;';
+      var suggestionsChildren = Array.prototype.slice.call(preview.children);
+      for (var sci = 0; sci < suggestionsChildren.length; sci++) {
+        if (suggestionsChildren[sci] === suggestionsImage) continue;
+        suggestionsChildren[sci].style.display = 'none';
+        suggestionsChildren[sci].style.visibility = 'hidden';
+      }
+    }
     if (index === 5) {
       // Card 006 uses the current Explore card treatment.
       title.textContent = SIXTH_TITLE;
@@ -395,10 +420,10 @@
     }
   }
   function getSelectedGame() {
-    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank' || window.__neoSelectedGame === 'vs-impostor' || window.__neoSelectedGame === 'tricky' || window.__neoSelectedGame === 'tricky-clowned-out') return window.__neoSelectedGame;
+    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank' || window.__neoSelectedGame === 'vs-impostor' || window.__neoSelectedGame === 'tricky' || window.__neoSelectedGame === 'tricky-clowned-out' || window.__neoSelectedGame === 'suggestions') return window.__neoSelectedGame;
     try {
       var value = sessionStorage.getItem(SELECTED_GAME_KEY);
-      if (value === 'sonic' || value === 'impostor' || value === 'hank' || value === 'vs-impostor' || value === 'tricky' || value === 'tricky-clowned-out') {
+      if (value === 'sonic' || value === 'impostor' || value === 'hank' || value === 'vs-impostor' || value === 'tricky' || value === 'tricky-clowned-out' || value === 'suggestions') {
         window.__neoSelectedGame = value;
         window.__neoSonicViewer = value === 'sonic';
         return value;
@@ -421,7 +446,17 @@
     if (getSelectedGame()) return;
     var cards = findCards();
     var suggestionsCard = findSuggestionsCard();
-    if (suggestionsCard) simplifyCard(suggestionsCard, 6);
+    if (suggestionsCard) {
+      simplifyCard(suggestionsCard, 6);
+      if (!suggestionsCard.__neoSuggestionsClickBound) {
+        suggestionsCard.__neoSuggestionsClickBound = true;
+        suggestionsCard.addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
+          setSelectedGame('suggestions');
+          scheduleViewerActivation();
+        }, true);
+      }
+    }
     pinSuggestionsFirst(cards);
     for (var i = 0; i < cards.length; i++) {
       simplifyCard(cards[i], i);
@@ -508,7 +543,7 @@
         var t = exactText(candidate);
         if (t === 'Placeholder 1' || t === 'Placeholder 2' || t === 'Placeholder 3' ||
             t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4' || /^Placeholder \d{3}$/.test(t) ||
-            t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE || t === 'Placeholder 005' || t === FIFTH_TITLE || t === 'Placeholder 006' || t === SIXTH_TITLE || t === SEVENTH_TITLE ||
+            t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE || t === 'Placeholder 005' || t === FIFTH_TITLE || t === 'Placeholder 006' || t === SIXTH_TITLE || t === SEVENTH_TITLE || t === SUGGESTIONS_TITLE ||
             t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE) {
           title = candidate;
           break;
@@ -529,6 +564,7 @@
       selectedGame === 'vs-impostor' ? IMPOSTOR_ICON_URL :
       selectedGame === 'tricky' ? TRICKY_ICON_URL :
       selectedGame === 'tricky-clowned-out' ? '/assets/TrickyCOLogo.webp?v=1' :
+      selectedGame === 'suggestions' ? SUGGESTIONS_IMAGE :
       '';
 
     left.style.display = 'flex';
@@ -595,6 +631,7 @@
       selectedGame === 'vs-impostor' ? FOURTH_TITLE :
       selectedGame === 'tricky' ? FIFTH_TITLE :
       selectedGame === 'tricky-clowned-out' ? SIXTH_TITLE :
+      selectedGame === 'suggestions' ? SUGGESTIONS_TITLE :
       parts.title.textContent;
 
     if (parts.title.textContent !== desiredTitle) parts.title.textContent = desiredTitle;
@@ -1436,7 +1473,7 @@
 
     if (parts.title) {
       parts.title.setAttribute('data-neo-game-viewer-title', selectedGame || 'generic');
-      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor' || selectedGame === 'vs-impostor' || selectedGame === 'tricky' || selectedGame === 'tricky-clowned-out') {
+      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor' || selectedGame === 'vs-impostor' || selectedGame === 'tricky' || selectedGame === 'tricky-clowned-out' || selectedGame === 'suggestions') {
         parts.title.textContent =
           selectedGame === 'sonic' ? SONIC_VIEWER_TITLE :
           selectedGame === 'hank' ? THIRD_TITLE :
@@ -1444,6 +1481,7 @@
           selectedGame === 'vs-impostor' ? FOURTH_TITLE :
           selectedGame === 'tricky' ? FIFTH_TITLE :
           selectedGame === 'tricky-clowned-out' ? SIXTH_TITLE :
+          selectedGame === 'suggestions' ? SUGGESTIONS_TITLE :
           parts.title.textContent;
         root.setAttribute('data-neo-game-viewer', selectedGame);
         updateViewerLogo(parts, selectedGame);
