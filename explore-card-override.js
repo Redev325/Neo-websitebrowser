@@ -1393,9 +1393,42 @@
     }
   }
 
+  function embedSuggestionsForm(root, stage) {
+    if (!root || !stage || getSelectedGame() !== 'suggestions') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+    stage.style.background = '#fff';
+
+    var iframe = stage.querySelector('#neo-suggestions-form');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'neo-suggestions-form';
+      iframe.src = 'https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=Zpnr9TaTM0uIlZmCQlsT7S2ip5XeBZhAmcOwOQXPHFhUMVVPWFhXUE9ON1kwVTlSMkdYMExTRlcyRS4u';
+      iframe.title = 'Suggestions';
+      iframe.name = 'neo-suggestions-form';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('loading', 'eager');
+      iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+      iframe.setAttribute('scrolling', 'auto');
+      iframe.style.position = 'absolute';
+      iframe.style.inset = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.minWidth = '0';
+      iframe.style.minHeight = '0';
+      iframe.style.border = '0';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+      iframe.style.display = 'block';
+      iframe.style.background = '#fff';
+      iframe.style.zIndex = '1';
+      stage.appendChild(iframe);
+    }
+  }
+
   function removeStrayGameIframe() {
     if (!isExplorePage() || getSelectedGame()) return;
-    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build, #neo-sonic-restored-build, #neo-accelerant-hank-game, #neo-tricky-game');
+    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build, #neo-sonic-restored-build, #neo-accelerant-hank-game, #neo-tricky-game, #neo-suggestions-form');
     for (var i = 0; i < frames.length; i++) frames[i].remove();
   }
 
@@ -1529,6 +1562,7 @@
     }
     if (selectedGame === 'hank') embedHank(root, parts.stage);
     if (selectedGame === 'tricky') embedTricky(root, parts.stage);
+    if (selectedGame === 'suggestions') embedSuggestionsForm(root, parts.stage);
   }
 
   function scheduleViewerActivation() {
