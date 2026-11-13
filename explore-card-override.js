@@ -103,13 +103,21 @@
       // Preserve the top position even in a CSS grid, and also move the
       // real grid item before the first game item in the DOM.
       suggestionsItem.style.setProperty('order', '-99999', 'important');
-      suggestionsItem.style.setProperty('grid-row-start', '1', 'important');
-      suggestionsItem.style.setProperty('grid-column-start', '1', 'important');
+
+      function alreadyBefore(first, second) {
+        if (!first || !second || first.parentNode !== second.parentNode) return false;
+        for (var sibling = first.nextElementSibling; sibling; sibling = sibling.nextElementSibling) {
+          if (sibling === second) return true;
+        }
+        return false;
+      }
 
       if (firstGameItem && suggestionsItem !== firstGameItem &&
           suggestionsItem.parentNode &&
           suggestionsItem.parentNode === firstGameItem.parentNode) {
-        suggestionsItem.parentNode.insertBefore(suggestionsItem, firstGameItem);
+        if (!alreadyBefore(suggestionsItem, firstGameItem)) {
+          suggestionsItem.parentNode.insertBefore(suggestionsItem, firstGameItem);
+        }
       } else if (suggestionsItem.parentElement) {
         // Fallback: locate the first sibling containing any known game card.
         var parent = suggestionsItem.parentElement;
@@ -125,7 +133,9 @@
           }
           if (firstSiblingGame) break;
         }
-        if (firstSiblingGame) parent.insertBefore(suggestionsItem, firstSiblingGame);
+        if (firstSiblingGame && !alreadyBefore(suggestionsItem, firstSiblingGame)) {
+          parent.insertBefore(suggestionsItem, firstSiblingGame);
+        }
       }
     }
   }
@@ -137,7 +147,7 @@
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
       if (t !== FIRST_TITLE && t !== SECOND_TITLE && t !== THIRD_TITLE && t !== FOURTH_TITLE &&
-          t !== 'Neo Game 004' && t !== 'Neo Game 4' && t !== FIFTH_TITLE && t !== SIXTH_TITLE && !/^Placeholder \\d+$/.test(t)) continue;
+          t !== 'Neo Game 004' && t !== 'Neo Game 4' && t !== FIFTH_TITLE && t !== SIXTH_TITLE && !/^Placeholder \d+$/.test(t)) continue;
       var card = cardFromTitle(nodes[i]);
       if (!card || !isLikelyExploreCard(card)) continue;
       if (card === suggestionsCard || (suggestionsItem && findGridCardItem(card) === suggestionsItem)) continue;
