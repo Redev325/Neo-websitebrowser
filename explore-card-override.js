@@ -50,19 +50,47 @@
     return true;
   }
   function findCards() {
-    var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
+    var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), foundCards = [];
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
       if (t !== FIRST_TITLE && t !== SECOND_TITLE && t !== THIRD_TITLE && t !== FOURTH_TITLE &&
           t !== 'Neo Game 004' && t !== 'Neo Game 4' && t !== FIFTH_TITLE && t !== SIXTH_TITLE && t !== SEVENTH_TITLE && !/^Placeholder \d+$/.test(t)) continue;
       var card = cardFromTitle(nodes[i]);
-      if (card && isLikelyExploreCard(card) && cards.indexOf(card) === -1) cards.push(card);
+      if (card && isLikelyExploreCard(card) && foundCards.indexOf(card) === -1) foundCards.push(card);
     }
-    cards.sort(function (a, b) {
+    foundCards.sort(function (a, b) {
       var ar = a.getBoundingClientRect(), br = b.getBoundingClientRect();
       if (Math.abs(ar.top - br.top) > 8) return ar.top - br.top;
       return ar.left - br.left;
     });
+
+    // Keep Suggestions? visually first without changing the positional indexes
+    // used below to wire the six existing game cards.
+    var suggestionsCard = null;
+    for (var sc = 0; sc < foundCards.length; sc++) {
+      var suggestionTitles = foundCards[sc].querySelectorAll('p,h1,h2,h3,h4,span,div');
+      for (var st = 0; st < suggestionTitles.length; st++) {
+        var suggestionText = leaf(suggestionTitles[st]);
+        if (suggestionText === SEVENTH_TITLE || suggestionText === 'Placeholder 007') {
+          suggestionsCard = foundCards[sc];
+          break;
+        }
+      }
+      if (suggestionsCard) break;
+    }
+
+    window.__neoSuggestionsCard = suggestionsCard;
+    var cards = foundCards.filter(function (item) { return item !== suggestionsCard; });
+    if (suggestionsCard) {
+      suggestionsCard.setAttribute('data-neo-suggestions-card', 'true');
+      suggestionsCard.style.setProperty('order', '-9999', 'important');
+      var firstGameCard = cards[0];
+      if (firstGameCard && suggestionsCard.parentNode &&
+          suggestionsCard.parentNode === firstGameCard.parentNode) {
+        suggestionsCard.parentNode.insertBefore(suggestionsCard, firstGameCard);
+      }
+    }
+
     for (var j = 0; j < cards.length; j++) {
       cards[j].setAttribute('data-neo-explore-card', String(j + 1));
     }
@@ -325,6 +353,7 @@
     // The viewer can remain mounted under the clicked card while it is open.
     if (getSelectedGame()) return;
     var cards = findCards();
+    if (window.__neoSuggestionsCard) simplifyCard(window.__neoSuggestionsCard, 6);
     for (var i = 0; i < cards.length; i++) {
       simplifyCard(cards[i], i);
       if (i === 0 && !cards[i].__neoImpostorClickBound) {
