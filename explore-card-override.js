@@ -1692,49 +1692,7 @@
     retry();
   }
 
-  function ensureOfficialLinksNavigation() {
-    var nav = document.querySelector('aside nav');
-    if (!nav || nav.querySelector('[data-neo-official-links-nav="true"]')) return;
-
-    var link = document.createElement('a');
-    link.href = '/OfficialLinks/';
-    link.setAttribute('aria-label', 'Official Links');
-    link.setAttribute('title', 'Official Links');
-    link.setAttribute('data-neo-official-links-nav', 'true');
-    link.className = 'neo-shine group relative w-10 h-10 flex items-center justify-center rounded-xl border border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/10 transition-all duration-300';
-    link.innerHTML =
-      '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M10 13a5 5 0 0 0 7.07 0l3-3A5 5 0 0 0 13 2.93l-1.72 1.72"/>' +
-      '<path d="M14 11a5 5 0 0 0-7.07 0l-3 3A5 5 0 0 0 11 21.07l1.72-1.72"/>' +
-      '</svg>' +
-      '<span class="pointer-events-none absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-card border border-border/60 px-2 py-1 text-[11px] text-foreground opacity-0 group-hover:opacity-100 transition-opacity z-50">Official Links</span>';
-    nav.appendChild(link);
-  }
-
-  function ensureOfficialLinksFooter() {
-    var footer = document.querySelector('footer');
-    if (!footer || footer.querySelector('[data-neo-official-links-footer="true"]')) return;
-    var exploreLabel = null;
-    var labels = footer.querySelectorAll('p');
-    for (var i = 0; i < labels.length; i++) {
-      if (exactText(labels[i]) === 'Explore') { exploreLabel = labels[i]; break; }
-    }
-    if (!exploreLabel) return;
-    var list = exploreLabel.parentElement && exploreLabel.parentElement.querySelector('ul');
-    if (!list) return;
-    var item = document.createElement('li');
-    var link = document.createElement('a');
-    link.href = '/OfficialLinks/';
-    link.textContent = 'Official Links';
-    link.className = 'text-muted-foreground hover:text-accent transition-colors';
-    link.setAttribute('data-neo-official-links-footer', 'true');
-    item.appendChild(link);
-    list.appendChild(item);
-  }
-
   function run() {
-    try { ensureOfficialLinksNavigation(); } catch (_) {}
-    try { ensureOfficialLinksFooter(); } catch (_) {}
     if (!findViewerRoot()) {
       try { removeStaleFavoriteOverlays(); } catch (_) {}
       try { simplifyExplore(); } catch (_) {}
