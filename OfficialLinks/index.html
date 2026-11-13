@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0b0d">
+  <title>Official Links | neo</title>
+  <style>
+    :root{color-scheme:dark;--accent:0 80% 55%;--bg:#0b0b0d;--panel:#151518;--muted:#a3a3aa;--line:rgba(255,255,255,.09)}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -10%,hsl(var(--accent)/.17),transparent 48%),var(--bg);color:#f5f5f6;font-family:Quicksand,Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    a{color:inherit;text-decoration:none}
+    .topbar{height:68px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(24px,calc((100vw - 1080px)/2));background:rgba(11,11,13,.72);backdrop-filter:blur(16px);position:sticky;top:0;z-index:5}
+    .brand{font-size:25px;font-weight:900;letter-spacing:-1.5px}.brand span{color:hsl(var(--accent))}
+    .topnav{display:flex;gap:22px;color:#b7b7bd;font-size:13px;font-weight:700}.topnav a:hover,.topnav a.active{color:hsl(var(--accent))}
+    main{width:min(100% - 40px,920px);margin:0 auto;padding:76px 0 90px}
+    .eyebrow{display:inline-flex;align-items:center;gap:8px;color:hsl(var(--accent));font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+    .eyebrow:before{content:"";width:7px;height:7px;border-radius:50%;background:hsl(var(--accent));box-shadow:0 0 12px hsl(var(--accent)/.8)}
+    h1{font-size:clamp(36px,7vw,58px);line-height:1.04;letter-spacing:-2.5px;margin:16px 0 14px;font-weight:900}
+    .intro{color:var(--muted);font-size:15px;line-height:1.7;max-width:610px;margin:0}
+    .section-title{display:flex;align-items:center;justify-content:space-between;margin:48px 0 16px}
+    .section-title h2{margin:0;font-size:15px;letter-spacing:.2px}.section-title span{font-size:11px;color:#777780}
+    .links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .link-card{min-height:112px;display:flex;align-items:center;gap:16px;padding:19px;border:1px solid var(--line);border-radius:15px;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.018));transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+    .link-card:hover{transform:translateY(-3px);border-color:hsl(var(--accent)/.8);box-shadow:0 0 0 1px hsl(var(--accent)/.2),0 12px 28px hsl(var(--accent)/.12)}
+    .link-icon{width:46px;height:46px;flex:0 0 46px;border-radius:13px;display:grid;place-items:center;background:hsl(var(--accent)/.12);color:hsl(var(--accent))}
+    .link-icon svg{width:22px;height:22px}.link-copy{min-width:0;flex:1}.link-copy strong{font-size:15px;display:block;margin-bottom:5px}.link-copy small{font-size:12px;line-height:1.45;color:var(--muted);display:block}
+    .arrow{color:#777780;font-size:19px;transition:transform .2s,color .2s}.link-card:hover .arrow{color:hsl(var(--accent));transform:translate(2px,-2px)}
+    .note{border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:12px;padding:15px 17px;color:#9999a1;font-size:12px;line-height:1.6;margin-top:18px}
+    footer{border-top:1px solid var(--line);padding:22px 20px;text-align:center;color:#74747c;font-size:11px}
+    @media(max-width:620px){.topbar{padding:0 18px}.topnav{gap:13px;font-size:11px}main{padding-top:56px}.links{grid-template-columns:1fr}.section-title{margin-top:38px}.link-card{min-height:100px}}
+    @media(max-width:380px){.topnav{gap:9px}.topnav a:nth-child(3){display:none}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="neo home">neo<span>.</span></a>
+    <nav class="topnav" aria-label="Main navigation">
+      <a href="/">Home</a>
+      <a href="/Explore">Explore</a>
+      <a href="/Community">Community</a>
+      <a href="/OfficialLinks/" class="active" aria-current="page">Official Links</a>
+    </nav>
+  </header>
+  <main>
+    <div class="eyebrow">Neo directory</div>
+    <h1>Official Links</h1>
+    <p class="intro">The official places to find Neo, explore its games and features, and join the community. Use these links to make sure you're visiting the right destinations.</p>
+
+    <div class="section-title"><h2>Explore Neo</h2><span>INTERNAL LINKS</span></div>
+    <div class="links">
+      <a class="link-card" href="/">
+        <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg></span>
+        <span class="link-copy"><strong>Neo Home</strong><small>Return to the official Neo homepage.</small></span><span class="arrow">↗</span>
+      </a>
+      <a class="link-card" href="/Explore">
+        <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></span>
+        <span class="link-copy"><strong>Explore</strong><small>Browse the game collection and featured experiences.</small></span><span class="arrow">↗</span>
+      </a>
+      <a class="link-card" href="/Community">
+        <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+        <span class="link-copy"><strong>Community</strong><small>Visit the Neo community page.</small></span><span class="arrow">↗</span>
+      </a>
+      <a class="link-card" href="/Browser">
+        <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg></span>
+        <span class="link-copy"><strong>Neo Browser</strong><small>Open the built-in browser experience.</small></span><span class="arrow">↗</span>
+      </a>
+    </div>
+
+    <div class="section-title"><h2>Community &amp; updates</h2><span>OFFICIAL EXTERNAL LINK</span></div>
+    <div class="links">
+      <a class="link-card" href="https://discord.gg/CsbqCEbQk7" target="_blank" rel="noopener noreferrer">
+        <span class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 8.5a7 7 0 0 1 8 0M7 17c-1.6-.7-2.7-1.7-3.5-3.2.5-3.2 1.7-5.6 3.8-7.1 1.5-.7 3-.9 4.7-.9s3.2.2 4.7.9c2.1 1.5 3.3 3.9 3.8 7.1-.8 1.5-1.9 2.5-3.5 3.2l-1.2-1.6M7 17l1.2-1.6m7.6 0 1.2 1.6"/><circle cx="9" cy="11.5" r="1"/><circle cx="15" cy="11.5" r="1"/></svg></span>
+        <span class="link-copy"><strong>Neo Discord</strong><small>Join the official Discord community.</small></span><span class="arrow">↗</span>
+      </a>
+    </div>
+    <p class="note">This page only lists destinations that are currently confirmed. Official YouTube, TikTok, Twitch and other social URLs can be added when their exact channel links are available.</p>
+  </main>
+  <footer>© <span id="year"></span> neo. All rights reserved.</footer>
+  <script>document.getElementById('year').textContent = String(new Date().getFullYear());</script>
+</body>
+</html>
