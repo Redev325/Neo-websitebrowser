@@ -9,6 +9,7 @@
   var FOURTH_TITLE = 'Vs Impostor';
   var FIFTH_TITLE = 'Vs Tricky';
   var SIXTH_TITLE = 'Vs Tricky:Clowned Out';
+  var SEVENTH_TITLE = 'Suggestions?';
   var TRICKY_ICON_URL = '/assets/Vstrickylogo.png?v=1';
   var SECOND_IMAGE = '/assets/Vs.exe.png?v=1';
   var VIEWER_TITLE = 'VS Impostor:Legacy';
@@ -53,7 +54,7 @@
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
       if (t !== FIRST_TITLE && t !== SECOND_TITLE && t !== THIRD_TITLE && t !== FOURTH_TITLE &&
-          t !== 'Neo Game 004' && t !== 'Neo Game 4' && t !== FIFTH_TITLE && t !== SIXTH_TITLE && !/^Placeholder \d+$/.test(t)) continue;
+          t !== 'Neo Game 004' && t !== 'Neo Game 4' && t !== FIFTH_TITLE && t !== SIXTH_TITLE && t !== SEVENTH_TITLE && !/^Placeholder \d+$/.test(t)) continue;
       var card = cardFromTitle(nodes[i]);
       if (card && isLikelyExploreCard(card) && cards.indexOf(card) === -1) cards.push(card);
     }
@@ -78,6 +79,7 @@
       if (index === 3 && (t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4')) return nodes[i];
       if (index === 4 && (t === 'Placeholder 005' || t === FIFTH_TITLE)) return nodes[i];
       if (index === 5 && (t === 'Placeholder 006' || t === SIXTH_TITLE)) return nodes[i];
+      if (index === 6 && (t === 'Placeholder 007' || t === SEVENTH_TITLE)) return nodes[i];
       if (index >= 2 && /^Placeholder \d+$/.test(t)) return nodes[i];
       if (wanted && t === wanted) return nodes[i];
     }
@@ -135,6 +137,10 @@
       image2.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;display:block;z-index:1;background:#000;image-rendering:auto;backface-visibility:hidden;transform:translateZ(0);';
       var svgs2 = preview.querySelectorAll('svg');
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
+    }
+    if (index === 6) {
+      // Card 007 is the suggestions entry; retain its existing thumbnail and card layout.
+      title.textContent = SEVENTH_TITLE;
     }
     if (index === 5) {
       // Card 006 uses the current Explore card treatment.
