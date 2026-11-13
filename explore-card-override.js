@@ -155,14 +155,6 @@
       title === SIXTH_TITLE || title === 'Placeholder 006';
   }
 
-  function isTrackedGameTitle(title) {
-    return title === FIRST_TITLE || title === SECOND_TITLE || title === THIRD_TITLE ||
-      title === FOURTH_TITLE || title === 'Neo Game 004' || title === 'Neo Game 4' ||
-      title === 'Placeholder 1' || title === 'Placeholder 2' || title === 'Placeholder 3' ||
-      title === 'Placeholder 004' || title === FIFTH_TITLE || title === 'Placeholder 005' ||
-      title === SIXTH_TITLE || title === 'Placeholder 006';
-  }
-
   function findCards() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
     var suggestionsCard = findSuggestionsCard();
