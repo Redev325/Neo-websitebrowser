@@ -262,6 +262,29 @@
       suggestionsImage.alt = SUGGESTIONS_TITLE;
       suggestionsImage.draggable = false;
       suggestionsImage.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;display:block;z-index:1;background:#000;';
+      card.setAttribute('data-neo-card-type', 'suggestions');
+
+      // Replace the old placeholder subtitle with dedicated Suggestions copy.
+      // This text is part of the original card data, so changing only the title
+      // and thumbnail leaves the outdated Placeholder 007 label visible.
+      var suggestionTextNodes = card.querySelectorAll('p,h1,h2,h3,h4,span,div');
+      for (var sdi = 0; sdi < suggestionTextNodes.length; sdi++) {
+        var suggestionNode = suggestionTextNodes[sdi];
+        if (suggestionNode === title) continue;
+        var suggestionText = exactText(suggestionNode);
+        if (/^Placeholder\\s*007\\s*[—–-]\\s*featured\\s+game$/i.test(suggestionText)) {
+          suggestionNode.textContent = 'Suggest a game or share feedback with Neo.';
+          suggestionNode.classList.add('neo-suggestions-description');
+          suggestionNode.style.display = 'block';
+          suggestionNode.style.margin = '0';
+          suggestionNode.style.padding = '0 14px 10px';
+          suggestionNode.style.fontSize = '12px';
+          suggestionNode.style.lineHeight = '1.4';
+          suggestionNode.style.fontWeight = '600';
+          suggestionNode.style.color = 'rgba(210,210,210,.82)';
+        }
+      }
+
       var suggestionsChildren = Array.prototype.slice.call(preview.children);
       for (var sci = 0; sci < suggestionsChildren.length; sci++) {
         if (suggestionsChildren[sci] === suggestionsImage) continue;
