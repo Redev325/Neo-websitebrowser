@@ -41,11 +41,12 @@
     for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
       if (!node.querySelectorAll) continue;
       var previews = node.querySelectorAll('.aspect-video');
-      // A card has one preview; a shared grid/list wrapper has several.
-      // Never bind a Suggestions click handler to a shared parent.
+      // A card has one preview. If an ancestor contains several previews,
+      // it is a shared list/grid and must never receive a card click handler.
       if (previews.length === 1) return node;
     }
-    return title && title.parentElement ? title.parentElement : null;
+    // Fail closed rather than accidentally treating a page/list wrapper as a card.
+    return null;
   }
   function isLikelyExploreCard(card) {
     if (!card) return false;
@@ -154,13 +155,21 @@
       title === SIXTH_TITLE || title === 'Placeholder 006';
   }
 
+  function isTrackedGameTitle(title) {
+    return title === FIRST_TITLE || title === SECOND_TITLE || title === THIRD_TITLE ||
+      title === FOURTH_TITLE || title === 'Neo Game 004' || title === 'Neo Game 4' ||
+      title === 'Placeholder 1' || title === 'Placeholder 2' || title === 'Placeholder 3' ||
+      title === 'Placeholder 004' || title === FIFTH_TITLE || title === 'Placeholder 005' ||
+      title === SIXTH_TITLE || title === 'Placeholder 006';
+  }
+
   function findCards() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
     var suggestionsCard = findSuggestionsCard();
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
-      // Only recognize the six known game slots. Other Explore cards and
-      // generic numbered placeholders must not receive game handlers or styling.
+      // Only scan the six known game slots. Do not touch unrelated Explore cards
+      // or generic numbered placeholders elsewhere on the page.
       if (!isTrackedGameTitle(t)) continue;
       var card = cardFromTitle(nodes[i]);
       if (!card || !isLikelyExploreCard(card) || card === suggestionsCard) continue;
