@@ -410,7 +410,7 @@
         var t = exactText(candidate);
         if (t === 'Placeholder 1' || t === 'Placeholder 2' || t === 'Placeholder 3' ||
             t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4' || /^Placeholder \d{3}$/.test(t) ||
-            t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE || t === 'Placeholder 005' || t === FIFTH_TITLE || t === 'Placeholder 006' || t === SIXTH_TITLE ||
+            t === FIRST_TITLE || t === SECOND_TITLE || t === THIRD_TITLE || t === 'Placeholder 005' || t === FIFTH_TITLE || t === 'Placeholder 006' || t === SIXTH_TITLE || t === SEVENTH_TITLE ||
             t === VIEWER_TITLE || t === SONIC_VIEWER_TITLE) {
           title = candidate;
           break;
