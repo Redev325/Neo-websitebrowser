@@ -217,7 +217,7 @@
     style.id = 'neo-explore-card-template-v2';
     style.textContent = [
       '.neo-explore-card[data-neo-card-template="v2"]{display:flex!important;flex-direction:column!important;overflow:hidden!important;border-radius:12px!important;border:1px solid rgba(255,255,255,.10)!important;background:#151515!important;box-shadow:0 5px 18px rgba(0,0,0,.22)!important;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease!important}',
-      '.neo-explore-card[data-neo-card-template="v2"]:hover{transform:translateY(-3px)!important;border-color:rgba(255,255,255,.22)!important;box-shadow:0 12px 26px rgba(0,0,0,.30)!important}',
+      '.neo-explore-card[data-neo-card-template="v2"]:hover{transform:translateY(-3px)!important;border-color:hsl(var(--accent,0 80% 55%))!important;box-shadow:0 0 0 1px hsl(var(--accent,0 80% 55%)/.35),0 12px 28px hsl(var(--accent,0 80% 55%)/.24)!important}',
       '.neo-explore-card[data-neo-card-template="v2"] .aspect-video{width:100%!important;aspect-ratio:16/9!important;min-height:0!important;overflow:hidden!important;border-radius:0!important}',
       '.neo-explore-card[data-neo-card-template="v2"] .neo-explore-card-content{display:flex!important;flex-direction:column!important;gap:8px!important;padding:14px!important;background:#151515!important}',
       '.neo-explore-card[data-neo-card-template="v2"] .neo-explore-card-title{display:block!important;margin:0!important;padding:0!important;color:#fff!important;font-size:15px!important;font-weight:800!important;line-height:1.2!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}',
