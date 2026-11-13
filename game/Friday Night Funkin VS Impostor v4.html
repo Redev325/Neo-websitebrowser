@@ -1,7 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<base href="https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/"><script>window.addEventListener("keydown",function(e){if([32,37,38,39,40].indexOf(e.keyCode)>-1){e.preventDefault();}},false);</script>
+	<base href="https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/">
+<script>
+/* NEO_V4_OPTIONAL_FONT_LIST_FALLBACK:
+   fonts-go-here.txt is a Lime placeholder list, not a font asset.
+   The upstream CDN returns 403 for this one file, so serve the local
+   harmless placeholder while leaving every real game asset on its
+   original pinned upstream URL. */
+(function () {
+  "use strict";
+  if (window.__neoV4OptionalFontListFallbackInstalled ||
+      !window.XMLHttpRequest || !XMLHttpRequest.prototype) return;
+  window.__neoV4OptionalFontListFallbackInstalled = true;
+  var proto = XMLHttpRequest.prototype;
+  var nativeOpen = proto.open;
+  proto.open = function (method, url) {
+    var args = Array.prototype.slice.call(arguments);
+    var requested = String(url || "");
+    if (/\/assets\/fonts\/fonts-go-here\.txt(?:[?#]|$)/i.test(requested)) {
+      args[1] = new URL("/game/assets/fonts/fonts-go-here.txt", window.location.origin).href;
+    }
+    return nativeOpen.apply(this, args);
+  };
+})();
+</script><script>window.addEventListener("keydown",function(e){if([32,37,38,39,40].indexOf(e.keyCode)>-1){e.preventDefault();}},false);</script>
 		
 	<meta charset="utf-8"> 
 	
