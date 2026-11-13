@@ -39,9 +39,13 @@
   function cardFromTitle(title) {
     var node = title;
     for (var i = 0; i < 12 && node; i++, node = node.parentElement) {
-      if (node.querySelector && node.querySelector('.aspect-video')) return node;
+      if (!node.querySelectorAll) continue;
+      var previews = node.querySelectorAll('.aspect-video');
+      // A card has one preview; a shared grid/list wrapper has several.
+      // Never bind a Suggestions click handler to a shared parent.
+      if (previews.length === 1) return node;
     }
-    return title.parentElement;
+    return title && title.parentElement ? title.parentElement : null;
   }
   function isLikelyExploreCard(card) {
     if (!card) return false;
@@ -142,17 +146,24 @@
     }
   }
 
+  function isTrackedGameTitle(title) {
+    return title === FIRST_TITLE || title === SECOND_TITLE || title === THIRD_TITLE ||
+      title === FOURTH_TITLE || title === 'Neo Game 004' || title === 'Neo Game 4' ||
+      title === 'Placeholder 1' || title === 'Placeholder 2' || title === 'Placeholder 3' ||
+      title === 'Placeholder 004' || title === FIFTH_TITLE || title === 'Placeholder 005' ||
+      title === SIXTH_TITLE || title === 'Placeholder 006';
+  }
+
   function findCards() {
     var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div'), cards = [];
     var suggestionsCard = findSuggestionsCard();
-    var suggestionsItem = suggestionsCard ? findGridCardItem(suggestionsCard) : null;
     for (var i = 0; i < nodes.length; i++) {
       var t = leaf(nodes[i]);
-      if (t !== FIRST_TITLE && t !== SECOND_TITLE && t !== THIRD_TITLE && t !== FOURTH_TITLE &&
-          t !== 'Neo Game 004' && t !== 'Neo Game 4' && t !== FIFTH_TITLE && t !== SIXTH_TITLE && !/^Placeholder \d+$/.test(t)) continue;
+      // Only recognize the six known game slots. Other Explore cards and
+      // generic numbered placeholders must not receive game handlers or styling.
+      if (!isTrackedGameTitle(t)) continue;
       var card = cardFromTitle(nodes[i]);
-      if (!card || !isLikelyExploreCard(card)) continue;
-      if (card === suggestionsCard || (suggestionsItem && findGridCardItem(card) === suggestionsItem)) continue;
+      if (!card || !isLikelyExploreCard(card) || card === suggestionsCard) continue;
       if (cards.indexOf(card) === -1) cards.push(card);
     }
     cards.sort(function (a, b) {
@@ -173,11 +184,10 @@
       if (index === 0 && (t === 'Placeholder 1' || t === FIRST_TITLE)) return nodes[i];
       if (index === 1 && (t === 'Placeholder 2' || t === SECOND_TITLE)) return nodes[i];
       if (index === 2 && (t === 'Placeholder 3' || t === THIRD_TITLE)) return nodes[i];
-      if (index === 3 && (t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4')) return nodes[i];
+      if (index === 3 && (t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4' || t === 'Placeholder 004')) return nodes[i];
       if (index === 4 && (t === 'Placeholder 005' || t === FIFTH_TITLE)) return nodes[i];
       if (index === 5 && (t === 'Placeholder 006' || t === SIXTH_TITLE)) return nodes[i];
       if (index === 6 && (t === 'Placeholder 007' || t === SEVENTH_TITLE)) return nodes[i];
-      if (index >= 2 && /^Placeholder \d+$/.test(t)) return nodes[i];
       if (wanted && t === wanted) return nodes[i];
     }
     return null;
