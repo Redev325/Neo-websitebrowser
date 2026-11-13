@@ -1,7 +1,7 @@
 (function () {
   'use strict';
-  if (window.__neoSimpleGameUIV13) return;
-  window.__neoSimpleGameUIV15 = true;
+  if (window.__neoSimpleGameUIV16) return;
+  window.__neoSimpleGameUIV16 = true;
 
   var FIRST_TITLE = 'VS IMPOSTOR: LEGACY';
   var SECOND_TITLE = 'Vs Sonic.exe(2.0-4.0)';
@@ -245,10 +245,6 @@
       image2.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;display:block;z-index:1;background:#000;image-rendering:auto;backface-visibility:hidden;transform:translateZ(0);';
       var svgs2 = preview.querySelectorAll('svg');
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
-    }
-    if (index === 6) {
-      // Card 007 is the suggestions entry; retain its existing thumbnail and card layout.
-      title.textContent = SEVENTH_TITLE;
     }
     if (index === 6) {
       // Suggestions uses the supplied repository artwork for its card thumbnail.
