@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<base href="https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/">
+	<base href="https://fastly.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/">
 <script>
 /* NEO_V4_OPTIONAL_FONT_LIST_FALLBACK:
    fonts-go-here.txt is a Lime placeholder list, not a font asset.
@@ -245,7 +245,13 @@
 /* VS Impostor V4 runtime fix: the Toogus background picker included an unhandled index 6. */
 (function () {
   "use strict";
-  var bundleUrl = "https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js";
+  var bundleUrl = "https://fastly.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js";
+  var bundleUrls = [
+    bundleUrl,
+    "https://gcore.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js",
+    "https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js",
+    "https://raw.githubusercontent.com/bubbls/fnf-mods/073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js"
+  ];
   var target = '"sussus toogus"==G.SONG.song.toLowerCase()&&(this.walker=new Ll(m.random.int(0,6),[-700,1850],70,.8),new Ll(m.random.int(0,6),[-700,1850],70,.8),new Ll(m.random.int(0,6),[-700,1850],70,.8))';
 
   function reportFatal(error) {
@@ -262,11 +268,63 @@
     } catch (_) {}
   }
 
-  window.__neoV4EngineReady = fetch(bundleUrl, { cache: "no-store" })
-    .then(function (response) {
-      if (!response.ok) throw new Error("Engine download failed (HTTP " + response.status + ").");
+  function fetchEngineBundle(index, failures) {
+    failures = failures || [];
+    if (index >= bundleUrls.length) {
+      return Promise.reject(new Error(
+        "VS Impostor V4 could not download its engine from any source. " + failures.join(" | ")
+      ));
+    }
+
+    var url = bundleUrls[index];
+    var controller = typeof AbortController === "function" ? new AbortController() : null;
+    var timeoutId = controller ? window.setTimeout(function () {
+      try { controller.abort(); } catch (_) {}
+    }, 25000) : null;
+
+    return fetch(url, {
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+      signal: controller ? controller.signal : undefined
+    }).then(function (response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
       return response.text();
-    })
+    }).then(function (source) {
+      // Do not accept an HTML error page or a different mod revision as JS.
+      var expectedBuildMatches = source.split(target).length - 1;
+      if (expectedBuildMatches !== 1) {
+        throw new Error("Downloaded content did not match the pinned V4 engine (expected one build marker, found " + expectedBuildMatches + ").");
+      }
+
+      window.__neoV4EngineSourceUrl = url;
+      // Use the same mirror for the relative chart, image, sound, and data files.
+      var base = document.querySelector("base");
+      if (base) base.href = url.slice(0, url.lastIndexOf("/") + 1);
+      console.info("NEO_V4_ENGINE_SOURCE: loaded pinned engine from " + url);
+      return source;
+    }).catch(function (error) {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      var reason = error && error.name === "AbortError"
+        ? "request timed out after 25 seconds"
+        : (error && error.message ? error.message : String(error));
+      failures.push(url + " => " + reason);
+      console.warn("NEO_V4_ENGINE_MIRROR_FAILED: " + failures[failures.length - 1]);
+
+      if (index + 1 >= bundleUrls.length) {
+        throw new Error("All VS Impostor V4 engine mirrors failed: " + failures.join(" | "));
+      }
+      return fetchEngineBundle(index + 1, failures);
+    }).then(function (source) {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      return source;
+    }, function (error) {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      throw error;
+    });
+  }
+
+  window.__neoV4EngineReady = fetchEngineBundle(0, [])
     .then(function (source) {
       var occurrences = source.split(target).length - 1;
       var invalidRanges = (source.match(/m\.random\.int\(0,6\)/g) || []).length;
