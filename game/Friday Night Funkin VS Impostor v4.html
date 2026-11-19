@@ -324,8 +324,11 @@
     });
   }
 
+  var neoV4UnpatchedEngineSource = null;
   window.__neoV4EngineReady = fetchEngineBundle(0, [])
     .then(function (source) {
+      // Preserve the pinned upstream bundle so a failed optional patch cannot leave the game black.
+      neoV4UnpatchedEngineSource = source;
       var occurrences = source.split(target).length - 1;
       var invalidRanges = (source.match(/m\.random\.int\(0,6\)/g) || []).length;
       if (occurrences !== 1 || invalidRanges !== 3) {
@@ -494,6 +497,28 @@
     })
     .catch(function (error) {
       reportFatal(error);
+      // A brittle compatibility patch must never prevent the base game from starting.
+      // If the pinned upstream bundle downloaded successfully, retry it unchanged.
+      if (typeof neoV4UnpatchedEngineSource === "string" && neoV4UnpatchedEngineSource.length > 100000) {
+        console.warn("NEO_V4_PATCH_FALLBACK: optional patch validation failed; starting the original pinned game bundle.", error);
+        return new Promise(function (resolve, reject) {
+          var fallbackUrl = URL.createObjectURL(new Blob([neoV4UnpatchedEngineSource], { type: "text/javascript" }));
+          var fallbackScript = document.createElement("script");
+          fallbackScript.type = "text/javascript";
+          fallbackScript.onload = function () {
+            URL.revokeObjectURL(fallbackUrl);
+            window.__neoV4UnpatchedFallbackLoaded = true;
+            console.info("NEO_V4_PATCH_FALLBACK: original VS Impostor V4 engine loaded.");
+            resolve();
+          };
+          fallbackScript.onerror = function () {
+            URL.revokeObjectURL(fallbackUrl);
+            reject(new Error("Both the patched and original VS Impostor V4 engine failed to execute."));
+          };
+          fallbackScript.src = fallbackUrl;
+          document.head.appendChild(fallbackScript);
+        });
+      }
       throw error;
     });
 })();
