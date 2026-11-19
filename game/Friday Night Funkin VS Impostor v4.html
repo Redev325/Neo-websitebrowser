@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<base href="https://fastly.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/">
+	<base href="https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/">
 <script>
 /* NEO_V4_OPTIONAL_FONT_LIST_FALLBACK:
    fonts-go-here.txt is a Lime placeholder list, not a font asset.
@@ -27,7 +27,7 @@
 </script><script>window.addEventListener("keydown",function(e){if([32,37,38,39,40].indexOf(e.keyCode)>-1){e.preventDefault();}},false);</script>
 		
 	<meta charset="utf-8">
-  <link rel="preconnect" href="https://fastly.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="dns-prefetch" href="//gcore.jsdelivr.net"> 
 	
 	<title>Game 22808</title>
@@ -247,11 +247,11 @@
 /* VS Impostor V4 runtime fix: the Toogus background picker included an unhandled index 6. */
 (function () {
   "use strict";
-  var bundleUrl = "https://fastly.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js";
+  var bundleUrl = "https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js";
   var bundleUrls = [
     bundleUrl,
+    "https://fastly.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js",
     "https://gcore.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js",
-    "https://cdn.jsdelivr.net/gh/bubbls/fnf-mods@073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js",
     "https://raw.githubusercontent.com/bubbls/fnf-mods/073b2f4f1e5bf5ad0b7ef794498f7fd025729694/imposter-v4%20copy/VSImpostor.js"
   ];
   var target = '"sussus toogus"==G.SONG.song.toLowerCase()&&(this.walker=new Ll(m.random.int(0,6),[-700,1850],70,.8),new Ll(m.random.int(0,6),[-700,1850],70,.8),new Ll(m.random.int(0,6),[-700,1850],70,.8))';
@@ -282,7 +282,7 @@
     var controller = typeof AbortController === "function" ? new AbortController() : null;
     var timeoutId = controller ? window.setTimeout(function () {
       try { controller.abort(); } catch (_) {}
-    }, 25000) : null;
+    }, 8000) : null;
 
     return fetch(url, {
       mode: "cors",
