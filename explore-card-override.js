@@ -57,14 +57,17 @@
     return true;
   }
   function findSuggestionsCard() {
-    var nodes = document.querySelectorAll('p,h1,h2,h3,h4,span,div');
-    for (var i = 0; i < nodes.length; i++) {
-      // Use normalized textContent, not leaf(): the card title may contain
-      // nested spans/icons and therefore not be a text-only leaf node.
-      var t = exactText(nodes[i]);
-      if (t !== SEVENTH_TITLE && t !== 'Placeholder 007') continue;
-      var card = cardFromTitle(nodes[i]);
-      if (card && isLikelyExploreCard(card)) return card;
+    // Resolve Suggestions from the real Explore card node rather than walking
+    // upward from a title and accidentally stopping at an incomplete wrapper.
+    var cards = document.querySelectorAll('.neo-explore-card');
+    for (var i = 0; i < cards.length; i++) {
+      var titleNodes = cards[i].querySelectorAll('p,h1,h2,h3,h4,span,div');
+      for (var j = 0; j < titleNodes.length; j++) {
+        var titleText = leaf(titleNodes[j]);
+        if (titleText === SEVENTH_TITLE || titleText === 'Placeholder 007') {
+          if (isLikelyExploreCard(cards[i])) return cards[i];
+        }
+      }
     }
     return null;
   }
@@ -355,7 +358,7 @@
       for (var bbt = 0; bbt < bloodbathTextNodes.length; bbt++) {
         var bloodbathText = exactText(bloodbathTextNodes[bbt]);
         if (/^Placeholder\s*008\s*[—–-]\s*featured\s+game$/i.test(bloodbathText)) {
-          bloodbathTextNodes[bbt].textContent = 'Placeholder 008 — coming soon';
+          bloodbathTextNodes[bbt].textContent = 'Fnf Bloodbath';
         }
       }
     }
