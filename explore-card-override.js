@@ -1234,7 +1234,7 @@
     var stageRect = stage.getBoundingClientRect();
     if (stageRect.width <= 0 || stageRect.height <= 0) return;
 
-    var sourceW = 1095, sourceH = 768;
+    var sourceW = 1095, sourceH = 647;
     // Match the PNG's contain behavior exactly, then crop each separate
     // button from the same source image.
     var scale = Math.min(stageRect.width / sourceW, stageRect.height / sourceH);
@@ -1624,7 +1624,7 @@
     var stageRect = stage.getBoundingClientRect();
     if (stageRect.width <= 0 || stageRect.height <= 0) return;
 
-    var sourceW = 1095, sourceH = 647;
+    var sourceW = 1095, sourceH = 768;
     var scale = Math.min(stageRect.width / sourceW, stageRect.height / sourceH);
     var displayedW = sourceW * scale;
     var displayedH = sourceH * scale;
