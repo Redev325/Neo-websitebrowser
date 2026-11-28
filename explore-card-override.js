@@ -549,6 +549,8 @@
     } catch (_) {}
     window.__neoSelectedGame = value || '';
     window.__neoSonicViewer = value === 'sonic';
+    if (value === 'bloodbath' && value !== previousValue) window.__neoBloodbathEngStarted = false;
+    if (!value) window.__neoBloodbathEngStarted = false;
 
     // The Vs Impostor selection screen is reset whenever a new viewer
     // session is opened. Clicking either selection button then dismisses
@@ -1472,6 +1474,187 @@
     }
   }
 
+  function embedBloodbathEnglish(stage) {
+    if (!stage || getSelectedGame() !== 'bloodbath') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+    stage.style.backgroundImage = 'none';
+    stage.style.backgroundColor = '#000';
+
+    var shell = stage.querySelector('#neo-bloodbath-selection-buttons');
+    if (shell) {
+      shell.style.display = 'none';
+      shell.style.visibility = 'hidden';
+      shell.style.pointerEvents = 'none';
+    }
+
+    var iframe = stage.querySelector('#neo-bloodbath-eng-game');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'neo-bloodbath-eng-game';
+      iframe.src = 'https://southparkbloodbath.runs-at.dev/';
+      iframe.title = 'FNF:BLOODBATH';
+      iframe.allow = 'autoplay; fullscreen; gamepad; keyboard-map; pointer-lock';
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('playsinline', '');
+      iframe.setAttribute('scrolling', 'no');
+      iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+      iframe.style.position = 'absolute';
+      iframe.style.inset = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      iframe.style.margin = '0';
+      iframe.style.padding = '0';
+      iframe.style.display = 'block';
+      iframe.style.background = '#000';
+      iframe.style.zIndex = '20';
+      stage.appendChild(iframe);
+    } else {
+      iframe.style.display = 'block';
+      iframe.style.visibility = 'visible';
+      iframe.style.pointerEvents = 'auto';
+    }
+  }
+
+  function setupBloodbathSelection(stage) {
+    if (!stage || getSelectedGame() !== 'bloodbath') return;
+    if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
+    stage.style.overflow = 'hidden';
+    stage.style.backgroundColor = '#000';
+    stage.style.backgroundImage = 'url("/bloodbathchoice.png?v=1")';
+    stage.style.backgroundRepeat = 'no-repeat';
+    stage.style.backgroundPosition = 'center center';
+    stage.style.backgroundSize = 'contain';
+
+    var shell = stage.querySelector('#neo-bloodbath-selection-buttons');
+    if (!shell) {
+      shell = document.createElement('div');
+      shell.id = 'neo-bloodbath-selection-buttons';
+      shell.style.position = 'absolute';
+      shell.style.inset = '0';
+      shell.style.pointerEvents = 'none';
+      shell.style.zIndex = '12';
+      shell.style.overflow = 'hidden';
+      stage.appendChild(shell);
+
+      function createBloodbathButton(id, label, box, launchesGame) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.id = id;
+        button.className = 'neo-bloodbath-choice-button';
+        button.setAttribute('aria-label', label);
+        button.title = label;
+        button.style.position = 'absolute';
+        button.style.boxSizing = 'border-box';
+        button.style.padding = '0';
+        button.style.margin = '0';
+        button.style.border = '0';
+        button.style.outline = '0';
+        button.style.background = 'transparent';
+        button.style.cursor = 'pointer';
+        button.style.pointerEvents = 'auto';
+        button.style.overflow = 'hidden';
+        button.style.borderRadius = '999px';
+        button.style.transformOrigin = 'center center';
+        button.style.transition = 'transform .14s ease, filter .14s ease';
+        button.dataset.srcX = String(box.x);
+        button.dataset.srcY = String(box.y);
+        button.dataset.srcW = String(box.w);
+        button.dataset.srcH = String(box.h);
+
+        var image = document.createElement('img');
+        image.src = '/bloodbathchoice.png?v=1';
+        image.alt = '';
+        image.draggable = false;
+        image.style.position = 'absolute';
+        image.style.maxWidth = 'none';
+        image.style.pointerEvents = 'none';
+        image.style.userSelect = 'none';
+        image.style.display = 'block';
+        button.appendChild(image);
+
+        button.addEventListener('mouseenter', function () {
+          this.style.transform = 'scale(1.018)';
+          image.style.filter = 'brightness(1.16) saturate(1.12) drop-shadow(0 0 12px rgba(255,35,35,.78))';
+        });
+        button.addEventListener('mouseleave', function () {
+          this.style.transform = 'scale(1)';
+          image.style.filter = 'none';
+        });
+        button.addEventListener('mousedown', function (event) {
+          if (event.button !== 0) return;
+          this.style.transform = 'scale(.985)';
+        });
+        button.addEventListener('mouseup', function () {
+          this.style.transform = 'scale(1.018)';
+        });
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          // Spanish and New Version remain visible, hoverable choices, but
+          // only the English build is connected to a playable game.
+          if (!launchesGame) return;
+          window.__neoBloodbathEngStarted = true;
+          embedBloodbathEnglish(stage);
+        });
+
+        shell.appendChild(button);
+      }
+
+      // Button hit areas match the three pill-shaped choices in bloodbathchoice.png
+      // (source image: 1095 x 647). All three animate on hover; only ENG launches.
+      createBloodbathButton('neo-bloodbath-choice-eng', 'BLOODBATH ENG', {
+        x: 72, y: 316, w: 460, h: 141
+      }, true);
+      createBloodbathButton('neo-bloodbath-choice-span', 'BLOODBATH SPAN', {
+        x: 554, y: 316, w: 470, h: 142
+      }, false);
+      createBloodbathButton('neo-bloodbath-choice-new', 'NEW VERSION', {
+        x: 325, y: 461, w: 475, h: 143
+      }, false);
+    }
+
+    if (window.__neoBloodbathEngStarted || stage.querySelector('#neo-bloodbath-eng-game')) {
+      window.__neoBloodbathEngStarted = true;
+      embedBloodbathEnglish(stage);
+      return;
+    }
+
+    var stageRect = stage.getBoundingClientRect();
+    if (stageRect.width <= 0 || stageRect.height <= 0) return;
+
+    var sourceW = 1095, sourceH = 647;
+    var scale = Math.min(stageRect.width / sourceW, stageRect.height / sourceH);
+    var displayedW = sourceW * scale;
+    var displayedH = sourceH * scale;
+    var offsetX = (stageRect.width - displayedW) / 2;
+    var offsetY = (stageRect.height - displayedH) / 2;
+
+    var buttons = shell.querySelectorAll('.neo-bloodbath-choice-button');
+    for (var i = 0; i < buttons.length; i++) {
+      var button = buttons[i];
+      var x = Number(button.dataset.srcX);
+      var y = Number(button.dataset.srcY);
+      var w = Number(button.dataset.srcW);
+      var h = Number(button.dataset.srcH);
+      button.style.left = (offsetX + x * scale) + 'px';
+      button.style.top = (offsetY + y * scale) + 'px';
+      button.style.width = (w * scale) + 'px';
+      button.style.height = (h * scale) + 'px';
+
+      var image = button.querySelector('img');
+      image.style.width = displayedW + 'px';
+      image.style.height = displayedH + 'px';
+      image.style.left = (-x * scale) + 'px';
+      image.style.top = (-y * scale) + 'px';
+    }
+
+    shell.style.display = 'block';
+    shell.style.visibility = 'visible';
+    shell.style.pointerEvents = 'none';
+  }
+
   function embedImpostor(root, stage) {
     if (!root || !stage || getSelectedGame() !== 'impostor') return;
     if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
@@ -1592,7 +1775,7 @@
 
   function removeStrayGameIframe() {
     if (!isExplorePage() || getSelectedGame()) return;
-    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build, #neo-sonic-restored-build, #neo-accelerant-hank-game, #neo-tricky-game, #neo-suggestions-form');
+    var frames = document.querySelectorAll('#neo-impostor-legacy-game, #neo-sonic-old-build, #neo-sonic-restored-build, #neo-accelerant-hank-game, #neo-tricky-game, #neo-suggestions-form, #neo-bloodbath-eng-game');
     for (var i = 0; i < frames.length; i++) frames[i].remove();
   }
 
@@ -1728,6 +1911,7 @@
     if (selectedGame === 'hank') embedHank(root, parts.stage);
     if (selectedGame === 'tricky') embedTricky(root, parts.stage);
     if (selectedGame === 'suggestions') embedSuggestionsForm(root, parts.stage);
+    if (selectedGame === 'bloodbath') setupBloodbathSelection(parts.stage);
   }
 
   function scheduleViewerActivation() {
