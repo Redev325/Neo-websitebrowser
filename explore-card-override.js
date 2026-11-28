@@ -1234,7 +1234,7 @@
     var stageRect = stage.getBoundingClientRect();
     if (stageRect.width <= 0 || stageRect.height <= 0) return;
 
-    var sourceW = 1095, sourceH = 647;
+    var sourceW = 1095, sourceH = 768;
     // Match the PNG's contain behavior exactly, then crop each separate
     // button from the same source image.
     var scale = Math.min(stageRect.width / sourceW, stageRect.height / sourceH);
@@ -1603,7 +1603,7 @@
       }
 
       // Button hit areas match the three pill-shaped choices in bloodbathchoice.png
-      // (source image: 1095 x 647). All three animate on hover; only ENG launches.
+      // (source image: 1095 x 768). All three animate on hover; only ENG launches.
       createBloodbathButton('neo-bloodbath-choice-eng', 'BLOODBATH ENG', {
         x: 72, y: 316, w: 460, h: 141
       }, true);
