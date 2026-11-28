@@ -320,7 +320,7 @@
       var svgs2 = preview.querySelectorAll('svg');
       for (var s2 = 0; s2 < svgs2.length; s2++) svgs2[s2].style.display = 'none';
     }
-    if (index === 6) {
+    if (index === 6 && card !== findSuggestionsCard()) {
       // Convert the repository's existing Placeholder 008 card in place.
       title.textContent = 'Fnf Bloodbath';
       preview.style.background = '#000';
@@ -354,7 +354,7 @@
       var bloodbathTextNodes = card.querySelectorAll('p,h1,h2,h3,h4,span,div');
       for (var bbt = 0; bbt < bloodbathTextNodes.length; bbt++) {
         var bloodbathText = exactText(bloodbathTextNodes[bbt]);
-        if (/^Placeholder\\s*008\\s*[—–-]\\s*featured\\s+game$/i.test(bloodbathText)) {
+        if (/^Placeholder\s*008\s*[—–-]\s*featured\s+game$/i.test(bloodbathText)) {
           bloodbathTextNodes[bbt].textContent = 'Placeholder 008 — coming soon';
         }
       }
