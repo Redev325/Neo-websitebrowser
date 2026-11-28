@@ -1519,6 +1519,11 @@
 
   function setupBloodbathSelection(stage) {
     if (!stage || getSelectedGame() !== 'bloodbath') return;
+    if (window.__neoBloodbathEngStarted || stage.querySelector('#neo-bloodbath-eng-game')) {
+      window.__neoBloodbathEngStarted = true;
+      embedBloodbathEnglish(stage);
+      return;
+    }
     if (getComputedStyle(stage).position === 'static') stage.style.position = 'relative';
     stage.style.overflow = 'hidden';
     stage.style.backgroundColor = '#000';
@@ -1613,12 +1618,6 @@
       createBloodbathButton('neo-bloodbath-choice-new', 'NEW VERSION', {
         x: 325, y: 461, w: 475, h: 143
       }, false);
-    }
-
-    if (window.__neoBloodbathEngStarted || stage.querySelector('#neo-bloodbath-eng-game')) {
-      window.__neoBloodbathEngStarted = true;
-      embedBloodbathEnglish(stage);
-      return;
     }
 
     var stageRect = stage.getBoundingClientRect();
