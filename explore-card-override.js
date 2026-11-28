@@ -1652,7 +1652,7 @@
 
     shell.style.display = 'block';
     shell.style.visibility = 'visible';
-    shell.style.pointerEvents = 'none';
+    shell.style.pointerEvents = 'auto';
   }
 
   function embedImpostor(root, stage) {
