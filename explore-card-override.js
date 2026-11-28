@@ -188,7 +188,7 @@
       if (index === 3 && (t === FOURTH_TITLE || t === 'Neo Game 004' || t === 'Neo Game 4' || t === 'Placeholder 004')) return nodes[i];
       if (index === 4 && (t === 'Placeholder 005' || t === FIFTH_TITLE)) return nodes[i];
       if (index === 5 && (t === 'Placeholder 006' || t === SIXTH_TITLE)) return nodes[i];
-      if (index === 6 && t === 'Placeholder 008') return nodes[i];
+      if (index === 6 && (t === 'Placeholder 008' || t === SEVENTH_TITLE || t === 'Placeholder 007')) return nodes[i];
       if (wanted && t === wanted) return nodes[i];
     }
     return null;
