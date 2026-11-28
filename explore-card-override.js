@@ -177,6 +177,64 @@
     }
     return cards;
   }
+  function ensureBloodbathPlaceholder(cards) {
+    // Add slot 008 only after all six existing game slots have rendered.
+    // Suggestions remains its separate special card and keeps its first-place pin.
+    if (!cards || cards.length < 6) return;
+    if (document.querySelector('[data-neo-bloodbath-placeholder="true"]')) return;
+
+    var lastCard = cards[5];
+    var lastItem = findGridCardItem(lastCard);
+    if (!lastCard || !lastItem || !lastItem.parentElement) return;
+
+    // Reuse the final card's outer layout classes so the new slot follows the
+    // existing responsive grid exactly, while creating fresh inner markup.
+    var bloodbathCard = lastCard.cloneNode(false);
+    bloodbathCard.removeAttribute('id');
+    bloodbathCard.removeAttribute('data-neo-explore-card');
+    bloodbathCard.removeAttribute('data-neo-card-template');
+    bloodbathCard.setAttribute('data-neo-bloodbath-placeholder', 'true');
+    bloodbathCard.setAttribute('data-neo-card-type', 'placeholder');
+    bloodbathCard.innerHTML = '';
+
+    var preview = document.createElement('div');
+    preview.className = 'aspect-video';
+    preview.style.cssText = 'position:relative;width:100%;aspect-ratio:16/9;min-height:0;overflow:hidden;background:#000;';
+    
+    var thumbnail = document.createElement('img');
+    thumbnail.src = '/assets/bloodbathbanner.png?v=1';
+    thumbnail.alt = 'Fnf Bloodbath';
+    thumbnail.loading = 'lazy';
+    thumbnail.decoding = 'async';
+    thumbnail.draggable = false;
+    thumbnail.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;display:block;z-index:1;background:#000;';
+    preview.appendChild(thumbnail);
+
+    var content = document.createElement('div');
+    content.className = 'neo-explore-card-content';
+    var title = document.createElement('p');
+    title.className = 'neo-explore-card-title';
+    title.textContent = 'Fnf Bloodbath';
+    var description = document.createElement('p');
+    description.className = 'neo-explore-card-description';
+    description.textContent = 'Placeholder 008 — coming soon';
+    content.appendChild(title);
+    content.appendChild(description);
+    bloodbathCard.appendChild(preview);
+    bloodbathCard.appendChild(content);
+
+    // If the original card sits inside a grid item wrapper, clone that
+    // wrapper shell as well. Otherwise insert the card as a direct grid child.
+    var newItem = bloodbathCard;
+    if (lastItem !== lastCard) {
+      newItem = lastItem.cloneNode(false);
+      newItem.removeAttribute('id');
+      newItem.appendChild(bloodbathCard);
+    }
+    lastItem.parentElement.insertBefore(newItem, lastItem.nextSibling);
+    applyNewExploreCardTemplate(bloodbathCard);
+  }
+
   function getCardTitle(card, index) {
     var wanted = index === 0 ? FIRST_TITLE : index === 1 ? SECOND_TITLE : null;
     var nodes = card.querySelectorAll('p,h1,h2,h3,h4,span,div');
@@ -557,6 +615,7 @@
     }
 
     var cards = findCards();
+    ensureBloodbathPlaceholder(cards);
     var suggestionsCard = findSuggestionsCard();
     if (suggestionsCard) {
       simplifyCard(suggestionsCard, 6);
