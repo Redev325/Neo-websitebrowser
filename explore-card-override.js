@@ -566,10 +566,10 @@
     }
   }
   function getSelectedGame() {
-    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank' || window.__neoSelectedGame === 'vs-impostor' || window.__neoSelectedGame === 'tricky' || window.__neoSelectedGame === 'tricky-clowned-out' || window.__neoSelectedGame === 'suggestions') return window.__neoSelectedGame;
+    if (window.__neoSelectedGame === 'sonic' || window.__neoSelectedGame === 'impostor' || window.__neoSelectedGame === 'hank' || window.__neoSelectedGame === 'vs-impostor' || window.__neoSelectedGame === 'tricky' || window.__neoSelectedGame === 'tricky-clowned-out' || window.__neoSelectedGame === 'suggestions' || window.__neoSelectedGame === 'bloodbath') return window.__neoSelectedGame;
     try {
       var value = sessionStorage.getItem(SELECTED_GAME_KEY);
-      if (value === 'sonic' || value === 'impostor' || value === 'hank' || value === 'vs-impostor' || value === 'tricky' || value === 'tricky-clowned-out' || value === 'suggestions') {
+      if (value === 'sonic' || value === 'impostor' || value === 'hank' || value === 'vs-impostor' || value === 'tricky' || value === 'tricky-clowned-out' || value === 'suggestions' || value === 'bloodbath') {
         window.__neoSelectedGame = value;
         window.__neoSonicViewer = value === 'sonic';
         return value;
@@ -662,6 +662,14 @@
           scheduleViewerActivation();
         }, true);
       }
+      if (i === 6 && !cards[i].__neoBloodbathClickBound) {
+        cards[i].__neoBloodbathClickBound = true;
+        cards[i].addEventListener('click', function (event) {
+          if (event.target && event.target.closest && event.target.closest('button[aria-label*="favorite" i]')) return;
+          setSelectedGame('bloodbath');
+          scheduleViewerActivation();
+        }, true);
+      }
     }
   }
   function findViewerRoot() {
@@ -718,6 +726,7 @@
       selectedGame === 'vs-impostor' ? IMPOSTOR_ICON_URL :
       selectedGame === 'tricky' ? TRICKY_ICON_URL :
       selectedGame === 'tricky-clowned-out' ? '/assets/TrickyCOLogo.webp?v=1' :
+      selectedGame === 'bloodbath' ? '/assets/bloodbathlogofnf.png' :
       selectedGame === 'suggestions' ? SUGGESTIONS_IMAGE :
       '';
 
@@ -785,6 +794,7 @@
       selectedGame === 'vs-impostor' ? FOURTH_TITLE :
       selectedGame === 'tricky' ? FIFTH_TITLE :
       selectedGame === 'tricky-clowned-out' ? SIXTH_TITLE :
+      selectedGame === 'bloodbath' ? 'FNF:BLOODBATH' :
       selectedGame === 'suggestions' ? SUGGESTIONS_TITLE :
       parts.title.textContent;
 
@@ -1660,7 +1670,7 @@
 
     if (parts.title) {
       parts.title.setAttribute('data-neo-game-viewer-title', selectedGame || 'generic');
-      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor' || selectedGame === 'vs-impostor' || selectedGame === 'tricky' || selectedGame === 'tricky-clowned-out' || selectedGame === 'suggestions') {
+      if (selectedGame === 'sonic' || selectedGame === 'hank' || selectedGame === 'impostor' || selectedGame === 'vs-impostor' || selectedGame === 'tricky' || selectedGame === 'tricky-clowned-out' || selectedGame === 'suggestions' || selectedGame === 'bloodbath') {
         parts.title.textContent =
           selectedGame === 'sonic' ? SONIC_VIEWER_TITLE :
           selectedGame === 'hank' ? THIRD_TITLE :
@@ -1668,6 +1678,7 @@
           selectedGame === 'vs-impostor' ? FOURTH_TITLE :
           selectedGame === 'tricky' ? FIFTH_TITLE :
           selectedGame === 'tricky-clowned-out' ? SIXTH_TITLE :
+          selectedGame === 'bloodbath' ? 'FNF:BLOODBATH' :
           selectedGame === 'suggestions' ? SUGGESTIONS_TITLE :
           parts.title.textContent;
         root.setAttribute('data-neo-game-viewer', selectedGame);
